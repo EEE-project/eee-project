@@ -1,0 +1,11 @@
+CLAUDE.md
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+dist/
+.venv/
+*.egg-info/
+.coverage
+htmlcov/
+**/__marimo__/
