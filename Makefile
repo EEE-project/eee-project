@@ -1,4 +1,4 @@
-.PHONY: help test test-v test-integration example-el example-grc notebook-el notebook-grc
+.PHONY: help test test-v test-integration example-el example-grc notebook-el notebook-grc notebook
 
 help:
 	@echo "make test              run all tests (quiet)"
@@ -6,6 +6,7 @@ help:
 	@echo "make test-integration  run integration tests only"
 	@echo "make example-el        run examples/modern_greek.py"
 	@echo "make example-grc       run examples/ancient_greek.py"
+	@echo "make notebook          open combined el/grc Marimo notebook"
 	@echo "make notebook-el       open Modern Greek Marimo notebook"
 	@echo "make notebook-grc      open Ancient Greek Marimo notebook"
 
@@ -29,3 +30,6 @@ notebook-el:
 
 notebook-grc:
 	uv run marimo run examples/ancient_greek_notebook.py
+
+notebook:
+	uv run marimo run examples/greek_notebook.py

@@ -13,6 +13,7 @@ make example-el     # run examples/modern_greek.py
 make example-grc    # run examples/ancient_greek.py
 make notebook-el    # open Modern Greek Marimo notebook
 make notebook-grc   # open Ancient Greek Marimo notebook
+make notebook       # open combined el/grc Marimo notebook
 ```
 
 ## Installation
@@ -51,12 +52,14 @@ Runnable example scripts are in `examples/`:
 | `examples/modern_greek_notebook.py` | `el` | Interactive Marimo paradigm viewer |
 | `examples/ancient_greek.py` | `grc` | Verbs, nouns, adjectives — full paradigms |
 | `examples/ancient_greek_notebook.py` | `grc` | Interactive Marimo paradigm viewer |
+| `examples/greek_notebook.py` | `el` / `grc` | Combined interactive notebook — full inflection paradigms for both languages |
 
 ```bash
 uv run python examples/modern_greek.py
 uv run python examples/ancient_greek.py
 uv run marimo run examples/modern_greek_notebook.py
 uv run marimo run examples/ancient_greek_notebook.py
+uv run marimo run examples/greek_notebook.py
 ```
 
 ## API
@@ -120,4 +123,4 @@ grc = "my_grc_eee.backend:AncientGreekBackend"
 
 ## Status
 
-v0.2.0
+v0.3.0
