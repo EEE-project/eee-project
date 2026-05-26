@@ -1,7 +1,6 @@
 from eee._exceptions import (
     UnsupportedLanguageError,
     BackendLoadError,
-    AnalysisNotSupportedError,
     AmbiguousPOSError,
 )
 
@@ -30,12 +29,6 @@ def test_backend_load_error_has_language_code():
     exc = BackendLoadError("la", cause)
     assert "la" in str(exc)
     assert exc.language_code == "la"
-
-
-def test_analysis_not_supported_error_has_backend_name():
-    exc = AnalysisNotSupportedError("ModernGreekBackend")
-    assert "ModernGreekBackend" in str(exc)
-    assert exc.backend_name == "ModernGreekBackend"
 
 
 def test_ambiguous_pos_error_has_lemma():

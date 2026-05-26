@@ -2,8 +2,8 @@
 Protocol compliance tests for MorphologyBackend.
 
 NOTE: @runtime_checkable Protocol checks method *existence* only, not return
-types. A class with `inflect` and `analyze` returning arbitrary types will
-satisfy isinstance() regardless.
+types. A class with `inflect` returning arbitrary types will satisfy
+isinstance() regardless.
 
 As of Python 3.12, MagicMock() without spec does NOT satisfy the Protocol
 (the runtime check no longer goes through __getattr__). MagicMock(spec=...)
@@ -21,19 +21,7 @@ class _ValidFakeBackend:
 
     language: str = "xx"
 
-    def inflect(self, lemma, features, pos):
-        return set()
-
-    def analyze(self, form, pos=None):
-        return []
-
-
-class _MissingAnalyze:
-    """Missing analyze — should NOT satisfy Protocol."""
-
-    language: str = "xx"
-
-    def inflect(self, lemma, features, pos):
+    def inflect(self, lemma, features, pos, **_kw):
         return set()
 
 
@@ -42,18 +30,12 @@ class _MissingInflect:
 
     language: str = "xx"
 
-    def analyze(self, form, pos=None):
-        return []
-
 
 class _MissingLanguage:
     """Missing language attribute — should NOT satisfy Protocol."""
 
-    def inflect(self, lemma, features, pos):
+    def inflect(self, lemma, features, pos, **_kw):
         return set()
-
-    def analyze(self, form, pos=None):
-        return []
 
 
 class _ExtraMethodsFakeBackend:
@@ -61,11 +43,8 @@ class _ExtraMethodsFakeBackend:
 
     language: str = "xx"
 
-    def inflect(self, lemma, features, pos):
+    def inflect(self, lemma, features, pos, **_kw):
         return set()
-
-    def analyze(self, form, pos=None):
-        return []
 
     def paradigm(self, lemma, pos):
         return {}
@@ -77,19 +56,12 @@ class _InstanceLevelLanguage:
     def __init__(self):
         self.language = "xx"
 
-    def inflect(self, lemma, features, pos):
+    def inflect(self, lemma, features, pos, **_kw):
         return set()
-
-    def analyze(self, form, pos=None):
-        return []
 
 
 def test_valid_fake_backend_satisfies_protocol():
     assert isinstance(_ValidFakeBackend(), MorphologyBackend)
-
-
-def test_missing_analyze_does_not_satisfy_protocol():
-    assert not isinstance(_MissingAnalyze(), MorphologyBackend)
 
 
 def test_missing_inflect_does_not_satisfy_protocol():

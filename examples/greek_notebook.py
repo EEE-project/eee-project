@@ -2,12 +2,12 @@
 # requires-python = ">=3.12"
 # dependencies = [
 #     "marimo>=0.19.4",
-#     "eee @ git+https://codeberg.org/EEE-project/eee.git",
+#     "eee @ git+https://codeberg.org/EEE-project/eee.git@unimorph-backend",
 #     "ancient-greek-morphology-eee @ git+https://codeberg.org/EEE-project/ancient-greek-morphology-eee.git",
 # ]
 #
 # [tool.uv.sources]
-# eee = { git = "https://codeberg.org/EEE-project/eee.git" }
+# eee = { git = "https://codeberg.org/EEE-project/eee.git", branch = "unimorph-backend" }
 # ancient-greek-morphology-eee = { git = "https://codeberg.org/EEE-project/ancient-greek-morphology-eee.git" }
 # ///
 """Greek morphology demo (Modern and Ancient) using the eee package.
@@ -21,7 +21,7 @@ Run from within the repo (uses local packages):
 
 import marimo
 
-__generated_with = "0.23.6"
+__generated_with = "0.23.8"
 app = marimo.App(width="medium")
 
 
@@ -36,8 +36,8 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Greek Morphology — Modern Greek (el) / Ancient Greek (grc)
-    **[eee](https://codeberg.org/EEE-project/eee)** — language-agnostic morphology for the EEE project.
+    # Greek Morphology — Modern / Ancient Greek
+    **[eee](https://codeberg.org/EEE-project/eee)** — language-agnostic morphology engine for the EEE project.
 
     Select a language, enter a lemma and part of speech to see the full inflection paradigm.
     Feature keys follow [Universal Dependencies FEATS](https://universaldependencies.org/u/feat/index.html).
@@ -53,20 +53,29 @@ def _(mo):
         label="Language",
     )
     pos_selector = mo.ui.dropdown(
-        options={"Verb": "verb", "Noun": "noun", "Adjective": "adjective"},
-        value="Verb",
+        options={"Noun": "noun", "Verb": "verb", "Adjective": "adjective"},
+        value="Noun",
         label="Part of speech",
     )
     return language_selector, pos_selector
 
 
 @app.cell(hide_code=True)
-def _(mo, pos_selector):
-    _is_noun = pos_selector.value == "noun"
+def _(language_selector, mo):
+    _default = "ancient-greek" if language_selector.value == "grc" else "modern-greek"
+    backend_selector = mo.ui.dropdown(
+        options={_default: None, "unimorph": "unimorph"},
+        value=_default,
+        label="Backend",
+    )
+    return (backend_selector,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
     gender_selector = mo.ui.dropdown(
-        options={"Masc": "Masc", "Fem": "Fem", "Neut": "Neut"} if _is_noun
-            else {"— (all)": None, "Masc": "Masc", "Fem": "Fem", "Neut": "Neut"},
-        value="Masc" if _is_noun else "— (all)",
+        options={"— (all)": None, "Masc": "Masc", "Fem": "Fem", "Neut": "Neut"},
+        value="— (all)",
         label="Gender",
     )
     return (gender_selector,)
@@ -81,14 +90,13 @@ def _(language_selector, mo, pos_selector):
             "Present": "pres",
             "Imperfect": "impf",
             "Aorist": "aor",
-            "Dependent": "dep",
-            "Future": "fut",
-            "Subjunctive": "subj",
-            "Conditional": "cond",
+            "Future/Subj (θα/να)": "fut",
+            "Conditional (θα)": "cond",
             "Imperative": "imp",
-            "Participle": "part",
+            "Perfect": "perf",
+            "Pluperfect": "pqp",
         }
-        _voice_opts = {"— (all)": None, "Active": "act", "Passive": "pass"}
+        _voice_opts = {}
     elif _is_verb:  # grc
         _tense_opts = {
             "— (all)": None,
@@ -105,31 +113,21 @@ def _(language_selector, mo, pos_selector):
     else:
         _tense_opts = _voice_opts = {"— (all)": None}
     tense_selector = mo.ui.dropdown(options=_tense_opts, value="— (all)", label="Tense")
-    voice_selector = mo.ui.dropdown(options=_voice_opts, value="— (all)", label="Voice")
+    voice_selector = mo.ui.dropdown(options=_voice_opts, value="— (all)", label="Voice") if _voice_opts else None
     return tense_selector, voice_selector
 
 
 @app.cell(hide_code=True)
-def _(gender_selector, language_selector, mo, pos_selector):
+def _(language_selector, mo, pos_selector):
     _LEMMA_DEFAULTS = {
-        ("verb",      "el",  None):   ("γράφω",    "e.g. γράφω, μιλάω"),
-        ("verb",      "grc", None):   ("λύω",      "e.g. λύω, βάλλω"),
-        ("noun",      "el",  None):   ("πόλη",     "e.g. πόλη, σπίτι"),
-        ("noun",      "el",  "Masc"): ("δάσκαλος", "e.g. δάσκαλος, πατέρας"),
-        ("noun",      "el",  "Fem"):  ("πόλη",     "e.g. πόλη, γυναίκα"),
-        ("noun",      "el",  "Neut"): ("σπίτι",    "e.g. σπίτι, παιδί"),
-        ("noun",      "grc", None):   ("θεός",     "e.g. θεός, σοφία, δεῖπνον"),
-        ("noun",      "grc", "Masc"): ("θεός",     "e.g. θεός, ἀνήρ, βασιλεύς"),
-        ("noun",      "grc", "Fem"):  ("σοφία",    "e.g. σοφία, πόλις, νύξ"),
-        ("noun",      "grc", "Neut"): ("δεῖπνον",  "e.g. δεῖπνον, ἔτος, ὕδωρ"),
-        ("adjective", "el",  None):   ("καλός",    "e.g. καλός, μεγάλος"),
-        ("adjective", "grc", None):   ("ἀγαθός",   "e.g. ἀγαθός, ταχύς"),
+        ("verb",      "el"):  ("γράφω",    "e.g. γράφω, μιλάω"),
+        ("verb",      "grc"): ("λύω",      "e.g. λύω, βάλλω"),
+        ("noun",      "el"):  ("πόλη",     "e.g. πόλη, σπίτι"),
+        ("noun",      "grc"): ("θεός",     "e.g. θεός, σοφία, δεῖπνον"),
+        ("adjective", "el"):  ("καλός",    "e.g. καλός, μεγάλος"),
+        ("adjective", "grc"): ("ἀγαθός",   "e.g. ἀγαθός, ταχύς"),
     }
-    _gender = gender_selector.value
-    _key = (pos_selector.value, language_selector.value, _gender)
-    _default_val, _placeholder = _LEMMA_DEFAULTS.get(
-        _key, _LEMMA_DEFAULTS.get((pos_selector.value, language_selector.value, None), ("", ""))
-    )
+    _default_val, _placeholder = _LEMMA_DEFAULTS.get((pos_selector.value, language_selector.value), ("", ""))
     lemma_input = mo.ui.text(
         value=_default_val,
         placeholder=_placeholder,
@@ -139,28 +137,63 @@ def _(gender_selector, language_selector, mo, pos_selector):
 
 
 @app.cell(hide_code=True)
+def _(backend_selector, eee, language_selector, lemma_input, mo, pos_selector):
+    _unimorph_verb = backend_selector.value == "unimorph" and language_selector.value == "grc" and pos_selector.value == "verb"
+    if _unimorph_verb:
+        corpus_table = None
+        _display = mo.callout(
+            mo.md("UniMorph has no Ancient Greek verb data — use **ancient-greek** backend"),
+            kind="warn",
+        )
+    else:
+        try:
+            _available = eee.list_lemmas(pos_selector.value, language=language_selector.value, backend=backend_selector.value)
+        except Exception:
+            _available = []
+        if _available:
+            _rows = (
+                [{"Word": w, "Type": "deponent/pass" if w.endswith("μαι") else "active"} for w in _available]
+                if language_selector.value == "el" and pos_selector.value == "verb" and backend_selector.value != "unimorph"
+                else [{"Word": w} for w in _available]
+            )
+            corpus_table = mo.ui.table(
+                _rows,
+                selection="single",
+                label=f"Corpus words — {pos_selector.value} ({len(_available)})",
+            )
+            _display = corpus_table
+        else:
+            corpus_table = None
+            _display = lemma_input
+    _display
+    return (corpus_table,)
+
+
+@app.cell(hide_code=True)
 def _(
+    backend_selector,
     gender_selector,
     language_selector,
-    lemma_input,
     mo,
     pos_selector,
     tense_selector,
     voice_selector,
 ):
-    _gender_widget = gender_selector if pos_selector.value != "verb" else mo.md("")
-    _main_row = mo.hstack([language_selector, lemma_input, pos_selector, _gender_widget], gap="1rem", justify="end")
+    _controls = [backend_selector, language_selector, pos_selector]
+    if pos_selector.value == "adjective":
+        _controls.append(gender_selector)
     if pos_selector.value == "verb":
-        _verb_row = mo.hstack([tense_selector, voice_selector], gap="1rem", justify="end")
-        _output = mo.vstack([_main_row, _verb_row])
-    else:
-        _output = _main_row
-    _output
+        _controls.append(tense_selector)
+        if voice_selector is not None:
+            _controls.append(voice_selector)
+    mo.hstack(_controls, gap="1rem", justify="start")
     return
 
 
 @app.cell(hide_code=True)
 def _(
+    backend_selector,
+    corpus_table,
     eee,
     gender_selector,
     language_selector,
@@ -170,11 +203,17 @@ def _(
     voice_selector,
 ):
     _lang = language_selector.value
-    _lemma = lemma_input.value.strip()
     _pos = pos_selector.value
+    if corpus_table is not None:
+        _lemma = corpus_table.value[0]["Word"] if corpus_table.value else ""
+    elif backend_selector.value == "unimorph" and _lang == "grc" and _pos == "verb":
+        _lemma = ""
+    else:
+        _lemma = lemma_input.value.strip()
     _gender = gender_selector.value
     _tense_filter = tense_selector.value
-    _voice_filter = voice_selector.value
+    _voice_filter = voice_selector.value if voice_selector is not None else None
+    _backend = backend_selector.value
 
     # ── Article tables (nouns / adjectives) ──────────────────────────────────────
     _EL_DEF = {
@@ -210,15 +249,6 @@ def _(
         ("Neut","Plur","Nom"): "τά",   ("Neut","Plur","Gen"): "τῶν",
         ("Neut","Plur","Dat"): "τοῖς", ("Neut","Plur","Acc"): "τά",   ("Neut","Plur","Voc"): "",
     }
-    _EL_PRONOUNS = {
-        ("pri","sg"): "εγώ",   ("sec","sg"): "εσύ",   ("ter","sg"): "αυτός/αυτή/αυτό",
-        ("pri","pl"): "εμείς", ("sec","pl"): "εσείς", ("ter","pl"): "αυτοί/αυτές/αυτά",
-    }
-    _GRC_PRONOUNS = {
-        ("1","Sing"): "ἐγώ",   ("2","Sing"): "σύ",     ("3","Sing"): "αὐτός/αὐτή/αὐτό",
-        ("1","Plur"): "ἡμεῖς", ("2","Plur"): "ὑμεῖς", ("3","Plur"): "αὐτοί/αὐταί/αὐτά",
-    }
-
     def _def_str(result, lang, gender, number, case):
         if not result or gender is None:
             return ", ".join(sorted(result)) if result else "—"
@@ -233,82 +263,38 @@ def _(
             return "—"
         return ", ".join(f"{art} {f}".strip() for f in sorted(result))
 
-    # ── el verb paradigm walker ───────────────────────────────────────────────────
-    def _el_verb_rows(paradigm, tense_f, voice_f):
-        rows = []
+    _EL_VERB_FORMS = []
+    for _per, _num in [("1","Sing"),("2","Sing"),("3","Sing"),("1","Plur"),("2","Plur"),("3","Plur")]:
+        _ns = "sg" if _num == "Sing" else "pl"
+        _EL_VERB_FORMS += [
+            (f"Pres {_per}{_ns}",       {"Tense":"Pres","Person":_per,"Number":_num},                None),
+            (f"Impf {_per}{_ns}",       {"Tense":"Past","Aspect":"Imp","Person":_per,"Number":_num}, None),
+            (f"Aor {_per}{_ns}",        {"Tense":"Past","Aspect":"Perf","Person":_per,"Number":_num},None),
+            (f"Fut/Subj Ipfv {_per}{_ns}", {"Tense":"Fut","Aspect":"Imp","Person":_per,"Number":_num},  "θα/να"),
+            (f"Fut/Subj Pfv {_per}{_ns}",  {"Tense":"Fut","Aspect":"Perf","Person":_per,"Number":_num}, "θα/να"),
+            (f"Cond {_per}{_ns}",       {"Tense":"Past","Aspect":"Imp","Person":_per,"Number":_num}, "θα"),
+            (f"Perf {_per}{_ns}",       {"Tense":"Perf","Person":_per,"Number":_num},                None),
+            (f"Pqp {_per}{_ns}",        {"Tense":"Pqp","Person":_per,"Number":_num},                 None),
+        ]
+    for _num in ("Sing","Plur"):
+        _ns = "sg" if _num == "Sing" else "pl"
+        _EL_VERB_FORMS += [
+            (f"Imp Cont 2{_ns}", {"Tense":"Pres","Mood":"Imp","Person":"2","Number":_num},  None),
+            (f"Imp Aor 2{_ns}",  {"Mood":"Imp","Aspect":"Perf","Person":"2","Number":_num}, None),
+        ]
 
-        def _w(tense, voice, mood):
-            return paradigm.get(tense, {}).get(voice, {}).get(mood, {})
+    _EL_TENSE_FILTER = {
+        "pres": lambda f, p: f.get("Tense") == "Pres" and "Mood" not in f,
+        "impf": lambda f, p: f.get("Tense") == "Past" and f.get("Aspect") == "Imp" and p is None,
+        "aor":  lambda f, p: f.get("Tense") == "Past" and f.get("Aspect") == "Perf" and "Mood" not in f,
+        "fut":  lambda f, p: f.get("Tense") == "Fut",
+        "cond": lambda f, p: f.get("Tense") == "Past" and p == "θα",
+        "imp":  lambda f, p: f.get("Mood") == "Imp",
+        "perf": lambda f, p: f.get("Tense") == "Perf",
+        "pqp":  lambda f, p: f.get("Tense") == "Pqp",
+    }
 
-        def _tense_ok(tk):
-            if tense_f is None:
-                return True
-            if tense_f == "fut":
-                return tk in ("fut_cont", "fut_simp")
-            if tense_f == "subj":
-                return tk in ("subj_pres", "subj_aor")
-            return tense_f == tk
-
-        def _voice_ok(voice):
-            if voice_f is None:
-                return True
-            return (voice_f == "act") == (voice == "active")
-
-        def _add(label_prefix, tk, tense, voice, mood, particle=""):
-            if not (_tense_ok(tk) and _voice_ok(voice)):
-                return
-            v_l = "Act" if voice == "active" else "Pass"
-            path = _w(tense, voice, mood)
-            if mood == "imp":
-                for num, num_l in [("sg", "2sg"), ("pl", "2pl")]:
-                    forms = path.get(num, {}).get("sec", set())
-                    if forms:
-                        fs = ", ".join(f"{particle} {f}".strip() for f in sorted(forms))
-                        rows.append({"Form": f"{label_prefix} {v_l} {num_l}", "Inflected forms": fs})
-            else:
-                for num, num_s in [("sg", "sg"), ("pl", "pl")]:
-                    nd = path.get(num, {})
-                    for per, per_n in [("pri", "1"), ("sec", "2"), ("ter", "3")]:
-                        forms = nd.get(per, set())
-                        if forms:
-                            _pron = _EL_PRONOUNS.get((per, num), "")
-                            _pfx = " ".join(x for x in [_pron, particle] if x)
-                            fs = ", ".join(f"{_pfx} {f}".strip() for f in sorted(forms))
-                            rows.append({"Form": f"{label_prefix} {v_l} {per_n}{num_s}", "Inflected forms": fs})
-
-        for _v in ["active", "passive"]:
-            _add("Pres Ind",  "pres",      "present",     _v, "ind")
-            _add("Impf",      "impf",      "paratatikos", _v, "ind")
-            _add("Aor Ind",   "aor",       "aorist",      _v, "ind")
-            _add("Dep",       "dep",       "conjunctive", _v, "ind")
-            _add("θα+Pres",   "fut_cont",  "present",     _v, "ind", "θα")
-            _add("θα+Dep",    "fut_simp",  "conjunctive", _v, "ind", "θα")
-            _add("να+Pres",   "subj_pres", "present",     _v, "ind", "να")
-            _add("να+Dep",    "subj_aor",  "conjunctive", _v, "ind", "να")
-            _add("θα+Impf",   "cond",      "paratatikos", _v, "ind", "θα")
-            _add("Imp Pres",  "imp",       "present",     _v, "imp")
-            _add("Imp Aor",   "imp",       "conjunctive", _v, "imp")
-
-        if _tense_ok("part"):
-            forms = paradigm.get("act_pres_participle", set())
-            if forms and isinstance(forms, set):
-                rows.append({"Form": "Act Pres Part", "Inflected forms": ", ".join(sorted(forms))})
-            for pk, lbl_pfx in [
-                ("pass_pres_participle",      "Pass Pres Part"),
-                ("active_aorist_participle",  "Act Aor Part"),
-                ("passive_perfect_participle","Pass Perf Part"),
-            ]:
-                part = paradigm.get(pk, {})
-                if part and isinstance(part, dict):
-                    for n_k, n_l in [("sg","Sg"), ("pl","Pl")]:
-                        for g_k, g_l in [("masc","Masc"), ("fem","Fem"), ("neut","Neut")]:
-                            fms = part.get(n_k, {}).get(g_k, {}).get("nom", set())
-                            if fms:
-                                rows.append({"Form": f"{lbl_pfx} {g_l} Nom {n_l}",
-                                             "Inflected forms": ", ".join(sorted(fms))})
-        return rows
-
-    # ── grc verb filter (unchanged) ───────────────────────────────────────────────
+    # ── grc verb filter ───────────────────────────────────────────────────────────
     _TENSE_MATCH_GRC = {
         "pres": lambda f: f.get("Tense") == "Pres",
         "aor":  lambda f: f.get("Tense") == "Aor",
@@ -375,80 +361,107 @@ def _(
             for _number in ("Sing", "Plur"):
                 for _case in ("Nom", "Gen", "Dat", "Acc"):
                     _ADJ_FORMS.append((
-                        f"Pos {_g} {_case} {_number}",
+                        f"{_g} {_case} {_number}",  # restore "Pos {_g}..." when Cmp/Sup re-enabled
                         {"Degree": "Pos", "Gender": _g, "Case": _case, "Number": _number},
                     ))
     else:  # el
         _NOUN_FORMS = [
-            ("Nom Sing", {"Number": "Sing", "Case": "Nom"}),
-            ("Gen Sing", {"Number": "Sing", "Case": "Gen"}),
-            ("Acc Sing", {"Number": "Sing", "Case": "Acc"}),
-            ("Voc Sing", {"Number": "Sing", "Case": "Voc"}),
-            ("Nom Plur", {"Number": "Plur", "Case": "Nom"}),
-            ("Gen Plur", {"Number": "Plur", "Case": "Gen"}),
-            ("Acc Plur", {"Number": "Plur", "Case": "Acc"}),
-            ("Voc Plur", {"Number": "Plur", "Case": "Voc"}),
+            (f"{_case} {_number}", {"Number": _number, "Case": _case})
+            for _number in ("Sing", "Plur")
+            for _case in ("Nom", "Gen", "Acc", "Voc")
         ]
         _ADJ_FORMS = [
-            (f"Pos {_g} {_c} {_n}", {"Degree": "Pos", "Gender": _g, "Number": _n, "Case": _c})
+            (f"{_g} {_c} {_n}", {"Degree": "Pos", "Gender": _g, "Number": _n, "Case": _c})  # restore "Pos {_g}..." when Cmp/Sup re-enabled
             for _g in ("Masc", "Fem", "Neut")
             for _n in ("Sing", "Plur")
             for _c in ("Nom", "Gen", "Acc")
         ]
 
-    # ── Compute rows ──────────────────────────────────────────────────────────────
     rows = []
     if _lemma:
         if _pos == "verb" and _lang == "el":
-            from eee.backends import modern_greek as _mg_mod
-            try:
-                _paradigm = _mg_mod.ModernGreekBackend().paradigm(_lemma, "verb")
-                rows = _el_verb_rows(_paradigm, _tense_filter, _voice_filter)
-            except Exception as _exc:
-                rows = [{"Form": "error", "Inflected forms": str(_exc)}]
+            for _label, _feats, _particle in _EL_VERB_FORMS:
+                _t_ok = _tense_filter is None or _EL_TENSE_FILTER.get(_tense_filter, lambda f, p: False)(_feats, _particle)
+                if not _t_ok:
+                    continue
+                try:
+                    _result = eee.inflect(_lemma, _feats, _pos, language=_lang, backend=_backend)
+                    if _result:
+                        _joined = ", ".join(sorted(_result))
+                        _forms_str = f"{_particle} {_joined}" if _particle else _joined
+                    else:
+                        _forms_str = "—"
+                except Exception as _exc:
+                    _forms_str = f"error: {_exc}"
+                rows.append({"Form": _label, "Inflected forms": _forms_str})
         elif _pos == "verb":  # grc
             _filtered = _filter_verbs_grc(_VERB_FORMS, _tense_filter, _voice_filter)
             for _label, _features in _filtered:
                 try:
-                    _result = eee.inflect(_lemma, _features, _pos, language=_lang)
-                    _pron = ""
-                    if _features.get("VerbForm") == "Fin" and _features.get("Mood") != "Imp":
-                        _pron = _GRC_PRONOUNS.get((_features.get("Person"), _features.get("Number")), "")
-                    _fs = ", ".join(f"{_pron} {f}".strip() for f in sorted(_result)) if _result else "—"
+                    _result = eee.inflect(_lemma, _features, _pos, language=_lang, backend=_backend)
+                    _fs = ", ".join(sorted(_result)) if _result else "—"
                     rows.append({"Form": _label, "Inflected forms": _fs})
                 except Exception as _exc:
                     rows.append({"Form": _label, "Inflected forms": f"error: {_exc}"})
         else:  # noun / adjective
             _forms_map = {"noun": _NOUN_FORMS, "adjective": _ADJ_FORMS}
+            _fg_noun = _gender
+            if _pos == "noun" and _fg_noun is None:
+                for _g in ("Masc", "Fem", "Neut"):
+                    try:
+                        _r = eee.inflect(_lemma, {"Number": "Sing", "Case": "Nom", "Gender": _g}, _pos, language=_lang, backend=_backend)
+                        if _lemma in (_r or set()):
+                            _fg_noun = _g
+                            break
+                    except Exception:
+                        pass
+            _use_articles = _pos == "noun" and _fg_noun is not None
             for _label, _features in _forms_map.get(_pos, []):
                 try:
-                    _result = eee.inflect(_lemma, _features, _pos, language=_lang)
-                    _fg = _features.get("Gender", _gender)
-                    _fn = _features.get("Number", "")
-                    _fc = _features.get("Case", "")
-                    rows.append({
-                        "Form":       _label,
-                        "Definite":   _def_str(_result, _lang, _fg, _fn, _fc),
-                        "Indefinite": _indef_str(_result, _lang, _fg, _fn, _fc),
-                    })
+                    _result = eee.inflect(_lemma, _features, _pos, language=_lang, backend=_backend)
+                    if _pos == "adjective":
+                        rows.append({"Form": _label, "Inflected forms": ", ".join(sorted(_result)) if _result else "—"})
+                    elif _use_articles:
+                        _fg = _features.get("Gender", _fg_noun)
+                        _fn = _features.get("Number", "")
+                        _fc = _features.get("Case", "")
+                        row = {"Form": _label, "Definite": _def_str(_result, _lang, _fg, _fn, _fc)}
+                        if _lang == "el":
+                            row["Indefinite"] = _indef_str(_result, _lang, _fg, _fn, _fc)
+                        rows.append(row)
+                    else:  # noun, gender unknown
+                        rows.append({"Form": _label, "Inflected forms": ", ".join(sorted(_result)) if _result else "—"})
                 except Exception as _exc:
-                    rows.append({"Form": _label, "Definite": f"error: {_exc}", "Indefinite": "—"})
+                    if _pos == "adjective" or not _use_articles:
+                        rows.append({"Form": _label, "Inflected forms": f"error: {_exc}"})
+                    else:
+                        row = {"Form": _label, "Definite": f"error: {_exc}"}
+                        if _lang == "el":
+                            row["Indefinite"] = "—"
+                        rows.append(row)
     return (rows,)
 
 
 @app.cell(hide_code=True)
-def _(language_selector, lemma_input, mo, rows):
-    if not lemma_input.value.strip():
-        _output = mo.md("Enter a lemma above.")
-    elif rows:
+def _(backend_selector, corpus_table, language_selector, lemma_input, mo, pos_selector, rows):
+    _lang = language_selector.value
+    _pos = pos_selector.value
+    if corpus_table is not None:
+        _lemma = corpus_table.value[0]["Word"] if corpus_table.value else ""
+    elif backend_selector.value == "unimorph" and _lang == "grc" and _pos == "verb":
+        _lemma = ""
+    else:
+        _lemma = lemma_input.value.strip()
+    if rows:
         _wrap = [k for k in rows[0] if k != "Form"]
         _output = mo.ui.table(rows, selection=None, show_column_summaries=False,
                               show_data_types=False, wrapped_columns=_wrap)
+    elif _lemma:
+        _output = mo.md(f"No forms found for **{_lemma}** ({_lang}).")
+    elif corpus_table is not None:
+        _output = mo.md("Select a word from the corpus table above.")
     else:
-        _output = mo.md(
-            f"No forms found for **{lemma_input.value.strip()}** "
-            f"({language_selector.value})."
-        )
+        _output = mo.md("")
     _output
     return
 

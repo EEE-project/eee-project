@@ -3,15 +3,11 @@ MorphologyBackend Protocol — language-agnostic morphology contract.
 
 Third-party backends need not import or inherit from this module.
 Any class with the correct methods and `language` attribute satisfies
-the Protocol structurally (duck typing). See AnalysisNotSupportedError
-in eee._exceptions for the expected exception from non-analyzing backends.
+the Protocol structurally (duck typing).
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
-
-if TYPE_CHECKING:
-    from eee._exceptions import AnalysisNotSupportedError  # noqa: F401
+from typing import Protocol, runtime_checkable
 
 __all__ = ["MorphologyBackend"]
 
@@ -24,10 +20,6 @@ class MorphologyBackend(Protocol):
     A backend must expose:
       - language (str): IETF language tag, e.g. "el", "grc", "la"
       - inflect(lemma, features, pos) -> set[str]
-      - analyze(form, pos=None) -> list[dict[str, str]]
-
-    Backends that do not implement analysis must raise
-    AnalysisNotSupportedError (not return []).
     """
 
     language: str
@@ -37,6 +29,7 @@ class MorphologyBackend(Protocol):
         lemma: str,
         features: dict[str, str],
         pos: str,
+        **_kw,
     ) -> set[str]:
         """
         Return the set of surface forms for lemma matching the given feature bundle.
@@ -52,28 +45,5 @@ class MorphologyBackend(Protocol):
 
         Returns:
             Set of alternative surface forms. Empty set if no forms match.
-        """
-        ...
-
-    def analyze(
-        self,
-        form: str,
-        pos: str | None = None,
-    ) -> list[dict[str, str]]:
-        """
-        Return possible morphological analyses for an inflected surface form.
-
-        Args:
-            form: Inflected surface form.
-            pos: Optional POS filter.
-
-        Returns:
-            List of UD FEATS dicts. List because morphological ambiguity is
-            common — a single form may match multiple lemmas or analyses.
-
-        Raises:
-            AnalysisNotSupportedError: If this backend has no analysis
-                implementation. This distinguishes "no analyzer" from
-                "analyzer ran, found zero results".
         """
         ...

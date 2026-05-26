@@ -1,0 +1,23 @@
+languages:
+  el:
+    name: Modern Greek
+    tier: dedicated
+    backend: modern-greek-inflexion-eee
+    pos: [verb, noun, adjective, article, pronoun]
+  grc:
+    name: Ancient Greek
+    tier: dedicated
+    backend: greek-inflexion
+    pos: [verb, noun, adjective]
+    unimorph_pos: [noun, adjective]
+    notes: "unimorph covers nouns/adjectives; noun tags omit gender; adj tags omit gender for masc/fem, include NEUT for neuter"
+  ell:
+    name: Modern Greek (unimorph)
+    tier: unimorph
+    unimorph_code: ell
+    pos: [verb, noun, adjective]
+    accuracy_pct: 84
+  la:
+    name: Latin
+    tier: unsupported
+    notes: "In UniMorph dataset but unimorph_inflect has no trained model"

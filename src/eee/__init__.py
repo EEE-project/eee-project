@@ -3,28 +3,34 @@ from __future__ import annotations
 
 from eee import _registry
 from eee._exceptions import (
-    AnalysisNotSupportedError,
     AmbiguousPOSError,
     BackendLoadError,
     UnsupportedLanguageError,
 )
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 __all__ = [
     "inflect",
-    "analyze",
+    "list_lemmas",
     "register_backend",
     "set_fallback_backend",
     "supported_languages",
+    "register_default_backends",
+    "language_info",
     "UnsupportedLanguageError",
     "BackendLoadError",
-    "AnalysisNotSupportedError",
     "AmbiguousPOSError",
 ]
 
 
-def inflect(lemma: str, features: dict[str, str], pos: str, language: str) -> set[str]:
+def inflect(
+    lemma: str,
+    features: dict[str, str],
+    pos: str,
+    language: str | None = None,
+    backend: str | None = None,
+) -> set[str]:
     """Return inflected forms for lemma matching the given UD feature bundle.
 
     Parameters
@@ -32,37 +38,41 @@ def inflect(lemma: str, features: dict[str, str], pos: str, language: str) -> se
     lemma:    base form of the word
     features: UD FEATS dict, e.g. {"Tense": "Pres", "Mood": "Ind", "Person": "1"}
     pos:      part of speech — "verb", "noun", "adjective", "adverb"
-    language: IETF language tag — "el", "grc", "la", etc. Required; no default.
+    language: IETF language tag — "el", "grc", etc. May be omitted when backend
+              maps to exactly one language (e.g. backend="modern-greek" → "el").
+    backend:  named backend variant, e.g. "unimorph". None selects the default.
 
     Raises
     ------
-    UnsupportedLanguageError  if no backend is registered for language
+    UnsupportedLanguageError  if language cannot be resolved or no backend found
     BackendLoadError          if a backend is found but fails to load
     """
-    return _registry.get_backend(language).inflect(lemma, features, pos)
+    lang = _registry.resolve_language(language, backend)
+    return _registry.get_backend(lang, backend=backend).inflect(lemma, features, pos)
 
 
-def analyze(form: str, language: str, pos: str | None = None) -> list[dict[str, str]]:
-    """Return possible morphological analyses for an inflected form.
+def list_lemmas(pos: str, language: str | None = None, backend: str | None = None) -> list[str]:
+    """Return lemmas available in the backend's corpus for the given POS.
 
-    Each analysis is a UD FEATS dict. Returns a list because morphological
-    ambiguity is common.
-
-    Raises
-    ------
-    UnsupportedLanguageError      if no backend is registered for language
-    AnalysisNotSupportedError     if the backend does not implement analysis
+    Returns [] for algorithm-based backends that have no finite vocabulary
+    (e.g. ModernGreekBackend), or when no corpus data is available.
     """
-    return _registry.get_backend(language).analyze(form, pos)
+    lang = _registry.resolve_language(language, backend)
+    b = _registry.get_backend(lang, backend=backend)
+    fn = getattr(b, "list_lemmas", None)
+    if fn is None:
+        return []
+    return fn(pos)
 
 
-def register_backend(code: str, instance: object) -> None:
+def register_backend(code: str, instance: object, backend: str | None = None) -> None:
     """Register or override a backend instance for a language code.
 
+    Pass backend='name' to register a named variant alongside the default.
     Idempotent: calling twice with the same instance produces the same state.
     Overrides any existing registration, including built-ins.
     """
-    _registry.register_backend(code, instance)
+    _registry.register_backend(code, instance, backend=backend)
 
 
 def set_fallback_backend(instance: object) -> None:
@@ -71,6 +81,22 @@ def set_fallback_backend(instance: object) -> None:
     Not included in supported_languages().
     """
     _registry.set_fallback_backend(instance)
+
+
+def register_default_backends() -> None:
+    """Register UniMorphBackend as the fallback for languages without a dedicated backend.
+
+    Call once at application startup. Tests that need isolated registry state
+    should NOT call this.
+    """
+    from eee.backends.unimorph import UniMorphBackend
+    _registry.set_fallback_backend(UniMorphBackend())
+
+
+def language_info(code: str) -> dict | None:
+    """Return the manifest entry for the given EEE language code, or None if unknown."""
+    from eee.backends.unimorph import _load_manifest
+    return _load_manifest().get("languages", {}).get(code)
 
 
 def supported_languages() -> dict[str, str]:

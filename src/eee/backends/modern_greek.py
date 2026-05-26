@@ -1,7 +1,6 @@
 """ModernGreekBackend — delegates to modern-greek-inflexion-eee."""
 from __future__ import annotations
 
-from eee._exceptions import AnalysisNotSupportedError
 from eee.backends._mg_features import (
     ACTIVE,
     FEM,
@@ -51,7 +50,7 @@ class ModernGreekBackend:
     def __init__(self) -> None:
         self._cache: dict[tuple[str, str], dict] = {}
 
-    def inflect(self, lemma: str, features: dict[str, str], pos: str) -> set[str]:
+    def inflect(self, lemma: str, features: dict[str, str], pos: str, **_kw) -> set[str]:
         """Return inflected forms matching the given UD feature bundle.
 
         Returns an empty set if the requested path doesn't exist in the paradigm.
@@ -62,7 +61,10 @@ class ModernGreekBackend:
             aspect = features.get("Aspect")
             actual_lemma = suppletive_lemma(lemma, aspect)
             full_paradigm = self.paradigm(actual_lemma, pos)
-            path = mg_verb_path(features)
+            try:
+                path = mg_verb_path(features)
+            except KeyError:
+                return set()
             result = _walk(full_paradigm, path)
             # Deponent fallback: if ACTIVE path yields nothing, retry with PASSIVE
             assert len(path) == 5, f"Unexpected verb path length: {path!r}"
@@ -86,10 +88,6 @@ class ModernGreekBackend:
 
         else:
             raise ValueError(f"Unknown POS for inflect: {pos!r}")
-
-    def analyze(self, form: str, pos: str | None = None) -> list[dict[str, str]]:
-        """Not implemented in v1. Always raises AnalysisNotSupportedError."""
-        raise AnalysisNotSupportedError("ModernGreekBackend")
 
     def paradigm(self, lemma: str, pos: str) -> dict:
         """Return the full inflectional paradigm for a lemma.

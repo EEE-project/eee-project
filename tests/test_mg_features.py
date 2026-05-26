@@ -184,8 +184,9 @@ def test_verb_present_without_aspect_defaults_to_present():
 
 
 def test_verb_imperative_aorist():
-    feats = {"Mood": "Imp", "Tense": "Past", "Aspect": "Perf", "Voice": "Act", "Number": "Sing", "Person": "2"}
-    assert mg_verb_path(feats) == [AORIST, ACTIVE, IMP, SG, SEC]
+    # Aorist imperative forms live under the conjunctive key in the paradigm, not aorist
+    feats = {"Mood": "Imp", "Aspect": "Perf", "Voice": "Act", "Number": "Sing", "Person": "2"}
+    assert mg_verb_path(feats) == [CONJUNCTIVE, ACTIVE, IMP, SG, SEC]
 
 
 def test_noun_missing_number_raises():

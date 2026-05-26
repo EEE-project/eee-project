@@ -10,4 +10,4 @@ jobs:
           python-version: "3.12"
       - run: pip install uv
       - run: uv sync --group dev
-      - run: uv run pytest
+      - run: uv run pytest -m "not integration"

@@ -6,7 +6,6 @@ The backend is auto-discovered via the eee.backends.v1 entry point.
 """
 import pytest
 import eee
-from eee import AnalysisNotSupportedError
 
 
 def test_grc_in_supported_languages():
@@ -44,6 +43,3 @@ def test_inflect_adjective():
     assert "ἀγαθή" in result
 
 
-def test_analyze_raises():
-    with pytest.raises(AnalysisNotSupportedError):
-        eee.analyze("λόγου", language="grc")

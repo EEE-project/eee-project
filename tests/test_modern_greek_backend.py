@@ -1,7 +1,6 @@
 """Integration tests for ModernGreekBackend against real library output."""
 import pytest
 
-from eee._exceptions import AnalysisNotSupportedError
 from eee.backends.modern_greek import ModernGreekBackend
 
 
@@ -112,19 +111,6 @@ def test_inflect_propagates_not_legal_verb_exception(backend):
     from modern_greek_inflexion_eee.exceptions import NotLegalVerbException
     with pytest.raises(NotLegalVerbException):
         backend.inflect("λύλύ", {"Tense": "Pres", "Voice": "Act", "Number": "Sing", "Person": "1"}, "verb")
-
-
-# ── analyze() ─────────────────────────────────────────────────────────────────
-
-
-def test_analyze_raises_analysis_not_supported(backend):
-    with pytest.raises(AnalysisNotSupportedError):
-        backend.analyze("λόγου")
-
-
-def test_analyze_error_message_contains_backend_name(backend):
-    with pytest.raises(AnalysisNotSupportedError, match="ModernGreekBackend"):
-        backend.analyze("λόγου")
 
 
 # ── paradigm() ────────────────────────────────────────────────────────────────

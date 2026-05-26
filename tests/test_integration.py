@@ -11,7 +11,6 @@ import sys
 import pytest
 
 import eee
-from eee import AnalysisNotSupportedError
 
 
 # ── Lazy-load guarantee ───────────────────────────────────────────────────────
@@ -91,14 +90,6 @@ def test_inflect_adjective():
         language="el",
     )
     assert result == {"καλός"}
-
-
-# ── analyze() ─────────────────────────────────────────────────────────────────
-
-
-def test_analyze_raises_not_supported():
-    with pytest.raises(AnalysisNotSupportedError):
-        eee.analyze("λόγου", language="el")
 
 
 # ── supported_languages() ─────────────────────────────────────────────────────

@@ -13,8 +13,33 @@ from eee._exceptions import BackendLoadError, UnsupportedLanguageError
 # ── Built-in backends (lazy-loaded on first use) ───────────────────────────────
 
 _BUILTIN_BACKENDS: dict[str, str] = {
-    "el": "eee.backends.modern_greek:ModernGreekBackend",
+    "el":                "eee.backends.modern_greek:ModernGreekBackend",
+    "el:modern-greek":   "eee.backends.modern_greek:ModernGreekBackend",
+    "el:unimorph":       "eee.backends.unimorph:UniMorphBackend",
+    # ancient-greek-morphology-eee is an optional package — soft import
+    "grc:ancient-greek": "ancient_greek_morphology_eee:AncientGreekBackend",
+    "grc:unimorph":      "eee.backends.unimorph:UniMorphBackend",
 }
+
+# Extra kwargs passed to the constructor when instantiating builtin backends.
+_BUILTIN_BACKEND_KWARGS: dict[str, dict] = {
+    "el:unimorph":  {"language": "el"},
+    "grc:unimorph": {"language": "grc"},
+}
+
+# Backend names that map to exactly one language — language= can be inferred.
+# Built from _BUILTIN_BACKENDS: any "lang:name" key where "name" appears for
+# only one language. "unimorph" is excluded because it covers both el and grc.
+def _build_single_language_map() -> dict[str, str]:
+    langs_by_backend: dict[str, set[str]] = {}
+    for key in _BUILTIN_BACKENDS:
+        if ":" in key:
+            lang, name = key.split(":", 1)
+            langs_by_backend.setdefault(name, set()).add(lang)
+    return {name: next(iter(langs)) for name, langs in langs_by_backend.items() if len(langs) == 1}
+
+_SINGLE_LANGUAGE_BACKENDS: dict[str, str] = _build_single_language_map()
+# {"modern-greek": "el", "ancient-greek": "grc"}
 
 # ── Module-level state ────────────────────────────────────────────────────────
 
@@ -57,10 +82,29 @@ def _load_from_entry_points(language_code: str) -> object | None:
 # ── Public API ────────────────────────────────────────────────────────────────
 
 
-def get_backend(language_code: str) -> object:
+def resolve_language(language_code: str | None, backend: str | None) -> str:
+    """Return a concrete language code, inferring from backend name if needed.
+
+    If language_code is given, returns it unchanged.
+    If language_code is None and backend maps to exactly one language, infers it.
+    Otherwise raises UnsupportedLanguageError.
+    """
+    if language_code is not None:
+        return language_code
+    if backend is None:
+        raise ValueError("language is required when backend is not specified")
+    lang = _SINGLE_LANGUAGE_BACKENDS.get(backend)
+    if lang is None:
+        raise ValueError(
+            f"backend={backend!r} supports multiple languages; specify language="
+        )
+    return lang
+
+
+def get_backend(language_code: str, backend: str | None = None) -> object:
     """Resolve and return a backend instance for the given language code.
 
-    Resolution order:
+    Resolution order (backend=None):
       1. Explicit registrations (_registered)
       2. Cached lazy-loaded instances (_cache)
       3. Built-in backends (_BUILTIN_BACKENDS)
@@ -68,24 +112,38 @@ def get_backend(language_code: str) -> object:
       5. Fallback backend (_fallback)
       6. Raise UnsupportedLanguageError
 
+    With backend='name', only steps 1-3 are tried (no entry-point or fallback
+    search); raises UnsupportedLanguageError if the named backend is not found.
+    ModuleNotFoundError during builtin load is treated as UnsupportedLanguageError
+    (soft import — optional packages that are not installed are silently absent).
+
     Raises:
         UnsupportedLanguageError: No backend found for the language code.
         BackendLoadError: Backend found but failed to load or instantiate.
     """
-    if language_code in _registered:
-        return _registered[language_code]
+    key = f"{language_code}:{backend}" if backend else language_code
 
-    if language_code in _cache:
-        return _cache[language_code]
+    if key in _registered:
+        return _registered[key]
 
-    if language_code in _BUILTIN_BACKENDS:
+    if key in _cache:
+        return _cache[key]
+
+    if key in _BUILTIN_BACKENDS:
         try:
-            cls = _load_class(_BUILTIN_BACKENDS[language_code])
-            instance = cls()
+            cls = _load_class(_BUILTIN_BACKENDS[key])
+            instance = cls(**_BUILTIN_BACKEND_KWARGS.get(key, {}))
+        except ModuleNotFoundError:
+            # Optional package not installed — fall through as if not registered
+            pass
         except Exception as exc:
             raise BackendLoadError(language_code, exc) from exc
-        _cache[language_code] = instance
-        return instance
+        else:
+            _cache[key] = instance
+            return instance
+
+    if backend is not None:
+        raise UnsupportedLanguageError(language_code)
 
     ep_instance = _load_from_entry_points(language_code)
     if ep_instance is not None:
@@ -97,15 +155,16 @@ def get_backend(language_code: str) -> object:
     raise UnsupportedLanguageError(language_code)
 
 
-def register_backend(language_code: str, instance: object) -> None:
+def register_backend(language_code: str, instance: object, backend: str | None = None) -> None:
     """Register a backend instance for a language code.
 
+    Pass backend='name' to register a named variant alongside the default.
     Overrides any existing registration (builtin, cached, or previously
-    registered). Calling again with the same instance is safe; the dict
-    entry is simply overwritten.
+    registered). Calling again with the same instance is safe.
     """
-    _cache.pop(language_code, None)
-    _registered[language_code] = instance
+    key = f"{language_code}:{backend}" if backend else language_code
+    _cache.pop(key, None)
+    _registered[key] = instance
 
 
 def set_fallback_backend(instance: object) -> None:

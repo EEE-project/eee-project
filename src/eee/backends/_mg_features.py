@@ -98,6 +98,9 @@ def mg_verb_path(features: dict[str, str]) -> list[str]:
     # Determine tense key
     if mood == "Sub" and aspect == "Perf":
         tense_key = CONJUNCTIVE
+    elif mood == "Imp" and aspect == "Perf":
+        # library shares the conjunctive key for both aorist subjunctive and aorist imperative
+        tense_key = CONJUNCTIVE
     elif tense == "Pres" and (aspect is None or aspect == "Imp"):
         # Pres without explicit Aspect is always imperfective in Greek
         tense_key = PRESENT
@@ -105,6 +108,12 @@ def mg_verb_path(features: dict[str, str]) -> list[str]:
         tense_key = PARATATIKOS
     elif tense == "Past" and aspect == "Perf":
         tense_key = AORIST
+    elif tense == "Fut" and (aspect is None or aspect == "Imp"):
+        # θα/να Ipfv: same stem as Present
+        tense_key = PRESENT
+    elif tense == "Fut" and aspect == "Perf":
+        # θα/να Pfv: same stem as Conjunctive
+        tense_key = CONJUNCTIVE
     else:
         raise KeyError(f"Cannot determine tense from features: {features!r}")
 

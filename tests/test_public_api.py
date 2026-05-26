@@ -6,7 +6,7 @@ import pytest
 
 import eee
 import eee._registry as _reg
-from eee._exceptions import AnalysisNotSupportedError, UnsupportedLanguageError
+from eee._exceptions import UnsupportedLanguageError
 
 
 # ── Fake backend ──────────────────────────────────────────────────────────────
@@ -15,11 +15,8 @@ from eee._exceptions import AnalysisNotSupportedError, UnsupportedLanguageError
 class FakeBackend:
     language = "xx"
 
-    def inflect(self, lemma, features, pos):
+    def inflect(self, lemma, features, pos, **_kw):
         return {"fake"}
-
-    def analyze(self, form, pos=None):
-        return [{"Fake": "Yes"}]
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -75,26 +72,6 @@ def test_inflect_routes_to_fallback():
     assert result == {"fake"}
 
 
-# ── analyze() ─────────────────────────────────────────────────────────────────
-
-
-def test_analyze_mg_backend_raises_analysis_not_supported():
-    with pytest.raises(AnalysisNotSupportedError):
-        eee.analyze("λόγου", language="el")
-
-
-def test_analyze_accessible_via_eee_namespace():
-    with pytest.raises(eee.AnalysisNotSupportedError):
-        eee.analyze("λόγου", language="el")
-
-
-def test_analyze_routes_to_registered_backend():
-    fake = FakeBackend()
-    eee.register_backend("xx", fake)
-    result = eee.analyze("word", language="xx")
-    assert result == [{"Fake": "Yes"}]
-
-
 # ── supported_languages() ─────────────────────────────────────────────────────
 
 
@@ -124,11 +101,6 @@ def test_backend_load_error_in_eee_namespace():
     from eee._exceptions import BackendLoadError
     assert hasattr(eee, "BackendLoadError")
     assert eee.BackendLoadError is BackendLoadError
-
-
-def test_analysis_not_supported_error_in_eee_namespace():
-    assert hasattr(eee, "AnalysisNotSupportedError")
-    assert eee.AnalysisNotSupportedError is AnalysisNotSupportedError
 
 
 def test_ambiguous_pos_error_in_eee_namespace():

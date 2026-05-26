@@ -19,21 +19,17 @@ import eee._registry as _reg
 class FakeBackend:
     language = "xx"
 
-    def inflect(self, lemma, features, pos):
+    def inflect(self, lemma, features, pos, **_kw):
         return {"fake"}
 
-    def analyze(self, form, pos=None):
-        return []
 
 
 class AnotherFakeBackend:
     language = "yy"
 
-    def inflect(self, lemma, features, pos):
+    def inflect(self, lemma, features, pos, **_kw):
         return {"another"}
 
-    def analyze(self, form, pos=None):
-        return []
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -130,8 +126,7 @@ def test_entry_point_instantiation_error_raises_backend_load_error():
         def __init__(self):
             raise RuntimeError("broken")
 
-        def inflect(self, lemma, features, pos): ...
-        def analyze(self, form, pos=None): ...
+        def inflect(self, lemma, features, pos, **_kw): ...
 
     ep = MagicMock()
     ep.name = "tt"

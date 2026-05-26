@@ -16,17 +16,22 @@ class BackendLoadError(Exception):
         )
 
 
-class AnalysisNotSupportedError(Exception):
-    def __init__(self, backend_name: str) -> None:
-        self.backend_name = backend_name
-        super().__init__(
-            f"Backend '{backend_name}' does not support morphological analysis."
-        )
-
-
 class AmbiguousPOSError(Exception):
     def __init__(self, lemma: str) -> None:
         self.lemma = lemma
         super().__init__(
             f"POS is required but was not provided for lemma '{lemma}'."
         )
+
+
+class PosNotSupportedError(Exception):
+    def __init__(self, pos: str) -> None:
+        self.pos = pos
+        super().__init__(f"POS '{pos}' is not supported by the UniMorph translator.")
+
+
+class FeatureNotSupportedError(Exception):
+    def __init__(self, key: str, value: str) -> None:
+        self.key = key
+        self.value = value
+        super().__init__(f"UD feature '{key}={value}' has no UniMorph mapping.")

@@ -1,10 +1,13 @@
 [project]
 name = "eee"
-version = "0.3.0"
+version = "0.4.0"
 requires-python = ">=3.12"
 dependencies = [
+    "marimo>=0.23.8",
     "modern-greek-inflexion-eee @ git+https://github.com/EEE-project/modern-greek-inflexion-eee.git",
+    "pyyaml>=6",
 ]
+
 
 [build-system]
 requires = ["hatchling"]
@@ -16,9 +19,13 @@ packages = ["src/eee"]
 [tool.hatch.metadata]
 allow-direct-references = true
 
+[tool.pytest.ini_options]
+markers = ["integration: requires optional deps or network (skipped in CI)"]
+
 [tool.uv.sources]
 modern-greek-inflexion-eee = { git = "https://github.com/EEE-project/modern-greek-inflexion-eee.git" }
 ancient-greek-morphology-eee = { git = "https://codeberg.org/EEE-project/ancient-greek-morphology-eee.git" }
+
 
 [dependency-groups]
 dev = [

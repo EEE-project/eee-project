@@ -2,11 +2,11 @@
 # requires-python = ">=3.12"
 # dependencies = [
 #     "marimo>=0.19.4",
-#     "eee @ git+https://codeberg.org/EEE-project/eee.git",
+#     "eee @ git+https://codeberg.org/EEE-project/eee.git@unimorph-backend",
 # ]
 #
 # [tool.uv.sources]
-# eee = { git = "https://codeberg.org/EEE-project/eee.git" }
+# eee = { git = "https://codeberg.org/EEE-project/eee.git", branch = "unimorph-backend" }
 # ///
 """Modern Greek morphology demo using the eee package.
 
@@ -19,7 +19,7 @@ Run from within the repo (uses local package):
 
 import marimo
 
-__generated_with = "0.23.6"
+__generated_with = "0.23.8"
 app = marimo.App(width="medium")
 
 
@@ -35,9 +35,9 @@ def _():
 def _(mo):
     mo.md(r"""
     # Modern Greek Morphology
-    **[eee](https://codeberg.org/EEE-project/eee)** — language-agnostic morphology for the EEE project.
+    **[eee](https://codeberg.org/EEE-project/eee)** — language-agnostic morphology engine for the EEE project.
 
-    Enter a Greek lemma and select its part of speech to see the full inflection paradigm.
+    Select a part of speech and backend. For the corpus-based backend pick a word from the table; for the algorithm-based backend type a lemma directly.
     Feature keys follow [Universal Dependencies FEATS](https://universaldependencies.org/u/feat/index.html).
     """)
     return
@@ -46,117 +46,193 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     lemma_input = mo.ui.text(
-        value="λύω",
+        value="γυναίκα",
         placeholder="e.g. λύω, γυναίκα, καλός",
         label="Lemma",
     )
     pos_selector = mo.ui.dropdown(
-        options={"Verb": "verb", "Noun": "noun", "Adjective": "adjective"},
-        value="Verb",
+        options={"Noun": "noun", "Verb": "verb", "Adjective": "adjective"},
+        value="Noun",
         label="Part of speech",
     )
-    mo.hstack([lemma_input, pos_selector], gap="1rem")
-    return lemma_input, pos_selector
+    gender_selector = mo.ui.dropdown(
+        options={"— (all)": None, "Masc": "Masc", "Fem": "Fem", "Neut": "Neut"},
+        value="— (all)",
+        label="Gender",
+    )
+    backend_selector = mo.ui.dropdown(
+        options={"modern-greek": None, "unimorph": "unimorph"},
+        value="modern-greek",
+        label="Backend",
+    )
+    return backend_selector, gender_selector, lemma_input, pos_selector
 
 
 @app.cell(hide_code=True)
-def _(eee, lemma_input, pos_selector):
-    _lemma = lemma_input.value.strip()
+def _(backend_selector, eee, gender_selector, lemma_input, mo, pos_selector):
+    try:
+        _available = eee.list_lemmas(pos_selector.value, language="el", backend=backend_selector.value)
+    except Exception:
+        _available = []
+    _rows = (
+        [{"Word": w, "Type": "deponent/pass" if w.endswith("μαι") else "active"} for w in _available]
+        if pos_selector.value == "verb" and backend_selector.value != "unimorph"
+        else [{"Word": w} for w in _available]
+    )
+    corpus_table = (
+        mo.ui.table(
+            _rows,
+            selection="single",
+            label=f"Corpus words — {pos_selector.value} ({len(_available)})",
+        )
+        if _available
+        else None
+    )
+    corpus_table if corpus_table is not None else lemma_input
+    return (corpus_table,)
+
+
+@app.cell(hide_code=True)
+def _(backend_selector, gender_selector, mo, pos_selector):
+    _controls = [backend_selector, pos_selector]
+    if pos_selector.value == "adjective":
+        _controls.append(gender_selector)
+    mo.hstack(_controls, gap="1rem", justify="start")
+    return
+
+
+@app.cell(hide_code=True)
+def _(backend_selector, corpus_table, eee, gender_selector, lemma_input, pos_selector):
+    _lemma = corpus_table.value[0]["Word"] if (corpus_table is not None and corpus_table.value) else lemma_input.value.strip()
     _pos = pos_selector.value
+    _gender = gender_selector.value
 
-    _VERB_FORMS = [
-        ("Pres Act 1sg",  {"Tense": "Pres", "Mood": "Ind", "VerbForm": "Fin", "Voice": "Act",  "Person": "1", "Number": "Sing"}),
-        ("Pres Act 2sg",  {"Tense": "Pres", "Mood": "Ind", "VerbForm": "Fin", "Voice": "Act",  "Person": "2", "Number": "Sing"}),
-        ("Pres Act 3sg",  {"Tense": "Pres", "Mood": "Ind", "VerbForm": "Fin", "Voice": "Act",  "Person": "3", "Number": "Sing"}),
-        ("Pres Act 1pl",  {"Tense": "Pres", "Mood": "Ind", "VerbForm": "Fin", "Voice": "Act",  "Person": "1", "Number": "Plur"}),
-        ("Pres Act 2pl",  {"Tense": "Pres", "Mood": "Ind", "VerbForm": "Fin", "Voice": "Act",  "Person": "2", "Number": "Plur"}),
-        ("Pres Act 3pl",  {"Tense": "Pres", "Mood": "Ind", "VerbForm": "Fin", "Voice": "Act",  "Person": "3", "Number": "Plur"}),
-        ("Impf Act 1sg",  {"Tense": "Past", "Aspect": "Imp",  "Voice": "Act",  "Person": "1", "Number": "Sing"}),
-        ("Impf Act 2sg",  {"Tense": "Past", "Aspect": "Imp",  "Voice": "Act",  "Person": "2", "Number": "Sing"}),
-        ("Impf Act 3sg",  {"Tense": "Past", "Aspect": "Imp",  "Voice": "Act",  "Person": "3", "Number": "Sing"}),
-        ("Impf Act 1pl",  {"Tense": "Past", "Aspect": "Imp",  "Voice": "Act",  "Person": "1", "Number": "Plur"}),
-        ("Impf Act 2pl",  {"Tense": "Past", "Aspect": "Imp",  "Voice": "Act",  "Person": "2", "Number": "Plur"}),
-        ("Impf Act 3pl",  {"Tense": "Past", "Aspect": "Imp",  "Voice": "Act",  "Person": "3", "Number": "Plur"}),
-        ("Aor Act 1sg",   {"Tense": "Past", "Aspect": "Perf", "Voice": "Act",  "Person": "1", "Number": "Sing"}),
-        ("Aor Act 2sg",   {"Tense": "Past", "Aspect": "Perf", "Voice": "Act",  "Person": "2", "Number": "Sing"}),
-        ("Aor Act 3sg",   {"Tense": "Past", "Aspect": "Perf", "Voice": "Act",  "Person": "3", "Number": "Sing"}),
-        ("Aor Act 1pl",   {"Tense": "Past", "Aspect": "Perf", "Voice": "Act",  "Person": "1", "Number": "Plur"}),
-        ("Aor Act 2pl",   {"Tense": "Past", "Aspect": "Perf", "Voice": "Act",  "Person": "2", "Number": "Plur"}),
-        ("Aor Act 3pl",   {"Tense": "Past", "Aspect": "Perf", "Voice": "Act",  "Person": "3", "Number": "Plur"}),
-        ("Pres Pass 1sg", {"Tense": "Pres", "Mood": "Ind", "VerbForm": "Fin", "Voice": "Pass", "Person": "1", "Number": "Sing"}),
-        ("Pres Pass 2sg", {"Tense": "Pres", "Mood": "Ind", "VerbForm": "Fin", "Voice": "Pass", "Person": "2", "Number": "Sing"}),
-        ("Pres Pass 3sg", {"Tense": "Pres", "Mood": "Ind", "VerbForm": "Fin", "Voice": "Pass", "Person": "3", "Number": "Sing"}),
-        ("Pres Pass 1pl", {"Tense": "Pres", "Mood": "Ind", "VerbForm": "Fin", "Voice": "Pass", "Person": "1", "Number": "Plur"}),
-        ("Pres Pass 2pl", {"Tense": "Pres", "Mood": "Ind", "VerbForm": "Fin", "Voice": "Pass", "Person": "2", "Number": "Plur"}),
-        ("Pres Pass 3pl", {"Tense": "Pres", "Mood": "Ind", "VerbForm": "Fin", "Voice": "Pass", "Person": "3", "Number": "Plur"}),
-        ("Aor Pass 1sg",  {"Tense": "Past", "Aspect": "Perf", "Voice": "Pass", "Person": "1", "Number": "Sing"}),
-        ("Aor Pass 2sg",  {"Tense": "Past", "Aspect": "Perf", "Voice": "Pass", "Person": "2", "Number": "Sing"}),
-        ("Aor Pass 3sg",  {"Tense": "Past", "Aspect": "Perf", "Voice": "Pass", "Person": "3", "Number": "Sing"}),
-        ("Aor Pass 1pl",  {"Tense": "Past", "Aspect": "Perf", "Voice": "Pass", "Person": "1", "Number": "Plur"}),
-        ("Aor Pass 2pl",  {"Tense": "Past", "Aspect": "Perf", "Voice": "Pass", "Person": "2", "Number": "Plur"}),
-        ("Aor Pass 3pl",  {"Tense": "Past", "Aspect": "Perf", "Voice": "Pass", "Person": "3", "Number": "Plur"}),
-    ]
+    _EL_VERB_FORMS = []
+    for _per, _num in [("1","Sing"),("2","Sing"),("3","Sing"),("1","Plur"),("2","Plur"),("3","Plur")]:
+        _ns = "sg" if _num == "Sing" else "pl"
+        _EL_VERB_FORMS += [
+            (f"Pres {_per}{_ns}",       {"Tense":"Pres","Person":_per,"Number":_num},                None),
+            (f"Impf {_per}{_ns}",       {"Tense":"Past","Aspect":"Imp","Person":_per,"Number":_num}, None),
+            (f"Aor {_per}{_ns}",        {"Tense":"Past","Aspect":"Perf","Person":_per,"Number":_num},None),
+            (f"Fut/Subj Ipfv {_per}{_ns}", {"Tense":"Fut","Aspect":"Imp","Person":_per,"Number":_num},  "θα/να"),
+            (f"Fut/Subj Pfv {_per}{_ns}",  {"Tense":"Fut","Aspect":"Perf","Person":_per,"Number":_num}, "θα/να"),
+            (f"Cond {_per}{_ns}",       {"Tense":"Past","Aspect":"Imp","Person":_per,"Number":_num}, "θα"),
+            (f"Perf {_per}{_ns}",       {"Tense":"Perf","Person":_per,"Number":_num},                None),
+            (f"Pqp {_per}{_ns}",        {"Tense":"Pqp","Person":_per,"Number":_num},                 None),
+        ]
+    for _num in ("Sing","Plur"):
+        _ns = "sg" if _num == "Sing" else "pl"
+        _EL_VERB_FORMS += [
+            (f"Imp Cont 2{_ns}", {"Tense":"Pres","Mood":"Imp","Person":"2","Number":_num},  None),
+            (f"Imp Aor 2{_ns}",  {"Mood":"Imp","Aspect":"Perf","Person":"2","Number":_num}, None),
+        ]
 
-    _NOUN_FORMS = [
-        ("Nom Sing", {"Number": "Sing", "Case": "Nom"}),
-        ("Gen Sing", {"Number": "Sing", "Case": "Gen"}),
-        ("Acc Sing", {"Number": "Sing", "Case": "Acc"}),
-        ("Voc Sing", {"Number": "Sing", "Case": "Voc"}),
-        ("Nom Plur", {"Number": "Plur", "Case": "Nom"}),
-        ("Gen Plur", {"Number": "Plur", "Case": "Gen"}),
-        ("Acc Plur", {"Number": "Plur", "Case": "Acc"}),
-        ("Voc Plur", {"Number": "Plur", "Case": "Voc"}),
-    ]
+    _NOUN_FORMS = []
+    for _number in ("Sing", "Plur"):
+        for _case in ("Nom", "Gen", "Acc", "Voc"):
+            _feats = {"Number": _number, "Case": _case}
+            if _gender:
+                _feats["Gender"] = _gender
+            _NOUN_FORMS.append((f"{_case} {_number}", _feats))
 
-    _ADJ_FORMS = [
-        ("Pos Masc Nom Sing",  {"Degree": "Pos", "Gender": "Masc", "Number": "Sing", "Case": "Nom"}),
-        ("Pos Masc Gen Sing",  {"Degree": "Pos", "Gender": "Masc", "Number": "Sing", "Case": "Gen"}),
-        ("Pos Masc Acc Sing",  {"Degree": "Pos", "Gender": "Masc", "Number": "Sing", "Case": "Acc"}),
-        ("Pos Masc Nom Plur",  {"Degree": "Pos", "Gender": "Masc", "Number": "Plur", "Case": "Nom"}),
-        ("Pos Masc Gen Plur",  {"Degree": "Pos", "Gender": "Masc", "Number": "Plur", "Case": "Gen"}),
-        ("Pos Masc Acc Plur",  {"Degree": "Pos", "Gender": "Masc", "Number": "Plur", "Case": "Acc"}),
-        ("Pos Fem Nom Sing",   {"Degree": "Pos", "Gender": "Fem",  "Number": "Sing", "Case": "Nom"}),
-        ("Pos Fem Gen Sing",   {"Degree": "Pos", "Gender": "Fem",  "Number": "Sing", "Case": "Gen"}),
-        ("Pos Fem Acc Sing",   {"Degree": "Pos", "Gender": "Fem",  "Number": "Sing", "Case": "Acc"}),
-        ("Pos Fem Nom Plur",   {"Degree": "Pos", "Gender": "Fem",  "Number": "Plur", "Case": "Nom"}),
-        ("Pos Fem Gen Plur",   {"Degree": "Pos", "Gender": "Fem",  "Number": "Plur", "Case": "Gen"}),
-        ("Pos Fem Acc Plur",   {"Degree": "Pos", "Gender": "Fem",  "Number": "Plur", "Case": "Acc"}),
-        ("Pos Neut Nom Sing",  {"Degree": "Pos", "Gender": "Neut", "Number": "Sing", "Case": "Nom"}),
-        ("Pos Neut Gen Sing",  {"Degree": "Pos", "Gender": "Neut", "Number": "Sing", "Case": "Gen"}),
-        ("Pos Neut Acc Sing",  {"Degree": "Pos", "Gender": "Neut", "Number": "Sing", "Case": "Acc"}),
-        ("Pos Neut Nom Plur",  {"Degree": "Pos", "Gender": "Neut", "Number": "Plur", "Case": "Nom"}),
-        ("Pos Neut Gen Plur",  {"Degree": "Pos", "Gender": "Neut", "Number": "Plur", "Case": "Gen"}),
-        ("Pos Neut Acc Plur",  {"Degree": "Pos", "Gender": "Neut", "Number": "Plur", "Case": "Acc"}),
-        ("Cmp Masc Nom Sing",  {"Degree": "Cmp", "Gender": "Masc", "Number": "Sing", "Case": "Nom"}),
-        ("Cmp Fem Nom Sing",   {"Degree": "Cmp", "Gender": "Fem",  "Number": "Sing", "Case": "Nom"}),
-        ("Cmp Neut Nom Sing",  {"Degree": "Cmp", "Gender": "Neut", "Number": "Sing", "Case": "Nom"}),
-        ("Sup Masc Nom Sing",  {"Degree": "Sup", "Gender": "Masc", "Number": "Sing", "Case": "Nom"}),
-        ("Sup Fem Nom Sing",   {"Degree": "Sup", "Gender": "Fem",  "Number": "Sing", "Case": "Nom"}),
-        ("Sup Neut Nom Sing",  {"Degree": "Sup", "Gender": "Neut", "Number": "Sing", "Case": "Nom"}),
-    ]
+    _ADJ_GENDERS = [_gender] if _gender else ["Masc", "Fem", "Neut"]
+    _ADJ_FORMS = []
+    for _g in _ADJ_GENDERS:
+        for _number in ("Sing", "Plur"):
+            for _case in ("Nom", "Gen", "Acc"):
+                _ADJ_FORMS.append((
+                    f"{_g} {_case} {_number}",  # restore "Pos {_g}..." when Cmp/Sup re-enabled
+                    {"Degree": "Pos", "Gender": _g, "Number": _number, "Case": _case},
+                ))
+    # Cmp/Sup correctness uncertain — re-enable after verification
+    # for _g in _ADJ_GENDERS:
+    #     _ADJ_FORMS.append((f"Cmp {_g} Nom Sing", {"Degree": "Cmp", "Gender": _g, "Number": "Sing", "Case": "Nom"}))
+    #     _ADJ_FORMS.append((f"Sup {_g} Nom Sing", {"Degree": "Sup", "Gender": _g, "Number": "Sing", "Case": "Nom"}))
 
-    _forms_map = {"verb": _VERB_FORMS, "noun": _NOUN_FORMS, "adjective": _ADJ_FORMS}
     rows = []
     if _lemma:
-        for _label, _features in _forms_map.get(_pos, []):
-            try:
-                _result = eee.inflect(_lemma, _features, _pos, language="el")
-                _forms_str = ", ".join(sorted(_result)) if _result else "—"
-            except Exception as _exc:
-                _forms_str = f"error: {_exc}"
-            rows.append({"Form": _label, "Inflected forms": _forms_str})
+        if _pos == "verb":
+            for _label, _feats, _particle in _EL_VERB_FORMS:
+                try:
+                    _result = eee.inflect(_lemma, _feats, _pos, language="el", backend=backend_selector.value)
+                    if _result:
+                        _joined = ", ".join(sorted(_result))
+                        _forms_str = f"{_particle} {_joined}" if _particle else _joined
+                    else:
+                        _forms_str = "—"
+                except Exception as _exc:
+                    _forms_str = f"error: {_exc}"
+                rows.append({"Form": _label, "Inflected forms": _forms_str})
+        elif _pos == "noun":
+            _EL_DEF = {
+                ("Masc","Sing","Nom"): "ο",    ("Masc","Sing","Gen"): "του",
+                ("Masc","Sing","Acc"): "τον",  ("Masc","Sing","Voc"): "",
+                ("Masc","Plur","Nom"): "οι",   ("Masc","Plur","Gen"): "των",
+                ("Masc","Plur","Acc"): "τους", ("Masc","Plur","Voc"): "",
+                ("Fem", "Sing","Nom"): "η",    ("Fem", "Sing","Gen"): "της",
+                ("Fem", "Sing","Acc"): "τη",   ("Fem", "Sing","Voc"): "",
+                ("Fem", "Plur","Nom"): "οι",   ("Fem", "Plur","Gen"): "των",
+                ("Fem", "Plur","Acc"): "τις",  ("Fem", "Plur","Voc"): "",
+                ("Neut","Sing","Nom"): "το",   ("Neut","Sing","Gen"): "του",
+                ("Neut","Sing","Acc"): "το",   ("Neut","Sing","Voc"): "",
+                ("Neut","Plur","Nom"): "τα",   ("Neut","Plur","Gen"): "των",
+                ("Neut","Plur","Acc"): "τα",   ("Neut","Plur","Voc"): "",
+            }
+            _EL_INDEF = {
+                ("Masc","Sing","Nom"): "ένας", ("Masc","Sing","Gen"): "ενός", ("Masc","Sing","Acc"): "έναν",
+                ("Fem", "Sing","Nom"): "μια",  ("Fem", "Sing","Gen"): "μιας", ("Fem", "Sing","Acc"): "μια",
+                ("Neut","Sing","Nom"): "ένα",  ("Neut","Sing","Gen"): "ενός", ("Neut","Sing","Acc"): "ένα",
+            }
+            _fg_noun = _gender
+            if _fg_noun is None:
+                for _g in ("Masc", "Fem", "Neut"):
+                    try:
+                        _r = eee.inflect(_lemma, {"Number": "Sing", "Case": "Nom", "Gender": _g}, _pos, language="el", backend=backend_selector.value)
+                        if _lemma in (_r or set()):
+                            _fg_noun = _g
+                            break
+                    except Exception:
+                        pass
+            _use_articles = _fg_noun is not None
+            for _label, _features in _NOUN_FORMS:
+                _fn = _features["Number"]
+                _fc = _features["Case"]
+                try:
+                    _result = eee.inflect(_lemma, _features, _pos, language="el", backend=backend_selector.value)
+                    if _use_articles:
+                        _da = _EL_DEF.get((_fg_noun, _fn, _fc), "")
+                        _ia = _EL_INDEF.get((_fg_noun, _fn, _fc), "")
+                        rows.append({
+                            "Form":       _label,
+                            "Definite":   ", ".join(f"{_da} {f}".strip() for f in sorted(_result)) if _result else "—",
+                            "Indefinite": ", ".join(f"{_ia} {f}".strip() for f in sorted(_result)) if (_result and _ia) else "—",
+                        })
+                    else:
+                        rows.append({"Form": _label, "Inflected forms": ", ".join(sorted(_result)) if _result else "—"})
+                except Exception as _exc:
+                    if _use_articles:
+                        rows.append({"Form": _label, "Definite": f"error: {_exc}", "Indefinite": "—"})
+                    else:
+                        rows.append({"Form": _label, "Inflected forms": f"error: {_exc}"})
+        else:  # adjective
+            for _label, _features in _ADJ_FORMS:
+                try:
+                    _result = eee.inflect(_lemma, _features, _pos, language="el", backend=backend_selector.value)
+                    rows.append({"Form": _label, "Inflected forms": ", ".join(sorted(_result)) if _result else "—"})
+                except Exception as _exc:
+                    rows.append({"Form": _label, "Inflected forms": f"error: {_exc}"})
     return (rows,)
 
 
 @app.cell(hide_code=True)
-def _(lemma_input, mo, rows):
-    # Display paradigm table
-    if not lemma_input.value.strip():
-        _output = mo.md("Enter a lemma above.")
+def _(corpus_table, lemma_input, mo, rows):
+    _lemma = corpus_table.value[0]["Word"] if (corpus_table is not None and corpus_table.value) else lemma_input.value.strip()
+    if not _lemma:
+        _output = mo.md("Enter a lemma above." if corpus_table is None else "Select a word from the corpus table above.")
     elif rows:
         _output = mo.ui.table(rows, selection=None)
     else:
-        _output = mo.md(f"No forms found for **{lemma_input.value.strip()}**.")
+        _output = mo.md(f"No forms found for **{_lemma}**.")
     _output
 
     return

@@ -1,0 +1,18 @@
+eee
+Copyright 2026 sadov
+
+This product includes data from the UniMorph project
+(https://unimorph.github.io/), used under the Creative Commons
+Attribution-ShareAlike 3.0 Unported License (CC BY-SA 3.0).
+
+  src/eee/data/unimorph/ell.tsv — Modern Greek morphological data
+  src/eee/data/unimorph/grc.tsv — Ancient Greek morphological data
+
+UniMorph datasets are derived from Wiktionary
+(https://www.wiktionary.org/), © Wiktionary contributors,
+licensed under CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/).
+
+UniMorph citation:
+  Batsuren et al. (2022). UniMorph 4.0: Universal Morphology.
+  In Proceedings of LREC 2022.
+  https://unimorph.github.io/
