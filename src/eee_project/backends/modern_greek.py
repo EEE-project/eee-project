@@ -1,7 +1,7 @@
 """ModernGreekBackend — delegates to modern-greek-inflexion-eee."""
 from __future__ import annotations
 
-from eee.backends._mg_features import (
+from eee_project.backends._mg_features import (
     ACTIVE,
     FEM,
     MASC,

@@ -1,0 +1,41 @@
+Case	Number	Gender	label
+Nom	Sing	Masc	Именит. ед. м.
+Nom	Sing	Fem	Именит. ед. ж.
+Nom	Sing	Neut	Именит. ед. с.
+Nom	Plur	Masc	Именит. мн. м.
+Nom	Plur	Fem	Именит. мн. ж.
+Nom	Plur	Neut	Именит. мн. с.
+Gen	Sing	Masc	Родит. ед. м.
+Gen	Sing	Fem	Родит. ед. ж.
+Gen	Sing	Neut	Родит. ед. с.
+Gen	Plur	Masc	Родит. мн. м.
+Gen	Plur	Fem	Родит. мн. ж.
+Gen	Plur	Neut	Родит. мн. с.
+Dat	Sing	Masc	Дат. ед. м.
+Dat	Sing	Fem	Дат. ед. ж.
+Dat	Sing	Neut	Дат. ед. с.
+Dat	Plur	Masc	Дат. мн. м.
+Dat	Plur	Fem	Дат. мн. ж.
+Dat	Plur	Neut	Дат. мн. с.
+Acc	Sing	Masc	Вин. ед. м.
+Acc	Sing	Fem	Вин. ед. ж.
+Acc	Sing	Neut	Вин. ед. с.
+Acc	Plur	Masc	Вин. мн. м.
+Acc	Plur	Fem	Вин. мн. ж.
+Acc	Plur	Neut	Вин. мн. с.
+Voc	Sing	Masc	Зват. ед. м.
+Voc	Sing	Fem	Зват. ед. ж.
+Voc	Sing	Neut	Зват. ед. с.
+Voc	Plur	Masc	Зват. мн. м.
+Voc	Plur	Fem	Зват. мн. ж.
+Voc	Plur	Neut	Зват. мн. с.
+Nom	Sing		Именит. ед.
+Nom	Plur		Именит. мн.
+Gen	Sing		Родит. ед.
+Gen	Plur		Родит. мн.
+Dat	Sing		Дат. ед.
+Dat	Plur		Дат. мн.
+Acc	Sing		Вин. ед.
+Acc	Plur		Вин. мн.
+Voc	Sing		Зват. ед.
+Voc	Plur		Зват. мн.

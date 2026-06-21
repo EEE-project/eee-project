@@ -3,14 +3,14 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from eee._exceptions import BackendLoadError, UnsupportedLanguageError
-from eee._registry import (
+from eee_project._exceptions import BackendLoadError, UnsupportedLanguageError
+from eee_project._registry import (
     get_backend,
     register_backend,
     set_fallback_backend,
     supported_languages,
 )
-import eee._registry as _reg
+import eee_project._registry as _reg
 
 
 # ── Fake backends ─────────────────────────────────────────────────────────────
@@ -141,7 +141,7 @@ def test_entry_point_instantiation_error_raises_backend_load_error():
 # ── Registration behaviour ────────────────────────────────────────────────────
 
 
-def test_register_overrides_builtin():
+def test_register_overrides_previously_registered():
     fake = FakeBackend()
     register_backend("el", fake)
     assert get_backend("el") is fake
@@ -165,11 +165,6 @@ def test_register_override_replaces_previous():
 # ── supported_languages() ─────────────────────────────────────────────────────
 
 
-def test_supported_languages_contains_el():
-    langs = supported_languages()
-    assert "el" in langs
-
-
 def test_supported_languages_returns_dict():
     assert isinstance(supported_languages(), dict)
 
@@ -189,35 +184,36 @@ def test_supported_languages_includes_entry_point_code():
     with patch("importlib.metadata.entry_points", return_value=[ep]):
         langs = supported_languages()
     assert "la" in langs
+    assert langs["la"] == ["latin_eee:LatinBackend"]
 
 
-def test_supported_languages_builtin_wins_over_entry_point():
-    ep = MagicMock()
-    ep.name = "el"
-    ep.value = "some_other:Backend"
+def test_supported_languages_collects_multiple_backends_per_language():
+    ep1 = MagicMock()
+    ep1.name = "xx"
+    ep1.value = "pkg_a:BackendA"
+    ep2 = MagicMock()
+    ep2.name = "xx"
+    ep2.value = "pkg_b:BackendB"
 
-    with patch("importlib.metadata.entry_points", return_value=[ep]):
+    with patch("importlib.metadata.entry_points", return_value=[ep1, ep2]):
         langs = supported_languages()
-    assert langs["el"] == "ModernGreekBackend"
+    assert langs["xx"] == ["pkg_a:BackendA", "pkg_b:BackendB"]
 
 
 # ── Resolution order ──────────────────────────────────────────────────────────
 
 
-def test_registered_beats_builtin():
+def test_registered_beats_entry_point():
     fake = FakeBackend()
-    register_backend("el", fake)
-    assert get_backend("el") is fake
+    register_backend("tt", fake)
 
-
-def test_builtin_beats_entry_point():
     ep = MagicMock()
-    ep.name = "el"
-    ep.load.return_value = FakeBackend
+    ep.name = "tt"
+    ep.load.return_value = AnotherFakeBackend
 
     with patch("importlib.metadata.entry_points", return_value=[ep]):
-        backend = get_backend("el")
-    assert not isinstance(backend, FakeBackend)
+        backend = get_backend("tt")
+    assert backend is fake
 
 
 def test_entry_point_beats_fallback():

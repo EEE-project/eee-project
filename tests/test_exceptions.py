@@ -1,4 +1,4 @@
-from eee._exceptions import (
+from eee_project._exceptions import (
     UnsupportedLanguageError,
     BackendLoadError,
     AmbiguousPOSError,

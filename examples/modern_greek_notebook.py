@@ -2,11 +2,15 @@
 # requires-python = ">=3.12"
 # dependencies = [
 #     "marimo>=0.19.4",
-#     "eee @ git+https://codeberg.org/EEE-project/eee.git@unimorph-backend",
+#     "eee @ git+https://codeberg.org/EEE-project/eee.git",
+#     "modern-greek-backend-eee @ git+https://codeberg.org/EEE-project/modern-greek-backend-eee.git",
+#     "unimorph-backend-eee @ git+https://codeberg.org/EEE-project/unimorph-backend-eee.git",
 # ]
 #
 # [tool.uv.sources]
-# eee = { git = "https://codeberg.org/EEE-project/eee.git", branch = "unimorph-backend" }
+# eee = { git = "https://codeberg.org/EEE-project/eee.git" }
+# modern-greek-backend-eee = { git = "https://codeberg.org/EEE-project/modern-greek-backend-eee.git" }
+# unimorph-backend-eee = { git = "https://codeberg.org/EEE-project/unimorph-backend-eee.git" }
 # ///
 """Modern Greek morphology demo using the eee package.
 
@@ -26,7 +30,12 @@ app = marimo.App(width="medium")
 @app.cell(hide_code=True)
 def _():
     import marimo as mo
-    import eee
+    import eee_project as eee
+    from modern_greek_backend_eee import ModernGreekBackend
+    from unimorph_backend_eee import UniMorphBackend
+
+    eee.register_backend("el", ModernGreekBackend())
+    eee.register_backend("el", UniMorphBackend(language="el"), backend="unimorph")
 
     return eee, mo
 
@@ -45,11 +54,6 @@ def _(mo):
 
 @app.cell(hide_code=True)
 def _(mo):
-    lemma_input = mo.ui.text(
-        value="γυναίκα",
-        placeholder="e.g. λύω, γυναίκα, καλός",
-        label="Lemma",
-    )
     pos_selector = mo.ui.dropdown(
         options={"Noun": "noun", "Verb": "verb", "Adjective": "adjective"},
         value="Noun",
@@ -65,7 +69,19 @@ def _(mo):
         value="modern-greek",
         label="Backend",
     )
-    return backend_selector, gender_selector, lemma_input, pos_selector
+    return backend_selector, gender_selector, pos_selector
+
+
+@app.cell(hide_code=True)
+def _(mo, pos_selector):
+    _LEMMA_DEFAULTS = {
+        "noun":      ("γυναίκα", "e.g. γυναίκα, σπίτι"),
+        "verb":      ("γράφω",   "e.g. γράφω, μιλάω"),
+        "adjective": ("καλός",   "e.g. καλός, μεγάλος"),
+    }
+    _val, _ph = _LEMMA_DEFAULTS.get(pos_selector.value, ("", ""))
+    lemma_input = mo.ui.text(value=_val, placeholder=_ph, label="Lemma")
+    return (lemma_input,)
 
 
 @app.cell(hide_code=True)
@@ -103,7 +119,7 @@ def _(backend_selector, gender_selector, mo, pos_selector):
 
 @app.cell(hide_code=True)
 def _(backend_selector, corpus_table, eee, gender_selector, lemma_input, pos_selector):
-    _lemma = corpus_table.value[0]["Word"] if (corpus_table is not None and corpus_table.value) else lemma_input.value.strip()
+    _lemma = corpus_table.value[0]["Word"] if (corpus_table is not None and corpus_table.value) else (lemma_input.value.strip() if corpus_table is None else "")
     _pos = pos_selector.value
     _gender = gender_selector.value
 
@@ -111,20 +127,20 @@ def _(backend_selector, corpus_table, eee, gender_selector, lemma_input, pos_sel
     for _per, _num in [("1","Sing"),("2","Sing"),("3","Sing"),("1","Plur"),("2","Plur"),("3","Plur")]:
         _ns = "sg" if _num == "Sing" else "pl"
         _EL_VERB_FORMS += [
-            (f"Pres {_per}{_ns}",       {"Tense":"Pres","Person":_per,"Number":_num},                None),
-            (f"Impf {_per}{_ns}",       {"Tense":"Past","Aspect":"Imp","Person":_per,"Number":_num}, None),
-            (f"Aor {_per}{_ns}",        {"Tense":"Past","Aspect":"Perf","Person":_per,"Number":_num},None),
-            (f"Fut/Subj Ipfv {_per}{_ns}", {"Tense":"Fut","Aspect":"Imp","Person":_per,"Number":_num},  "θα/να"),
-            (f"Fut/Subj Pfv {_per}{_ns}",  {"Tense":"Fut","Aspect":"Perf","Person":_per,"Number":_num}, "θα/να"),
-            (f"Cond {_per}{_ns}",       {"Tense":"Past","Aspect":"Imp","Person":_per,"Number":_num}, "θα"),
-            (f"Perf {_per}{_ns}",       {"Tense":"Perf","Person":_per,"Number":_num},                None),
-            (f"Pqp {_per}{_ns}",        {"Tense":"Pqp","Person":_per,"Number":_num},                 None),
+            (f"Present (Ενεστ.) {_per}{_ns}",          {"Tense":"Pres","Person":_per,"Number":_num},                None),
+            (f"Past Cont (Παρατ.) {_per}{_ns}",        {"Tense":"Past","Aspect":"Imp","Person":_per,"Number":_num}, None),
+            (f"Past Simple (Αόρ.) {_per}{_ns}",        {"Tense":"Past","Aspect":"Perf","Person":_per,"Number":_num},None),
+            (f"Fut Cont (Εξακ. Μέλλ.) {_per}{_ns}",   {"Tense":"Fut","Aspect":"Imp","Person":_per,"Number":_num},  "θα/να"),
+            (f"Fut Simple (Απλ. Μέλλ.) {_per}{_ns}",  {"Tense":"Fut","Aspect":"Perf","Person":_per,"Number":_num}, "θα/να"),
+            (f"Conditional (θα+Παρατ.) {_per}{_ns}",  {"Tense":"Past","Aspect":"Imp","Person":_per,"Number":_num}, "θα"),
+            (f"Perfect (Παρακ.) {_per}{_ns}",          {"Tense":"Perf","Person":_per,"Number":_num},                None),
+            (f"Pluperfect (Υπερσ.) {_per}{_ns}",       {"Tense":"Pqp","Person":_per,"Number":_num},                 None),
         ]
     for _num in ("Sing","Plur"):
         _ns = "sg" if _num == "Sing" else "pl"
         _EL_VERB_FORMS += [
-            (f"Imp Cont 2{_ns}", {"Tense":"Pres","Mood":"Imp","Person":"2","Number":_num},  None),
-            (f"Imp Aor 2{_ns}",  {"Mood":"Imp","Aspect":"Perf","Person":"2","Number":_num}, None),
+            (f"Imp Cont (Προστ. Ενεστ.) 2{_ns}", {"Tense":"Pres","Mood":"Imp","Person":"2","Number":_num},  None),
+            (f"Imp Simple (Προστ. Αόρ.) 2{_ns}",  {"Mood":"Imp","Aspect":"Perf","Person":"2","Number":_num}, None),
         ]
 
     _NOUN_FORMS = []
@@ -226,7 +242,7 @@ def _(backend_selector, corpus_table, eee, gender_selector, lemma_input, pos_sel
 
 @app.cell(hide_code=True)
 def _(corpus_table, lemma_input, mo, rows):
-    _lemma = corpus_table.value[0]["Word"] if (corpus_table is not None and corpus_table.value) else lemma_input.value.strip()
+    _lemma = corpus_table.value[0]["Word"] if (corpus_table is not None and corpus_table.value) else (lemma_input.value.strip() if corpus_table is None else "")
     if not _lemma:
         _output = mo.md("Enter a lemma above." if corpus_table is None else "Select a word from the corpus table above.")
     elif rows:

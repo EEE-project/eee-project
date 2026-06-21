@@ -1,6 +1,6 @@
 import pytest
-from eee.backends.unimorph import ud_to_unimorph_tag
-from eee._exceptions import FeatureNotSupportedError, PosNotSupportedError
+from eee_project.backends.unimorph import ud_to_unimorph_tag
+from eee_project._exceptions import FeatureNotSupportedError, PosNotSupportedError
 
 
 def tokens(tag):

@@ -1,0 +1,41 @@
+Case	Number	Gender	label
+Nom	Sing	Masc	Nom. Sg. m.
+Nom	Sing	Fem	Nom. Sg. f.
+Nom	Sing	Neut	Nom. Sg. n.
+Nom	Plur	Masc	Nom. Pl. m.
+Nom	Plur	Fem	Nom. Pl. f.
+Nom	Plur	Neut	Nom. Pl. n.
+Gen	Sing	Masc	Gen. Sg. m.
+Gen	Sing	Fem	Gen. Sg. f.
+Gen	Sing	Neut	Gen. Sg. n.
+Gen	Plur	Masc	Gen. Pl. m.
+Gen	Plur	Fem	Gen. Pl. f.
+Gen	Plur	Neut	Gen. Pl. n.
+Dat	Sing	Masc	Dat. Sg. m.
+Dat	Sing	Fem	Dat. Sg. f.
+Dat	Sing	Neut	Dat. Sg. n.
+Dat	Plur	Masc	Dat. Pl. m.
+Dat	Plur	Fem	Dat. Pl. f.
+Dat	Plur	Neut	Dat. Pl. n.
+Acc	Sing	Masc	Acc. Sg. m.
+Acc	Sing	Fem	Acc. Sg. f.
+Acc	Sing	Neut	Acc. Sg. n.
+Acc	Plur	Masc	Acc. Pl. m.
+Acc	Plur	Fem	Acc. Pl. f.
+Acc	Plur	Neut	Acc. Pl. n.
+Voc	Sing	Masc	Voc. Sg. m.
+Voc	Sing	Fem	Voc. Sg. f.
+Voc	Sing	Neut	Voc. Sg. n.
+Voc	Plur	Masc	Voc. Pl. m.
+Voc	Plur	Fem	Voc. Pl. f.
+Voc	Plur	Neut	Voc. Pl. n.
+Nom	Sing		Nom. Sg.
+Nom	Plur		Nom. Pl.
+Gen	Sing		Gen. Sg.
+Gen	Plur		Gen. Pl.
+Dat	Sing		Dat. Sg.
+Dat	Plur		Dat. Pl.
+Acc	Sing		Acc. Sg.
+Acc	Plur		Acc. Pl.
+Voc	Sing		Voc. Sg.
+Voc	Plur		Voc. Pl.

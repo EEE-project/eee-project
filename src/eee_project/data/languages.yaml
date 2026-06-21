@@ -1,0 +1,45 @@
+languages:
+  el:
+    name: Modern Greek
+    tier: dedicated
+    backend: modern-greek-inflexion-eee
+    default_backend: modern-greek
+    pos: [verb, noun, adjective, article, pronoun]
+  grc:
+    name: Ancient Greek
+    tier: dedicated
+    backend: greek-inflexion
+    default_backend: ancient-greek
+    pos: [verb, noun, adjective]
+    unimorph_pos: [noun, adjective]
+    notes: "unimorph covers nouns/adjectives; noun tags omit gender; adj tags omit gender for masc/fem, include NEUT for neuter"
+  ell:
+    name: Modern Greek (unimorph)
+    tier: unimorph
+    unimorph_code: ell
+    pos: [verb, noun, adjective]
+    accuracy_pct: 84
+  la:
+    name: Latin
+    tier: unimorph
+    unimorph_code: lat
+    pos: [noun, adjective]
+    notes: "lat.tsv filtered to N+ADJ; verb tags use a different structure (V;IND;ACT;...) not yet mapped"
+  ru:
+    name: Russian
+    tier: unimorph
+    unimorph_code: rus
+    pos: [noun, adjective]
+    notes: "Loc (prepositional case) maps to UniMorph ESS; ACC adjectives carry animacy prefix (ANIM/INAN)"
+  es:
+    name: Spanish
+    tier: unimorph
+    unimorph_code: spa
+    pos: [noun, adjective]
+    notes: "No case system; nominals indexed by Gender+Number only"
+  tr:
+    name: Turkish
+    tier: unimorph
+    unimorph_code: tur
+    pos: [noun]
+    notes: "Nouns only; adj entries in tur.tsv are LGSPEC1 predicative forms, not standard UD adjectives"

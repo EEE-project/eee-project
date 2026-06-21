@@ -13,7 +13,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from eee._protocol import MorphologyBackend
+from eee_project._protocol import MorphologyBackend
 
 
 class _ValidFakeBackend:
@@ -91,9 +91,3 @@ def test_magicmock_without_spec_does_not_satisfy_protocol():
     mock = MagicMock()
     assert not isinstance(mock, MorphologyBackend)
 
-
-def test_modern_greek_backend_satisfies_protocol():
-    from eee.backends.modern_greek import ModernGreekBackend
-
-    backend = ModernGreekBackend()
-    assert isinstance(backend, MorphologyBackend)

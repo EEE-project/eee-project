@@ -1,7 +1,7 @@
 """Tests for UD ↔ modern-greek-inflexion-eee feature path mapping."""
 import pytest
 
-from eee.backends._mg_features import (
+from eee_project.backends._mg_features import (
     ACC,
     ADJ,
     ACTIVE,

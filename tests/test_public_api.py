@@ -1,12 +1,9 @@
-"""Public API tests — eee.__init__ delegation and lazy-load guarantee."""
-import subprocess
-import sys
-
+"""Public API tests — eee.__init__ delegation and framework behaviour."""
 import pytest
 
-import eee
-import eee._registry as _reg
-from eee._exceptions import UnsupportedLanguageError
+import eee_project as eee
+import eee_project._registry as _reg
+from eee_project._exceptions import UnsupportedLanguageError
 
 
 # ── Fake backend ──────────────────────────────────────────────────────────────
@@ -27,25 +24,18 @@ def reset_registry():
     registered_before = dict(_reg._registered)
     cache_before = dict(_reg._cache)
     fallback_before = _reg._fallback
+    chains_before = {k: dict(v) for k, v in _reg._chains.items()}
     yield
     _reg._registered.clear()
     _reg._registered.update(registered_before)
     _reg._cache.clear()
     _reg._cache.update(cache_before)
     _reg._fallback = fallback_before
+    _reg._chains.clear()
+    _reg._chains.update(chains_before)
 
 
 # ── inflect() ─────────────────────────────────────────────────────────────────
-
-
-def test_inflect_routes_to_mg_backend():
-    result = eee.inflect(
-        "λύω",
-        {"Tense": "Pres", "Mood": "Ind", "VerbForm": "Fin", "Voice": "Act", "Person": "1", "Number": "Sing"},
-        "verb",
-        language="el",
-    )
-    assert result == {"λύω"}
 
 
 def test_inflect_unknown_language_raises_unsupported():
@@ -72,21 +62,31 @@ def test_inflect_routes_to_fallback():
     assert result == {"fake"}
 
 
+def test_inflect_missing_language_raises_value_error():
+    with pytest.raises(ValueError, match="language is required"):
+        eee.inflect("hello", {}, "verb")
+
+
 # ── supported_languages() ─────────────────────────────────────────────────────
 
 
 def test_supported_languages_returns_dict():
-    assert isinstance(eee.supported_languages(), dict)
-
-
-def test_supported_languages_contains_el():
-    assert "el" in eee.supported_languages()
+    langs = eee.supported_languages()
+    assert isinstance(langs, dict)
+    for v in langs.values():
+        assert isinstance(v, list)
 
 
 def test_supported_languages_excludes_fallback():
     fake = FakeBackend()
     eee.set_fallback_backend(fake)
     assert "xx" not in eee.supported_languages()
+
+
+def test_supported_languages_excludes_explicit_registrations():
+    fake = FakeBackend()
+    eee.register_backend("de", fake)
+    assert "de" not in eee.supported_languages()
 
 
 # ── Exception re-exports ──────────────────────────────────────────────────────
@@ -98,48 +98,12 @@ def test_unsupported_language_error_in_eee_namespace():
 
 
 def test_backend_load_error_in_eee_namespace():
-    from eee._exceptions import BackendLoadError
+    from eee_project._exceptions import BackendLoadError
     assert hasattr(eee, "BackendLoadError")
     assert eee.BackendLoadError is BackendLoadError
 
 
 def test_ambiguous_pos_error_in_eee_namespace():
-    from eee._exceptions import AmbiguousPOSError
+    from eee_project._exceptions import AmbiguousPOSError
     assert hasattr(eee, "AmbiguousPOSError")
     assert eee.AmbiguousPOSError is AmbiguousPOSError
-
-
-def test_supported_languages_excludes_explicit_registrations():
-    fake = FakeBackend()
-    eee.register_backend("de", fake)
-    assert "de" not in eee.supported_languages()
-
-
-# ── Lazy-load guarantee ───────────────────────────────────────────────────────
-
-
-def _run(code: str) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        [sys.executable, "-c", code],
-        capture_output=True,
-        text=True,
-    )
-
-
-def test_import_eee_does_not_load_inflexion_library():
-    result = _run(
-        "import eee; "
-        "assert 'modern_greek_inflexion_eee' not in __import__('sys').modules, "
-        "'library was eagerly imported'"
-    )
-    assert result.returncode == 0, result.stderr
-
-
-def test_inflect_el_triggers_inflexion_library_import():
-    result = _run(
-        "import eee; "
-        "eee.inflect('λύω', {'Tense':'Pres','Mood':'Ind','VerbForm':'Fin','Voice':'Act','Person':'1','Number':'Sing'}, 'verb', language='el'); "
-        "assert 'modern_greek_inflexion_eee' in __import__('sys').modules, "
-        "'library was not imported after inflect()'"
-    )
-    assert result.returncode == 0, result.stderr

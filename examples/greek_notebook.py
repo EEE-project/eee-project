@@ -2,13 +2,17 @@
 # requires-python = ">=3.12"
 # dependencies = [
 #     "marimo>=0.19.4",
-#     "eee @ git+https://codeberg.org/EEE-project/eee.git@unimorph-backend",
-#     "ancient-greek-morphology-eee @ git+https://codeberg.org/EEE-project/ancient-greek-morphology-eee.git",
+#     "eee @ git+https://codeberg.org/EEE-project/eee.git",
+#     "modern-greek-backend-eee @ git+https://codeberg.org/EEE-project/modern-greek-backend-eee.git",
+#     "unimorph-backend-eee @ git+https://codeberg.org/EEE-project/unimorph-backend-eee.git",
+#     "ancient-greek-backend-eee @ git+https://codeberg.org/EEE-project/ancient-greek-backend-eee.git",
 # ]
 #
 # [tool.uv.sources]
-# eee = { git = "https://codeberg.org/EEE-project/eee.git", branch = "unimorph-backend" }
-# ancient-greek-morphology-eee = { git = "https://codeberg.org/EEE-project/ancient-greek-morphology-eee.git" }
+# eee = { git = "https://codeberg.org/EEE-project/eee.git" }
+# modern-greek-backend-eee = { git = "https://codeberg.org/EEE-project/modern-greek-backend-eee.git" }
+# unimorph-backend-eee = { git = "https://codeberg.org/EEE-project/unimorph-backend-eee.git" }
+# ancient-greek-backend-eee = { git = "https://codeberg.org/EEE-project/ancient-greek-backend-eee.git" }
 # ///
 """Greek morphology demo (Modern and Ancient) using the eee package.
 
@@ -28,7 +32,15 @@ app = marimo.App(width="medium")
 @app.cell(hide_code=True)
 def _():
     import marimo as mo
-    import eee
+    import eee_project as eee
+    from ancient_greek_backend_eee import AncientGreekBackend
+    from modern_greek_backend_eee import ModernGreekBackend
+    from unimorph_backend_eee import UniMorphBackend
+
+    eee.register_backend("el", ModernGreekBackend())
+    eee.register_backend("el", UniMorphBackend(language="el"), backend="unimorph")
+    eee.register_backend("grc", AncientGreekBackend())
+    eee.register_backend("grc", UniMorphBackend(language="grc"), backend="unimorph")
 
     return eee, mo
 
@@ -87,14 +99,15 @@ def _(language_selector, mo, pos_selector):
     if _is_verb and language_selector.value == "el":
         _tense_opts = {
             "— (all)": None,
-            "Present": "pres",
-            "Imperfect": "impf",
-            "Aorist": "aor",
-            "Future/Subj (θα/να)": "fut",
-            "Conditional (θα)": "cond",
-            "Imperative": "imp",
-            "Perfect": "perf",
-            "Pluperfect": "pqp",
+            "Present (Ενεστώτας)": "pres",
+            "Past Continuous (Παρατατικός)": "impf",
+            "Past Simple (Αόριστος)": "aor",
+            "Future Continuous (Εξακ. Μέλλ.)": "fut_cont",
+            "Future Simple (Απλ. Μέλλ.)": "fut_simp",
+            "Conditional (θα+Παρατ.)": "cond",
+            "Imperative (Προστακτική)": "imp",
+            "Perfect (Παρακείμενος)": "perf",
+            "Pluperfect (Υπερσυντέλικος)": "pqp",
         }
         _voice_opts = {}
     elif _is_verb:  # grc
@@ -267,31 +280,32 @@ def _(
     for _per, _num in [("1","Sing"),("2","Sing"),("3","Sing"),("1","Plur"),("2","Plur"),("3","Plur")]:
         _ns = "sg" if _num == "Sing" else "pl"
         _EL_VERB_FORMS += [
-            (f"Pres {_per}{_ns}",       {"Tense":"Pres","Person":_per,"Number":_num},                None),
-            (f"Impf {_per}{_ns}",       {"Tense":"Past","Aspect":"Imp","Person":_per,"Number":_num}, None),
-            (f"Aor {_per}{_ns}",        {"Tense":"Past","Aspect":"Perf","Person":_per,"Number":_num},None),
-            (f"Fut/Subj Ipfv {_per}{_ns}", {"Tense":"Fut","Aspect":"Imp","Person":_per,"Number":_num},  "θα/να"),
-            (f"Fut/Subj Pfv {_per}{_ns}",  {"Tense":"Fut","Aspect":"Perf","Person":_per,"Number":_num}, "θα/να"),
-            (f"Cond {_per}{_ns}",       {"Tense":"Past","Aspect":"Imp","Person":_per,"Number":_num}, "θα"),
-            (f"Perf {_per}{_ns}",       {"Tense":"Perf","Person":_per,"Number":_num},                None),
-            (f"Pqp {_per}{_ns}",        {"Tense":"Pqp","Person":_per,"Number":_num},                 None),
+            (f"Present (Ενεστ.) {_per}{_ns}",          {"Tense":"Pres","Person":_per,"Number":_num},                None),
+            (f"Past Cont (Παρατ.) {_per}{_ns}",        {"Tense":"Past","Aspect":"Imp","Person":_per,"Number":_num}, None),
+            (f"Past Simple (Αόρ.) {_per}{_ns}",        {"Tense":"Past","Aspect":"Perf","Person":_per,"Number":_num},None),
+            (f"Fut Cont (Εξακ. Μέλλ.) {_per}{_ns}",   {"Tense":"Fut","Aspect":"Imp","Person":_per,"Number":_num},  "θα/να"),
+            (f"Fut Simple (Απλ. Μέλλ.) {_per}{_ns}",  {"Tense":"Fut","Aspect":"Perf","Person":_per,"Number":_num}, "θα/να"),
+            (f"Conditional (θα+Παρατ.) {_per}{_ns}",  {"Tense":"Past","Aspect":"Imp","Person":_per,"Number":_num}, "θα"),
+            (f"Perfect (Παρακ.) {_per}{_ns}",          {"Tense":"Perf","Person":_per,"Number":_num},                None),
+            (f"Pluperfect (Υπερσ.) {_per}{_ns}",       {"Tense":"Pqp","Person":_per,"Number":_num},                 None),
         ]
     for _num in ("Sing","Plur"):
         _ns = "sg" if _num == "Sing" else "pl"
         _EL_VERB_FORMS += [
-            (f"Imp Cont 2{_ns}", {"Tense":"Pres","Mood":"Imp","Person":"2","Number":_num},  None),
-            (f"Imp Aor 2{_ns}",  {"Mood":"Imp","Aspect":"Perf","Person":"2","Number":_num}, None),
+            (f"Imp Cont (Προστ. Ενεστ.) 2{_ns}", {"Tense":"Pres","Mood":"Imp","Person":"2","Number":_num},  None),
+            (f"Imp Simple (Προστ. Αόρ.) 2{_ns}",  {"Mood":"Imp","Aspect":"Perf","Person":"2","Number":_num}, None),
         ]
 
     _EL_TENSE_FILTER = {
-        "pres": lambda f, p: f.get("Tense") == "Pres" and "Mood" not in f,
-        "impf": lambda f, p: f.get("Tense") == "Past" and f.get("Aspect") == "Imp" and p is None,
-        "aor":  lambda f, p: f.get("Tense") == "Past" and f.get("Aspect") == "Perf" and "Mood" not in f,
-        "fut":  lambda f, p: f.get("Tense") == "Fut",
-        "cond": lambda f, p: f.get("Tense") == "Past" and p == "θα",
-        "imp":  lambda f, p: f.get("Mood") == "Imp",
-        "perf": lambda f, p: f.get("Tense") == "Perf",
-        "pqp":  lambda f, p: f.get("Tense") == "Pqp",
+        "pres":     lambda f, p: f.get("Tense") == "Pres" and "Mood" not in f,
+        "impf":     lambda f, p: f.get("Tense") == "Past" and f.get("Aspect") == "Imp" and p is None,
+        "aor":      lambda f, p: f.get("Tense") == "Past" and f.get("Aspect") == "Perf" and "Mood" not in f,
+        "fut_cont": lambda f, p: f.get("Tense") == "Fut" and f.get("Aspect") == "Imp",
+        "fut_simp": lambda f, p: f.get("Tense") == "Fut" and f.get("Aspect") == "Perf",
+        "cond":     lambda f, p: f.get("Tense") == "Past" and p == "θα",
+        "imp":      lambda f, p: f.get("Mood") == "Imp",
+        "perf":     lambda f, p: f.get("Tense") == "Perf",
+        "pqp":      lambda f, p: f.get("Tense") == "Pqp",
     }
 
     # ── grc verb filter ───────────────────────────────────────────────────────────
@@ -370,9 +384,10 @@ def _(
             for _number in ("Sing", "Plur")
             for _case in ("Nom", "Gen", "Acc", "Voc")
         ]
+        _genders = [_gender] if _gender else ["Masc", "Fem", "Neut"]
         _ADJ_FORMS = [
             (f"{_g} {_c} {_n}", {"Degree": "Pos", "Gender": _g, "Number": _n, "Case": _c})  # restore "Pos {_g}..." when Cmp/Sup re-enabled
-            for _g in ("Masc", "Fem", "Neut")
+            for _g in _genders
             for _n in ("Sing", "Plur")
             for _c in ("Nom", "Gen", "Acc")
         ]

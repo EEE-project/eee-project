@@ -3,12 +3,12 @@ import logging
 
 import yaml
 
-from eee._exceptions import (
+from eee_project._exceptions import (
     FeatureNotSupportedError,
     PosNotSupportedError,
     UnsupportedLanguageError,
 )
-from eee.backends.unimorph_tags import (
+from eee_project.backends.unimorph_tags import (
     CASE_MAP,
     DEGREE_MAP,
     GENDER_MAP,
@@ -41,7 +41,7 @@ def _validate_manifest(data: dict) -> None:
 def _load_manifest() -> dict:
     global _MANIFEST_CACHE
     if _MANIFEST_CACHE is None:
-        data_path = importlib.resources.files("eee.data").joinpath("languages.yaml")
+        data_path = importlib.resources.files("eee_project.data").joinpath("languages.yaml")
         text = data_path.read_text(encoding="utf-8")
         data = yaml.safe_load(text)
         _validate_manifest(data)
@@ -53,7 +53,7 @@ def _load_index(language: str) -> dict[tuple[str, str], set[str]]:
     if language in _INDEX_CACHE:
         return _INDEX_CACHE[language]
     tsv = (
-        importlib.resources.files("eee.data")
+        importlib.resources.files("eee_project.data")
         .joinpath("unimorph")
         .joinpath(f"{language}.tsv")
     )

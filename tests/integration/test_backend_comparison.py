@@ -19,7 +19,7 @@ pytestmark = pytest.mark.integration
 
 @pytest.fixture(autouse=True)
 def clear_index_cache():
-    from eee.backends.unimorph import _INDEX_CACHE
+    from eee_project.backends.unimorph import _INDEX_CACHE
     _INDEX_CACHE.clear()
     yield
     _INDEX_CACHE.clear()
@@ -30,7 +30,7 @@ def clear_index_cache():
 
 def test_el_verb_present_1sg_all_three():
     """el ακούω pres 1sg — default and modern-greek agree; unimorph also matches."""
-    import eee
+    import eee_project as eee
     features = {"Tense": "Pres", "Mood": "Ind", "Person": "1", "Number": "Sing", "Voice": "Act"}
 
     result_default     = eee.inflect("ακούω", features, "verb", language="el")
@@ -44,7 +44,7 @@ def test_el_verb_present_1sg_all_three():
 
 def test_el_verb_aorist_1sg_all_three():
     """el ακούω aorist 1sg — default and modern-greek agree; unimorph also matches."""
-    import eee
+    import eee_project as eee
     features = {
         "Tense": "Past", "Aspect": "Perf", "Mood": "Ind",
         "Person": "1", "Number": "Sing", "Voice": "Act",
@@ -61,7 +61,7 @@ def test_el_verb_aorist_1sg_all_three():
 
 def test_el_noun_gen_sg_all_three():
     """el μαγκιά gen sg — default and modern-greek agree; unimorph also matches."""
-    import eee
+    import eee_project as eee
     features = {"Case": "Gen", "Number": "Sing"}
 
     result_default      = eee.inflect("μαγκιά", features, "noun", language="el")
@@ -74,8 +74,8 @@ def test_el_noun_gen_sg_all_three():
 
 def test_el_default_not_called_for_unimorph():
     """Selecting backend='unimorph' bypasses ModernGreekBackend entirely."""
-    import eee
-    import eee._registry as _reg
+    import eee_project as eee
+    import eee_project._registry as _reg
 
     features = {"Tense": "Pres", "Mood": "Ind", "Person": "1", "Number": "Sing", "Voice": "Act"}
 
@@ -95,7 +95,7 @@ def test_el_default_not_called_for_unimorph():
 
 def test_grc_verb_aorist_default_and_ancient_greek_agree():
     """grc λύω aorist — default and ancient-greek return the same forms."""
-    import eee
+    import eee_project as eee
     features = {
         "VerbForm": "Fin", "Tense": "Aor", "Mood": "Ind",
         "Voice": "Act", "Person": "1", "Number": "Sing",
@@ -110,8 +110,8 @@ def test_grc_verb_aorist_default_and_ancient_greek_agree():
 
 def test_grc_verb_unimorph_not_supported():
     """grc verb — UniMorph has no Ancient Greek verbs, raises PosNotSupportedError."""
-    import eee
-    from eee._exceptions import PosNotSupportedError
+    import eee_project as eee
+    from eee_project._exceptions import PosNotSupportedError
 
     features = {
         "VerbForm": "Fin", "Tense": "Aor", "Mood": "Ind",
@@ -123,7 +123,7 @@ def test_grc_verb_unimorph_not_supported():
 
 def test_grc_noun_default_and_ancient_greek_agree():
     """grc θεός gen sg — default and ancient-greek return the same forms."""
-    import eee
+    import eee_project as eee
     features = {"Case": "Gen", "Number": "Sing", "Gender": "Masc"}
 
     result_default       = eee.inflect("θεός", features, "noun", language="grc")
@@ -134,7 +134,7 @@ def test_grc_noun_default_and_ancient_greek_agree():
 
 def test_grc_noun_unimorph_independent():
     """grc βοηθός gen sg — UniMorph returns forms from its own TSV dataset."""
-    import eee
+    import eee_project as eee
 
     result_unimorph = eee.inflect(
         "βοηθός", {"Case": "Gen", "Number": "Sing"}, "noun", language="grc", backend="unimorph"
@@ -144,8 +144,8 @@ def test_grc_noun_unimorph_independent():
 
 def test_grc_default_not_called_for_unimorph():
     """Selecting backend='unimorph' for grc noun bypasses AncientGreekBackend."""
-    import eee
-    import eee._registry as _reg
+    import eee_project as eee
+    import eee_project._registry as _reg
 
     # Prime the grc entry-point backend into cache
     _ = eee.inflect("θεός", {"Case": "Nom", "Number": "Sing", "Gender": "Masc"}, "noun", language="grc")
