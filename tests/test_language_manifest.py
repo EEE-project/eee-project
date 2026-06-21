@@ -1,6 +1,6 @@
 """Language quality manifest tests."""
 import pytest
-import eee
+import eee_project as eee
 
 
 def test_el_is_dedicated():
@@ -11,8 +11,20 @@ def test_ell_is_unimorph():
     assert eee.language_info("ell")["tier"] == "unimorph"
 
 
-def test_la_is_unsupported():
-    assert eee.language_info("la")["tier"] == "unsupported"
+def test_la_is_unimorph():
+    assert eee.language_info("la")["tier"] == "unimorph"
+
+
+def test_ru_is_unimorph():
+    assert eee.language_info("ru")["tier"] == "unimorph"
+
+
+def test_es_is_unimorph():
+    assert eee.language_info("es")["tier"] == "unimorph"
+
+
+def test_tr_is_unimorph():
+    assert eee.language_info("tr")["tier"] == "unimorph"
 
 
 def test_unknown_code_returns_none():
@@ -24,7 +36,3 @@ def test_manifest_schema_valid():
     assert eee.language_info("el") is not None
 
 
-def test_invalid_tier_raises_on_load():
-    from eee.backends.unimorph import _validate_manifest
-    with pytest.raises(ValueError, match="invalid tier"):
-        _validate_manifest({"languages": {"zz": {"tier": "bogus"}}})

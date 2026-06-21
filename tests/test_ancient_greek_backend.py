@@ -5,7 +5,7 @@ Requires ancient-greek-morphology-eee installed (dev dependency).
 The backend is auto-discovered via the eee.backends.v1 entry point.
 """
 import pytest
-import eee
+import eee_project as eee
 
 
 def test_grc_in_supported_languages():

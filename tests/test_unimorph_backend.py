@@ -4,7 +4,7 @@ import logging
 
 import pytest
 
-import eee._registry as _reg
+import eee_project._registry as _reg
 
 
 @pytest.fixture(autouse=True)
@@ -22,7 +22,7 @@ def reset_registry():
 
 @pytest.fixture()
 def backend():
-    from eee.backends.unimorph import UniMorphBackend
+    from eee_project.backends.unimorph import UniMorphBackend
     return UniMorphBackend()
 
 
@@ -31,13 +31,13 @@ NOUN_FEATURES = {"Case": "Gen", "Number": "Sing"}
 
 
 def test_grc_verb_raises_pos_not_supported(backend):
-    from eee._exceptions import PosNotSupportedError
+    from eee_project._exceptions import PosNotSupportedError
     with pytest.raises(PosNotSupportedError):
         backend.inflect("λύω", VERB_FEATURES, "verb", language="grc")
 
 
 def test_grc_verb_emits_warning(backend, caplog):
-    from eee._exceptions import PosNotSupportedError
+    from eee_project._exceptions import PosNotSupportedError
     with caplog.at_level(logging.WARNING):
         with pytest.raises(PosNotSupportedError):
             backend.inflect("λύω", VERB_FEATURES, "verb", language="grc")
@@ -45,37 +45,37 @@ def test_grc_verb_emits_warning(backend, caplog):
 
 
 def test_ell_unsupported_pos_raises(backend):
-    from eee._exceptions import PosNotSupportedError
+    from eee_project._exceptions import PosNotSupportedError
     with pytest.raises(PosNotSupportedError):
         backend.inflect("ο", {}, "article", language="ell")
 
 
 def test_unknown_language_raises(backend):
-    from eee._exceptions import UnsupportedLanguageError
+    from eee_project._exceptions import UnsupportedLanguageError
     with pytest.raises(UnsupportedLanguageError):
         backend.inflect("foo", {}, "noun", language="xx")
 
 
 def test_ell_noun_returns_set(backend):
-    with patch("eee.backends.unimorph._lookup", return_value={"λόγου"}):
+    with patch("eee_project.backends.unimorph._lookup", return_value={"λόγου"}):
         result = backend.inflect("λόγος", NOUN_FEATURES, "noun", language="ell")
     assert result == {"λόγου"}
 
 
 def test_empty_result_returns_empty_set(backend):
-    with patch("eee.backends.unimorph._lookup", return_value=set()):
+    with patch("eee_project.backends.unimorph._lookup", return_value=set()):
         result = backend.inflect("λόγος", {"Case": "Nom", "Number": "Sing"}, "noun", language="ell")
     assert result == set()
 
 
 def test_unk_sentinel_filtered(backend):
-    with patch("eee.backends.unimorph._lookup", return_value={"UNK"}):
+    with patch("eee_project.backends.unimorph._lookup", return_value={"UNK"}):
         result = backend.inflect("λόγος", {"Case": "Nom", "Number": "Sing"}, "noun", language="ell")
     assert result == set()
 
 
 def test_empty_string_filtered(backend):
-    with patch("eee.backends.unimorph._lookup", return_value={""}):
+    with patch("eee_project.backends.unimorph._lookup", return_value={""}):
         result = backend.inflect("λόγος", {"Case": "Nom", "Number": "Sing"}, "noun", language="ell")
     assert result == set()
 
@@ -89,7 +89,7 @@ def test_supported_languages_excludes_el(backend):
 
 
 def test_emdash_sentinel_filtered(backend):
-    with patch("eee.backends.unimorph._lookup", return_value={"—"}):
+    with patch("eee_project.backends.unimorph._lookup", return_value={"—"}):
         result = backend.inflect("λόγος", {"Case": "Nom", "Number": "Sing"}, "noun", language="ell")
     assert result == set()
 
@@ -101,7 +101,7 @@ def test_inflect_future_no_aspect_calls_lookup_twice(backend):
     def _side(lemma, tag, language):
         return per_tag.get(tag, set())
 
-    with patch("eee.backends.unimorph._lookup", side_effect=_side) as mock_lookup:
+    with patch("eee_project.backends.unimorph._lookup", side_effect=_side) as mock_lookup:
         result = backend.inflect(
             "ακούω",
             {"Tense": "Fut", "Voice": "Act", "Mood": "Ind", "Person": "1", "Number": "Sing"},
@@ -114,7 +114,7 @@ def test_inflect_future_no_aspect_calls_lookup_twice(backend):
 
 def test_inflect_future_explicit_aspect_calls_lookup_once(backend):
     """Future with explicit Aspect=Imp → _lookup called exactly once."""
-    with patch("eee.backends.unimorph._lookup", return_value={"ακούω"}) as mock_lookup:
+    with patch("eee_project.backends.unimorph._lookup", return_value={"ακούω"}) as mock_lookup:
         result = backend.inflect(
             "ακούω",
             {"Tense": "Fut", "Aspect": "Imp", "Voice": "Act", "Mood": "Ind", "Person": "1", "Number": "Sing"},

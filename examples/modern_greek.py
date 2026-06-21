@@ -1,11 +1,13 @@
 # /// script
 # requires-python = ">=3.12"
 # dependencies = [
-#     "eee @ git+https://codeberg.org/EEE-project/eee.git",
+#     "eee-project @ git+https://codeberg.org/EEE-project/eee.git",
+#     "modern-greek-backend-eee @ git+https://codeberg.org/EEE-project/modern-greek-backend-eee.git",
 # ]
 #
 # [tool.uv.sources]
-# eee = { git = "https://codeberg.org/EEE-project/eee.git" }
+# eee-project = { git = "https://codeberg.org/EEE-project/eee.git" }
+# modern-greek-backend-eee = { git = "https://codeberg.org/EEE-project/modern-greek-backend-eee.git" }
 # ///
 """Modern Greek morphology examples using the eee package.
 
@@ -16,7 +18,10 @@ Run from within the repo (uses local package):
     uv run python examples/modern_greek.py
 """
 
-import eee
+import eee_project as eee
+from modern_greek_backend_eee import ModernGreekBackend
+
+eee.register_backend("el", ModernGreekBackend())
 
 
 def show(label: str, result: set[str]) -> None:
@@ -86,4 +91,6 @@ show("Sup Masc Sing Nom", eee.inflect("καλός", {"Degree": "Sup", "Gender": 
 print()
 print("=== Registry ===")
 print()
-print(f"  supported_languages() → {eee.supported_languages()}")
+print("  registered: el → ModernGreekBackend (explicit)")
+for lang, backends in eee.supported_languages().items():
+    print(f"  entry points: {lang} → {', '.join(backends)}")

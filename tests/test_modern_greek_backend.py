@@ -1,7 +1,7 @@
 """Integration tests for ModernGreekBackend against real library output."""
 import pytest
 
-from eee.backends.modern_greek import ModernGreekBackend
+from eee_project.backends.modern_greek import ModernGreekBackend
 
 
 @pytest.fixture
@@ -154,5 +154,5 @@ def test_backend_language_is_el(backend):
 
 
 def test_backend_satisfies_protocol():
-    from eee._protocol import MorphologyBackend
+    from eee_project._protocol import MorphologyBackend
     assert isinstance(ModernGreekBackend(), MorphologyBackend)

@@ -1,10 +1,10 @@
 """Fallback routing tests — all backends mocked, no real model calls."""
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
-import eee
-import eee._registry as _reg
+import eee_project as eee
+import eee_project._registry as _reg
 
 
 def _mock_backend(result=None):
@@ -16,7 +16,23 @@ def _mock_backend(result=None):
 VERB_FEATURES = {"Tense": "Pres", "Voice": "Act", "Mood": "Ind", "Person": "1", "Number": "Sing"}
 
 
-def test_el_uses_dedicated_not_fallback():
+@pytest.fixture(autouse=True)
+def reset_registry():
+    registered_before = dict(_reg._registered)
+    cache_before = dict(_reg._cache)
+    fallback_before = _reg._fallback
+    chains_before = {k: dict(v) for k, v in _reg._chains.items()}
+    yield
+    _reg._registered.clear()
+    _reg._registered.update(registered_before)
+    _reg._cache.clear()
+    _reg._cache.update(cache_before)
+    _reg._fallback = fallback_before
+    _reg._chains.clear()
+    _reg._chains.update(chains_before)
+
+
+def test_el_uses_registered_not_fallback():
     dedicated = _mock_backend({"λύω"})
     fallback = _mock_backend()
     eee.register_backend("el", dedicated)
@@ -26,15 +42,6 @@ def test_el_uses_dedicated_not_fallback():
     fallback.inflect.assert_not_called()
 
 
-def test_el_unimorph_backend_kwarg():
-    fallback = _mock_backend({"λύει"})
-    eee.set_fallback_backend(fallback)
-    with patch("eee.backends.unimorph._lookup", return_value={"ακούω"}):
-        result = eee.inflect("λύω", VERB_FEATURES, "verb", language="el", backend="unimorph")
-    fallback.inflect.assert_not_called()
-    assert result == {"ακούω"}
-
-
 def test_unknown_language_uses_fallback():
     fallback = _mock_backend({"x"})
     eee.set_fallback_backend(fallback)
@@ -42,7 +49,7 @@ def test_unknown_language_uses_fallback():
     fallback.inflect.assert_called_once()
 
 
-def test_grc_verb_uses_dedicated_not_fallback():
+def test_grc_uses_registered_not_fallback():
     dedicated = _mock_backend({"λύει"})
     fallback = _mock_backend()
     eee.register_backend("grc", dedicated)
@@ -52,18 +59,9 @@ def test_grc_verb_uses_dedicated_not_fallback():
     fallback.inflect.assert_not_called()
 
 
-def test_register_default_backends_wires_fallback():
-    with patch("eee.backends.unimorph._lookup", return_value={"λύει"}):
-        eee.register_default_backends()
-        from eee._exceptions import UnsupportedLanguageError
-        try:
-            eee.inflect("λύω", VERB_FEATURES, "verb", language="el", backend="unimorph")
-        except UnsupportedLanguageError:
-            pytest.fail("UnsupportedLanguageError raised — builtin not wired")
-
-
-def test_el_unimorph_works_without_register_default_backends():
-    """backend='unimorph' is a builtin — no register_default_backends() call needed."""
-    with patch("eee.backends.unimorph._lookup", return_value={"ακούω"}):
-        result = eee.inflect("λύω", VERB_FEATURES, "verb", language="el", backend="unimorph")
+def test_named_backend_registered_explicitly():
+    """Explicit register_backend() + named backend works without builtins."""
+    unimorph = _mock_backend({"ακούω"})
+    eee.register_backend("el", unimorph, backend="unimorph")
+    result = eee.inflect("λύω", VERB_FEATURES, "verb", language="el", backend="unimorph")
     assert result == {"ακούω"}

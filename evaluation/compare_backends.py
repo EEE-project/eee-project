@@ -20,10 +20,19 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 import eee
-from eee.backends.unimorph import UniMorphBackend
+from unimorph_backend_eee import UniMorphBackend
 
-# Dedicated backends: "el" (MG) is built-in; "grc" loaded via entry point if installed
-eee.register_default_backends()
+try:
+    from modern_greek_backend_eee import ModernGreekBackend
+    eee.register_backend("el", ModernGreekBackend())
+except ImportError:
+    pass
+
+try:
+    from ancient_greek_backend_eee import AncientGreekBackend
+    eee.register_backend("grc", AncientGreekBackend())
+except ImportError:
+    pass
 
 unimorph = UniMorphBackend()
 

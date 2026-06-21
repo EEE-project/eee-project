@@ -5,6 +5,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Clone backend packages
+        run: |
+          git clone https://codeberg.org/EEE-project/modern-greek-backend-eee.git ../modern-greek-backend-eee
+          git clone https://codeberg.org/EEE-project/unimorph-backend-eee.git ../unimorph-backend-eee
+          git clone https://codeberg.org/EEE-project/ancient-greek-backend-eee.git ../ancient-greek-backend-eee
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"

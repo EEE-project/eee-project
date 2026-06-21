@@ -1,11 +1,12 @@
 [project]
-name = "eee"
-version = "0.4.0"
+name = "eee-project"
+version = "0.5.0"
 requires-python = ">=3.12"
 dependencies = [
+    "anywidget>=0.9",
     "marimo>=0.23.8",
-    "modern-greek-inflexion-eee @ git+https://github.com/EEE-project/modern-greek-inflexion-eee.git",
     "pyyaml>=6",
+    "tomlkit>=0.15.0",
 ]
 
 
@@ -14,7 +15,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/eee"]
+packages = ["src/eee_project"]
 
 [tool.hatch.metadata]
 allow-direct-references = true
@@ -23,14 +24,17 @@ allow-direct-references = true
 markers = ["integration: requires optional deps or network (skipped in CI)"]
 
 [tool.uv.sources]
-modern-greek-inflexion-eee = { git = "https://github.com/EEE-project/modern-greek-inflexion-eee.git" }
-ancient-greek-morphology-eee = { git = "https://codeberg.org/EEE-project/ancient-greek-morphology-eee.git" }
-
+modern-greek-backend-eee = { path = "../modern-greek-backend-eee" }
+unimorph-backend-eee = { path = "../unimorph-backend-eee" }
+ancient-greek-backend-eee = { path = "../ancient-greek-backend-eee" }
 
 [dependency-groups]
 dev = [
-    "ancient-greek-morphology-eee",
     "marimo>=0.19.4",
+    "pandas",
     "pytest>=8",
     "pytest-cov",
+    "modern-greek-backend-eee",
+    "unimorph-backend-eee",
+    "ancient-greek-backend-eee",
 ]

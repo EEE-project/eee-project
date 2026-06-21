@@ -1,13 +1,13 @@
 # /// script
 # requires-python = ">=3.12"
 # dependencies = [
-#     "eee @ git+https://codeberg.org/EEE-project/eee.git",
-#     "ancient-greek-morphology-eee @ git+https://codeberg.org/EEE-project/ancient-greek-morphology-eee.git",
+#     "eee-project @ git+https://codeberg.org/EEE-project/eee.git",
+#     "ancient-greek-backend-eee @ git+https://codeberg.org/EEE-project/ancient-greek-backend-eee.git",
 # ]
 #
 # [tool.uv.sources]
-# eee = { git = "https://codeberg.org/EEE-project/eee.git" }
-# ancient-greek-morphology-eee = { git = "https://codeberg.org/EEE-project/ancient-greek-morphology-eee.git" }
+# eee-project = { git = "https://codeberg.org/EEE-project/eee.git" }
+# ancient-greek-backend-eee = { git = "https://codeberg.org/EEE-project/ancient-greek-backend-eee.git" }
 # ///
 """Ancient Greek morphology examples using the eee package.
 
@@ -18,7 +18,10 @@ Run from within the repo (uses local packages):
     uv run python examples/ancient_greek.py
 """
 
-import eee
+import eee_project as eee
+from ancient_greek_backend_eee import AncientGreekBackend
+
+eee.register_backend("grc", AncientGreekBackend())
 
 
 def show(label: str, result: set[str]) -> None:
@@ -101,4 +104,6 @@ show("Masc Gen Sing", eee.inflect("ἀληθής", {"Case": "Gen", "Number": "Si
 print()
 print("=== Registry ===")
 print()
-print(f"  supported_languages() → {eee.supported_languages()}")
+print("  registered: grc → AncientGreekBackend (explicit)")
+for lang, backends in eee.supported_languages().items():
+    print(f"  entry points: {lang} → {', '.join(backends)}")

@@ -1,20 +1,24 @@
 # /// script
 # requires-python = ">=3.12"
 # dependencies = [
-#     "eee @ git+https://codeberg.org/EEE-project/eee.git",
-#     "ancient-greek-morphology-eee @ git+https://codeberg.org/EEE-project/ancient-greek-morphology-eee.git",
+#     "eee-project @ git+https://codeberg.org/EEE-project/eee.git",
+#     "modern-greek-backend-eee @ git+https://codeberg.org/EEE-project/modern-greek-backend-eee.git",
+#     "unimorph-backend-eee @ git+https://codeberg.org/EEE-project/unimorph-backend-eee.git",
+#     "ancient-greek-backend-eee @ git+https://codeberg.org/EEE-project/ancient-greek-backend-eee.git",
 # ]
 #
 # [tool.uv.sources]
-# eee = { git = "https://codeberg.org/EEE-project/eee.git" }
-# ancient-greek-morphology-eee = { git = "https://codeberg.org/EEE-project/ancient-greek-morphology-eee.git" }
+# eee-project = { git = "https://codeberg.org/EEE-project/eee.git" }
+# modern-greek-backend-eee = { git = "https://codeberg.org/EEE-project/modern-greek-backend-eee.git" }
+# unimorph-backend-eee = { git = "https://codeberg.org/EEE-project/unimorph-backend-eee.git" }
+# ancient-greek-backend-eee = { git = "https://codeberg.org/EEE-project/ancient-greek-backend-eee.git" }
 # ///
 """Side-by-side comparison of all eee backends.
 
 Key findings shown here:
   - MG dedicated (el) and UniMorph (ell) agree on nouns/adjectives when ell.tsv has the lemma.
   - ell.tsv is missing many common words (λόγος, άνθρωπος); coverage depends on the corpus.
-  - UniMorph ell verb tags (V;1;SG;IPFV;PRS) differ from eee's UD mapping → always ∅ for verbs.
+  - Both backends agree on MG verbs (ell.tsv uses V;PERSON;NUMBER;ASPECT;TENSE; eee maps to it).
   - AG dedicated (grc) covers classical lexicon; grc.tsv covers a different (Byzantine/NT) corpus.
   - The two AG backends have COMPLEMENTARY coverage: θεός ∈ dedicated, βοηθός ∈ UniMorph.
 
@@ -26,22 +30,20 @@ Run from within the repo (uses local packages):
 """
 from __future__ import annotations
 
-import eee
-from eee.backends.modern_greek import ModernGreekBackend
-from eee.backends.unimorph import UniMorphBackend
-
-eee.register_default_backends()
-
-mg = ModernGreekBackend()
-um = UniMorphBackend()
+import eee_project as eee
+from modern_greek_backend_eee import ModernGreekBackend
+from unimorph_backend_eee import UniMorphBackend
 
 try:
-    from ancient_greek_morphology_eee.backend import AncientGreekBackend
+    from ancient_greek_backend_eee import AncientGreekBackend
     ag: object | None = AncientGreekBackend()
     ag_label = "grc dedicated"
 except ImportError:
     ag = None
     ag_label = "grc (not installed)"
+
+mg = ModernGreekBackend()
+um = UniMorphBackend()
 
 
 def fmt(result: set[str]) -> str:
@@ -96,25 +98,25 @@ for lemma in ("γυναίκα", "σπίτι", "λόγος"):
         "MG noun  el(dedicated) vs ell(UniMorph)", lemma,
         MG_NOUN_SLOTS, "noun",
         "el dedicated", "el", mg,
-        "ell UniMorph",  "ell", um,
+        "ell UniMorph",  "el", um,
     )
 
 # ── Modern Greek verbs: el dedicated vs ell UniMorph ─────────────────────────
-# UniMorph always returns ∅ — ell.tsv uses V;1;SG;IPFV;PRS order (no mood/voice),
-# but eee generates V;IND;PRS;ACT;1;SG. Tag format mismatch, not a missing lemma.
+# Both backends use V;PERSON;NUMBER;ASPECT;TENSE tag order. When ell.tsv has the
+# lemma, both backends agree. ell.tsv verb coverage is limited (~1,094 lemmas).
 
 MG_VERB_SLOTS = [
     (f"{p}{'sg' if n == 'Sing' else 'pl'} {label}",
-     {"Tense": t, "Mood": "Ind", "Voice": "Act", "Person": p, "Number": n, **extra})
-    for label, t, extra in [("prs", "Pres", {}), ("impf", "Past", {"Aspect": "Imp"})]
+     {"Tense": t, "Mood": "Ind", "Person": p, "Number": n, **extra})
+    for label, t, extra in [("prs", "Pres", {}), ("impf", "Past", {"Aspect": "Imp"}), ("aor", "Past", {"Aspect": "Perf"})]
     for p, n in [("1", "Sing"), ("2", "Sing"), ("3", "Sing")]
 ]
 
 table(
-    "MG verb  el(dedicated) vs ell(UniMorph) — tag format mismatch", "λύω",
+    "MG verb  el(dedicated) vs ell(UniMorph)", "ακούω",
     MG_VERB_SLOTS, "verb",
     "el dedicated", "el", mg,
-    "ell UniMorph",  "ell", um,
+    "ell UniMorph",  "el", um,
 )
 
 # ── Ancient Greek verbs: grc dedicated only ───────────────────────────────────
@@ -175,11 +177,10 @@ for lemma in ("ἀγαθός", "μυστικός"):
 print(f"\n{'─' * 74}")
 print("  Backend registry")
 print(f"{'─' * 74}")
-for code, cls in eee.supported_languages().items():
-    print(f"  {code:<6}  {cls}")
-print(f"  {'ell':<6}  UniMorphBackend (fallback — nouns/adjectives from ell.tsv)")
+for code, backends in eee.supported_languages().items():
+    print(f"  {code:<6}  {', '.join(backends)}")
 print()
-print("  ell.tsv:  ~212k forms, 8 373 lemmas (corpus-derived, not full lexicon)")
-print("  grc.tsv:  ~44k forms, 2 431 lemmas (Byzantine/NT corpus)")
+print("  ell.tsv:  ~11,937 lemmas — verb 1,094 · noun 8,351 · adj 2,492 (corpus-derived, not full lexicon)")
+print("  grc.tsv:  ~2,431 lemmas — noun 2,224 · adj 207 (mixed Attic/Koine/Hellenistic)")
 print()
 print("  ≠ = backends disagree    ∅ = backend has no result")

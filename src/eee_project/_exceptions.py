@@ -1,11 +1,20 @@
 class UnsupportedLanguageError(Exception):
-    def __init__(self, language_code: str) -> None:
+    def __init__(self, language_code: str, backend: str | None = None) -> None:
         self.language_code = language_code
-        super().__init__(
-            f"No backend registered for language '{language_code}'. "
-            f"Install a backend package (e.g., pip install {language_code}-eee) "
-            f"or register one with eee.register_backend()."
-        )
+        if backend is not None:
+            msg = (
+                f"No backend named '{backend}' found for language '{language_code}'. "
+                f"Install a backend package that registers '{backend}' in the "
+                f"eee_project.named_backends.v1 entry point group, or register one explicitly "
+                f"with eee.register_backend({language_code!r}, instance, backend={backend!r})."
+            )
+        else:
+            msg = (
+                f"No backend registered for language '{language_code}'. "
+                f"Install a backend package (e.g., pip install {language_code}-eee) "
+                f"or register one with eee.register_backend()."
+            )
+        super().__init__(msg)
 
 
 class BackendLoadError(Exception):

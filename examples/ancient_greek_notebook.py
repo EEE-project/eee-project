@@ -2,13 +2,15 @@
 # requires-python = ">=3.12"
 # dependencies = [
 #     "marimo>=0.19.4",
-#     "eee @ git+https://codeberg.org/EEE-project/eee.git@unimorph-backend",
-#     "ancient-greek-morphology-eee @ git+https://codeberg.org/EEE-project/ancient-greek-morphology-eee.git",
+#     "eee-project @ git+https://codeberg.org/EEE-project/eee.git",
+#     "unimorph-backend-eee @ git+https://codeberg.org/EEE-project/unimorph-backend-eee.git",
+#     "ancient-greek-backend-eee @ git+https://codeberg.org/EEE-project/ancient-greek-backend-eee.git",
 # ]
 #
 # [tool.uv.sources]
-# eee = { git = "https://codeberg.org/EEE-project/eee.git", branch = "unimorph-backend" }
-# ancient-greek-morphology-eee = { git = "https://codeberg.org/EEE-project/ancient-greek-morphology-eee.git" }
+# eee-project = { git = "https://codeberg.org/EEE-project/eee.git" }
+# unimorph-backend-eee = { git = "https://codeberg.org/EEE-project/unimorph-backend-eee.git" }
+# ancient-greek-backend-eee = { git = "https://codeberg.org/EEE-project/ancient-greek-backend-eee.git" }
 # ///
 """Ancient Greek morphology demo using the eee package.
 
@@ -28,7 +30,13 @@ app = marimo.App(width="medium")
 @app.cell(hide_code=True)
 def _():
     import marimo as mo
-    import eee
+    import eee_project as eee
+    from ancient_greek_backend_eee import AncientGreekBackend
+    from unimorph_backend_eee import UniMorphBackend
+
+    eee.register_backend("grc", AncientGreekBackend())
+    eee.register_backend("grc", UniMorphBackend(language="grc"), backend="unimorph")
+
     return eee, mo
 
 

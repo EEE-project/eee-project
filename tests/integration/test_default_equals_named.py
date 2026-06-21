@@ -10,7 +10,7 @@ Run:
     uv run pytest tests/integration/test_default_equals_named.py -m integration -v
 """
 import pytest
-import eee
+import eee_project as eee
 
 pytestmark = pytest.mark.integration
 
