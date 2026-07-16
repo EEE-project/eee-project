@@ -16,6 +16,14 @@ def test_inflect_no_chain_uses_single_backend():
     assert isinstance(result, set)
 
 
+def test_inflect_no_chain_applies_post_hook():
+    _reg.register_backend("grc", MockBackend({"θεός"}))
+    _reg._chains.pop("grc", None)   # remove YAML default chain for this test
+    result = eee.inflect("θεός", {}, "noun", language="grc",
+                         post_hook=lambda forms, ctx: forms | {"call_form"})
+    assert result == {"θεός", "call_form"}
+
+
 def test_inflect_runs_chain_when_registered():
     register("grc", "mock-a", MockBackend({"θεός"}))
     _reg.set_chain("grc", ["mock-a"])

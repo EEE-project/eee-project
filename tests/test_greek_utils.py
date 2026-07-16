@@ -3,45 +3,15 @@ from types import SimpleNamespace
 
 import pytest
 
-from eee_project import GreekUtils
+from eee_project import GreekUtils, ANCIENT_GREEK
+from conftest import StubMo, StubBackend
 
 
 # ---------------------------------------------------------------------------
 # Stub backend
 # ---------------------------------------------------------------------------
 
-class _StubMo:
-    """Minimal marimo stub — only the parts GreekUtils touches."""
-
-    class _text:
-        def __init__(self, label=""):
-            self.label = label
-            self.value = ""
-
-    class _array:
-        def __init__(self, elements):
-            self.elements = elements
-            self.value = [e.value for e in elements]
-
-    class _md:
-        def __init__(self, text):
-            self.text = text
-
-    class ui:
-        @staticmethod
-        def text(label=""):
-            return _StubMo._text(label)
-
-        @staticmethod
-        def array(elements):
-            return _StubMo._array(elements)
-
-    @staticmethod
-    def md(text):
-        return _StubMo._md(text)
-
-
-_mo = _StubMo()
+_mo = StubMo()
 
 import pandas as _pd_real
 
@@ -88,20 +58,19 @@ def _adj_paradigm(word):
     }
 
 
-class StubBackend:
-    def paradigm(self, word, pos):
-        if pos == 'noun':
-            return _noun_paradigm(word)
-        if pos == 'verb':
-            return _verb_paradigm(word)
-        if pos == 'adjective':
-            return _adj_paradigm(word)
-        return {}
+def _paradigm(word, pos):
+    if pos == 'noun':
+        return _noun_paradigm(word)
+    if pos == 'verb':
+        return _verb_paradigm(word)
+    if pos == 'adjective':
+        return _adj_paradigm(word)
+    return {}
 
 
 @pytest.fixture
 def gu():
-    return GreekUtils(StubBackend(), _mo, _pd_real)
+    return GreekUtils(StubBackend(_paradigm), _mo, _pd_real)
 
 
 # ---------------------------------------------------------------------------
@@ -122,7 +91,8 @@ class TestCheckNounSimple:
             test_word="η μνήμη", is_pluralia_tantum=False,
             active_cases=[["sg","nom"],["sg","acc"],["sg","gen"],["pl","nom"],["pl","acc"],["pl","gen"]],
         )
-        assert gu.check_noun_test("η μνήμη", snap, mode='simple') is True
+        ok, _ = gu.check_noun_test("η μνήμη", snap, mode='simple')
+        assert ok is True
 
     def test_correct_with_article_ignored_simple(self, gu):
         # In simple mode articles are validated if present but not required
@@ -131,7 +101,8 @@ class TestCheckNounSimple:
             test_word="η μνήμη", is_pluralia_tantum=False,
             active_cases=[["sg","nom"],["sg","acc"],["sg","gen"],["pl","nom"],["pl","acc"],["pl","gen"]],
         )
-        assert gu.check_noun_test("η μνήμη", snap, mode='simple') is True
+        ok, _ = gu.check_noun_test("η μνήμη", snap, mode='simple')
+        assert ok is True
 
     def test_wrong_noun_form(self, gu):
         snap = _snap(
@@ -139,7 +110,9 @@ class TestCheckNounSimple:
             test_word="η μνήμη", is_pluralia_tantum=False,
             active_cases=[["sg","nom"],["sg","acc"],["sg","gen"],["pl","nom"],["pl","acc"],["pl","gen"]],
         )
-        assert gu.check_noun_test("η μνήμη", snap, mode='simple') is False
+        ok, errs = gu.check_noun_test("η μνήμη", snap, mode='simple')
+        assert ok is False
+        assert "WRONG" in errs
 
     def test_wrong_article_simple(self, gu):
         # wrong article in simple mode → error
@@ -148,14 +121,27 @@ class TestCheckNounSimple:
             test_word="η μνήμη", is_pluralia_tantum=False,
             active_cases=[["sg","nom"],["sg","acc"],["sg","gen"],["pl","nom"],["pl","acc"],["pl","gen"]],
         )
-        assert gu.check_noun_test("η μνήμη", snap, mode='simple') is False
+        ok, errs = gu.check_noun_test("η μνήμη", snap, mode='simple')
+        assert ok is False
+        assert "article" in errs
 
     def test_stale_test_word(self, gu):
         snap = _snap(
             ["μνήμη", "μνήμη", "μνήμης", "μνήμες", "μνήμες", "μνημών"],
             test_word="η γειτονιά",
         )
-        assert gu.check_noun_test("η μνήμη", snap, mode='simple') is False
+        ok, _ = gu.check_noun_test("η μνήμη", snap, mode='simple')
+        assert ok is False
+
+    def test_returns_feedback_string(self, gu):
+        snap = _snap(
+            ["μνήμη", "WRONG", "μνήμης", "μνήμες", "μνήμες", "μνημών"],
+            test_word="η μνήμη", is_pluralia_tantum=False,
+            active_cases=[["sg","nom"],["sg","acc"],["sg","gen"],["pl","nom"],["pl","acc"],["pl","gen"]],
+        )
+        ok, fb = gu.check_noun_test("η μνήμη", snap, mode='simple')
+        assert ok is False
+        assert isinstance(fb, str) and len(fb) > 0
 
 
 class TestCheckNounComplex:
@@ -171,7 +157,8 @@ class TestCheckNounComplex:
         )
 
     def test_correct(self, gu):
-        assert gu.check_noun_test("η μνήμη", self._correct_snap(), mode='complex') is True
+        ok, _ = gu.check_noun_test("η μνήμη", self._correct_snap(), mode='complex')
+        assert ok is True
 
     def test_missing_article_required(self, gu):
         snap = _snap(
@@ -180,8 +167,9 @@ class TestCheckNounComplex:
             test_word="η μνήμη", is_pluralia_tantum=False,
             active_cases=[["sg","nom"],["sg","acc"],["sg","gen"],["pl","nom"],["pl","acc"],["pl","gen"]],
         )
-        # missing definite article in complex mode → error
-        assert gu.check_noun_test("η μνήμη", snap, mode='complex') is False
+        ok, errs = gu.check_noun_test("η μνήμη", snap, mode='complex')
+        assert ok is False
+        assert "article missing" in errs
 
     def test_wrong_indefinite_article(self, gu):
         snap = _snap(
@@ -191,7 +179,8 @@ class TestCheckNounComplex:
             test_word="η μνήμη", is_pluralia_tantum=False,
             active_cases=[["sg","nom"],["sg","acc"],["sg","gen"],["pl","nom"],["pl","acc"],["pl","gen"]],
         )
-        assert gu.check_noun_test("η μνήμη", snap, mode='complex') is False
+        ok, _ = gu.check_noun_test("η μνήμη", snap, mode='complex')
+        assert ok is False
 
 
 # ---------------------------------------------------------------------------
@@ -270,7 +259,7 @@ class TestCheckAdjective:
 
     def test_correct_complex(self, gu):
         answers = []
-        p = StubBackend().paradigm("ωραίος", "adjective")['adj']
+        p = StubBackend(_paradigm).paradigm("ωραίος", "adjective")['adj']
         for n in ('sg', 'pl'):
             for g_ in ('masc', 'fem', 'neut'):
                 for c in ('nom', 'acc', 'gen'):
@@ -315,7 +304,8 @@ def test_alt_backend_noun():
         test_word="το βιβλίο", is_pluralia_tantum=False,
         active_cases=[["sg","nom"],["sg","acc"],["sg","gen"],["pl","nom"],["pl","acc"],["pl","gen"]],
     )
-    assert gu2.check_noun_test("το βιβλίο", snap, mode='simple') is True
+    ok, _ = gu2.check_noun_test("το βιβλίο", snap, mode='simple')
+    assert ok is True
 
 
 def test_alt_backend_unknown_word():
@@ -326,4 +316,70 @@ def test_alt_backend_unknown_word():
         test_word="η άγνωστο", is_pluralia_tantum=False,
         active_cases=[["sg","nom"],["sg","acc"],["sg","gen"],["pl","nom"],["pl","acc"],["pl","gen"]],
     )
-    assert gu2.check_noun_test("η άγνωστο", snap, mode='simple') is False
+    ok, _ = gu2.check_noun_test("η άγνωστο", snap, mode='simple')
+    assert ok is False
+
+
+# ---------------------------------------------------------------------------
+# Ancient Greek article=True path
+# ---------------------------------------------------------------------------
+
+class _AGStubBackend:
+    """AG backend stub — ἀγορά (fem, a-stem)."""
+    def paradigm(self, word, pos):
+        if pos == 'noun' and word == 'ἀγορά':
+            return {
+                'fem': {
+                    'sg': {'nom': {'ἀγορά'}, 'acc': {'ἀγοράν'}, 'gen': {'ἀγορᾶς'}},
+                    'pl': {'nom': {'ἀγοραί'}, 'acc': {'ἀγοράς'}, 'gen': {'ἀγορῶν'}},
+                }
+            }
+        return {}
+
+
+_AC_AG = [["sg","nom"],["sg","acc"],["sg","gen"],["pl","nom"],["pl","acc"],["pl","gen"]]
+
+@pytest.fixture
+def gu_ag():
+    return GreekUtils(_AGStubBackend(), _mo, _pd_real, config=ANCIENT_GREEK)
+
+
+class TestCheckNounArticleRequired:
+    def _snap(self, values):
+        return _snap(values, test_word="ἀγορά", is_pluralia_tantum=False, active_cases=_AC_AG)
+
+    def test_correct_with_article(self, gu_ag):
+        snap = self._snap(["ἡ ἀγορά", "τὴν ἀγοράν", "τῆς ἀγορᾶς",
+                           "αἱ ἀγοραί", "τὰς ἀγοράς", "τῶν ἀγορῶν"])
+        ok, fb = gu_ag.check_noun_test("ἀγορά", snap, article=True)
+        assert ok is True
+        assert fb == ""
+
+    def test_acute_accent_article_accepted(self, gu_ag):
+        # τήν (acute) is also valid alongside τὴν (grave)
+        snap = self._snap(["ἡ ἀγορά", "τήν ἀγοράν", "τῆς ἀγορᾶς",
+                           "αἱ ἀγοραί", "τάς ἀγοράς", "τῶν ἀγορῶν"])
+        ok, _ = gu_ag.check_noun_test("ἀγορά", snap, article=True)
+        assert ok is True
+
+    def test_missing_article_fails(self, gu_ag):
+        snap = self._snap(["ἀγορά", "ἀγοράν", "ἀγορᾶς",
+                           "ἀγοραί", "ἀγοράς", "ἀγορῶν"])
+        ok, errs = gu_ag.check_noun_test("ἀγορά", snap, article=True)
+        assert ok is False
+        assert "article missing" in errs
+
+    def test_wrong_article_fails(self, gu_ag):
+        # ὁ is masc nom — wrong for fem noun
+        snap = self._snap(["ὁ ἀγορά", "τὴν ἀγοράν", "τῆς ἀγορᾶς",
+                           "αἱ ἀγοραί", "τὰς ἀγοράς", "τῶν ἀγορῶν"])
+        ok, errs = gu_ag.check_noun_test("ἀγορά", snap, article=True)
+        assert ok is False
+        assert "article" in errs
+
+    def test_no_article_required_when_false(self, gu_ag):
+        # article=False (default) — bare forms are fine
+        snap = self._snap(["ἀγορά", "ἀγοράν", "ἀγορᾶς",
+                           "ἀγοραί", "ἀγοράς", "ἀγορῶν"])
+        ok, _ = gu_ag.check_noun_test("ἀγορά", snap)
+        assert ok is True

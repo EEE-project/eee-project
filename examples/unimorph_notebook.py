@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.12"
 # dependencies = [
-#     "marimo>=0.23.8",
+#     "marimo>=0.23.13",
 #     "eee-project @ git+https://codeberg.org/EEE-project/eee.git",
 #     "unimorph-backend-eee @ git+https://codeberg.org/EEE-project/unimorph-backend-eee.git",
 # ]

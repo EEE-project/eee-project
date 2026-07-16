@@ -2,7 +2,6 @@
 import pytest
 
 from eee_project.backends._mg_features import (
-    ACC,
     ADJ,
     ACTIVE,
     AORIST,

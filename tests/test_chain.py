@@ -1,12 +1,8 @@
 """Tests for BackendChain executor."""
 import pytest
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock
 
-import eee_project._registry as _reg
 from eee_project._chain import BackendChain
-from eee_project._exceptions import UnsupportedLanguageError
-from eee_project._results import InflectResult
-from eee_project._hooks import HookContext
 from conftest import mock_backend, register
 
 

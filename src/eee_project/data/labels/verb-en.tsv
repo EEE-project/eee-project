@@ -1,89 +1,169 @@
-Tense	VerbForm	Voice	Mood	Person	Number	label
-Pres	Fin	Act	Ind	1	Sing	Pres. Act. Ind. 1 Sg.
-Pres	Fin	Act	Ind	2	Sing	Pres. Act. Ind. 2 Sg.
-Pres	Fin	Act	Ind	3	Sing	Pres. Act. Ind. 3 Sg.
-Pres	Fin	Act	Ind	1	Plur	Pres. Act. Ind. 1 Pl.
-Pres	Fin	Act	Ind	2	Plur	Pres. Act. Ind. 2 Pl.
-Pres	Fin	Act	Ind	3	Plur	Pres. Act. Ind. 3 Pl.
-Pres	Fin	Act	Sub	1	Sing	Pres. Act. Sub. 1 Sg.
-Pres	Fin	Act	Sub	2	Sing	Pres. Act. Sub. 2 Sg.
-Pres	Fin	Act	Sub	3	Sing	Pres. Act. Sub. 3 Sg.
-Pres	Fin	Act	Sub	1	Plur	Pres. Act. Sub. 1 Pl.
-Pres	Fin	Act	Sub	2	Plur	Pres. Act. Sub. 2 Pl.
-Pres	Fin	Act	Sub	3	Plur	Pres. Act. Sub. 3 Pl.
-Pres	Fin	Act	Opt	1	Sing	Pres. Act. Opt. 1 Sg.
-Pres	Fin	Act	Opt	2	Sing	Pres. Act. Opt. 2 Sg.
-Pres	Fin	Act	Opt	3	Sing	Pres. Act. Opt. 3 Sg.
-Pres	Fin	Act	Opt	1	Plur	Pres. Act. Opt. 1 Pl.
-Pres	Fin	Act	Opt	2	Plur	Pres. Act. Opt. 2 Pl.
-Pres	Fin	Act	Opt	3	Plur	Pres. Act. Opt. 3 Pl.
-Pres	Fin	Act	Imp	2	Sing	Pres. Act. Imp. 2 Sg.
-Pres	Fin	Act	Imp	2	Plur	Pres. Act. Imp. 2 Pl.
-Pres	Inf	Act			Pres. Act. Inf.
-Imp	Fin	Act	Ind	1	Sing	Impf. Act. Ind. 1 Sg.
-Imp	Fin	Act	Ind	2	Sing	Impf. Act. Ind. 2 Sg.
-Imp	Fin	Act	Ind	3	Sing	Impf. Act. Ind. 3 Sg.
-Imp	Fin	Act	Ind	1	Plur	Impf. Act. Ind. 1 Pl.
-Imp	Fin	Act	Ind	2	Plur	Impf. Act. Ind. 2 Pl.
-Imp	Fin	Act	Ind	3	Plur	Impf. Act. Ind. 3 Pl.
-Aor	Fin	Act	Ind	1	Sing	Aor. Act. Ind. 1 Sg.
-Aor	Fin	Act	Ind	2	Sing	Aor. Act. Ind. 2 Sg.
-Aor	Fin	Act	Ind	3	Sing	Aor. Act. Ind. 3 Sg.
-Aor	Fin	Act	Ind	1	Plur	Aor. Act. Ind. 1 Pl.
-Aor	Fin	Act	Ind	2	Plur	Aor. Act. Ind. 2 Pl.
-Aor	Fin	Act	Ind	3	Plur	Aor. Act. Ind. 3 Pl.
-Aor	Fin	Act	Sub	1	Sing	Aor. Act. Sub. 1 Sg.
-Aor	Fin	Act	Sub	2	Sing	Aor. Act. Sub. 2 Sg.
-Aor	Fin	Act	Sub	3	Sing	Aor. Act. Sub. 3 Sg.
-Aor	Fin	Act	Sub	1	Plur	Aor. Act. Sub. 1 Pl.
-Aor	Fin	Act	Sub	2	Plur	Aor. Act. Sub. 2 Pl.
-Aor	Fin	Act	Sub	3	Plur	Aor. Act. Sub. 3 Pl.
-Aor	Fin	Act	Opt	1	Sing	Aor. Act. Opt. 1 Sg.
-Aor	Fin	Act	Opt	2	Sing	Aor. Act. Opt. 2 Sg.
-Aor	Fin	Act	Opt	3	Sing	Aor. Act. Opt. 3 Sg.
-Aor	Fin	Act	Opt	1	Plur	Aor. Act. Opt. 1 Pl.
-Aor	Fin	Act	Opt	2	Plur	Aor. Act. Opt. 2 Pl.
-Aor	Fin	Act	Opt	3	Plur	Aor. Act. Opt. 3 Pl.
-Aor	Fin	Act	Imp	2	Sing	Aor. Act. Imp. 2 Sg.
-Aor	Fin	Act	Imp	2	Plur	Aor. Act. Imp. 2 Pl.
-Aor	Inf	Act			Aor. Act. Inf.
-Fut	Fin	Act	Ind	1	Sing	Fut. Act. Ind. 1 Sg.
-Fut	Fin	Act	Ind	2	Sing	Fut. Act. Ind. 2 Sg.
-Fut	Fin	Act	Ind	3	Sing	Fut. Act. Ind. 3 Sg.
-Fut	Fin	Act	Ind	1	Plur	Fut. Act. Ind. 1 Pl.
-Fut	Fin	Act	Ind	2	Plur	Fut. Act. Ind. 2 Pl.
-Fut	Fin	Act	Ind	3	Plur	Fut. Act. Ind. 3 Pl.
-Perf	Fin	Act	Ind	1	Sing	Perf. Act. Ind. 1 Sg.
-Perf	Fin	Act	Ind	2	Sing	Perf. Act. Ind. 2 Sg.
-Perf	Fin	Act	Ind	3	Sing	Perf. Act. Ind. 3 Sg.
-Perf	Fin	Act	Ind	1	Plur	Perf. Act. Ind. 1 Pl.
-Perf	Fin	Act	Ind	2	Plur	Perf. Act. Ind. 2 Pl.
-Perf	Fin	Act	Ind	3	Plur	Perf. Act. Ind. 3 Pl.
-Pres	Fin	Mid	Ind	1	Sing	Pres. Mid. Ind. 1 Sg.
-Pres	Fin	Mid	Ind	2	Sing	Pres. Mid. Ind. 2 Sg.
-Pres	Fin	Mid	Ind	3	Sing	Pres. Mid. Ind. 3 Sg.
-Pres	Fin	Mid	Ind	1	Plur	Pres. Mid. Ind. 1 Pl.
-Pres	Fin	Mid	Ind	2	Plur	Pres. Mid. Ind. 2 Pl.
-Pres	Fin	Mid	Ind	3	Plur	Pres. Mid. Ind. 3 Pl.
-Pres	Inf	Mid			Pres. Mid. Inf.
-Aor	Fin	Mid	Ind	1	Sing	Aor. Mid. Ind. 1 Sg.
-Aor	Fin	Mid	Ind	2	Sing	Aor. Mid. Ind. 2 Sg.
-Aor	Fin	Mid	Ind	3	Sing	Aor. Mid. Ind. 3 Sg.
-Aor	Fin	Mid	Ind	1	Plur	Aor. Mid. Ind. 1 Pl.
-Aor	Fin	Mid	Ind	2	Plur	Aor. Mid. Ind. 2 Pl.
-Aor	Fin	Mid	Ind	3	Plur	Aor. Mid. Ind. 3 Pl.
-Aor	Fin	Mid	Imp	2	Sing	Aor. Mid. Imp. 2 Sg.
-Aor	Fin	Mid	Imp	2	Plur	Aor. Mid. Imp. 2 Pl.
-Aor	Inf	Mid			Aor. Mid. Inf.
-Pres	Fin	Pass	Ind	1	Sing	Pres. Pass. Ind. 1 Sg.
-Pres	Fin	Pass	Ind	2	Sing	Pres. Pass. Ind. 2 Sg.
-Pres	Fin	Pass	Ind	3	Sing	Pres. Pass. Ind. 3 Sg.
-Pres	Fin	Pass	Ind	1	Plur	Pres. Pass. Ind. 1 Pl.
-Pres	Fin	Pass	Ind	2	Plur	Pres. Pass. Ind. 2 Pl.
-Pres	Fin	Pass	Ind	3	Plur	Pres. Pass. Ind. 3 Pl.
-Aor	Fin	Pass	Ind	1	Sing	Aor. Pass. Ind. 1 Sg.
-Aor	Fin	Pass	Ind	2	Sing	Aor. Pass. Ind. 2 Sg.
-Aor	Fin	Pass	Ind	3	Sing	Aor. Pass. Ind. 3 Sg.
-Aor	Fin	Pass	Ind	1	Plur	Aor. Pass. Ind. 1 Pl.
-Aor	Fin	Pass	Ind	2	Plur	Aor. Pass. Ind. 2 Pl.
-Aor	Fin	Pass	Ind	3	Plur	Aor. Pass. Ind. 3 Pl.
+Tense	VerbForm	Aspect	Voice	Mood	Person	Number	label
+Pres	Fin		Act	Ind	1	Sing	Pres. Act. Ind. 1 Sg.
+Pres	Fin		Act	Ind	2	Sing	Pres. Act. Ind. 2 Sg.
+Pres	Fin		Act	Ind	3	Sing	Pres. Act. Ind. 3 Sg.
+Pres	Fin		Act	Ind	1	Plur	Pres. Act. Ind. 1 Pl.
+Pres	Fin		Act	Ind	2	Plur	Pres. Act. Ind. 2 Pl.
+Pres	Fin		Act	Ind	3	Plur	Pres. Act. Ind. 3 Pl.
+Pres	Fin		Act	Sub	1	Sing	Pres. Act. Sub. 1 Sg.
+Pres	Fin		Act	Sub	2	Sing	Pres. Act. Sub. 2 Sg.
+Pres	Fin		Act	Sub	3	Sing	Pres. Act. Sub. 3 Sg.
+Pres	Fin		Act	Sub	1	Plur	Pres. Act. Sub. 1 Pl.
+Pres	Fin		Act	Sub	2	Plur	Pres. Act. Sub. 2 Pl.
+Pres	Fin		Act	Sub	3	Plur	Pres. Act. Sub. 3 Pl.
+Pres	Fin		Act	Opt	1	Sing	Pres. Act. Opt. 1 Sg.
+Pres	Fin		Act	Opt	2	Sing	Pres. Act. Opt. 2 Sg.
+Pres	Fin		Act	Opt	3	Sing	Pres. Act. Opt. 3 Sg.
+Pres	Fin		Act	Opt	1	Plur	Pres. Act. Opt. 1 Pl.
+Pres	Fin		Act	Opt	2	Plur	Pres. Act. Opt. 2 Pl.
+Pres	Fin		Act	Opt	3	Plur	Pres. Act. Opt. 3 Pl.
+Pres	Fin		Act	Imp	2	Sing	Pres. Act. Imp. 2 Sg.
+Pres	Fin		Act	Imp	2	Plur	Pres. Act. Imp. 2 Pl.
+Pres	Inf		Act			Pres. Act. Inf.	
+Imp	Fin		Act	Ind	1	Sing	Impf. Act. Ind. 1 Sg.
+Imp	Fin		Act	Ind	2	Sing	Impf. Act. Ind. 2 Sg.
+Imp	Fin		Act	Ind	3	Sing	Impf. Act. Ind. 3 Sg.
+Imp	Fin		Act	Ind	1	Plur	Impf. Act. Ind. 1 Pl.
+Imp	Fin		Act	Ind	2	Plur	Impf. Act. Ind. 2 Pl.
+Imp	Fin		Act	Ind	3	Plur	Impf. Act. Ind. 3 Pl.
+Aor	Fin		Act	Ind	1	Sing	Aor. Act. Ind. 1 Sg.
+Aor	Fin		Act	Ind	2	Sing	Aor. Act. Ind. 2 Sg.
+Aor	Fin		Act	Ind	3	Sing	Aor. Act. Ind. 3 Sg.
+Aor	Fin		Act	Ind	1	Plur	Aor. Act. Ind. 1 Pl.
+Aor	Fin		Act	Ind	2	Plur	Aor. Act. Ind. 2 Pl.
+Aor	Fin		Act	Ind	3	Plur	Aor. Act. Ind. 3 Pl.
+Aor	Fin		Act	Sub	1	Sing	Aor. Act. Sub. 1 Sg.
+Aor	Fin		Act	Sub	2	Sing	Aor. Act. Sub. 2 Sg.
+Aor	Fin		Act	Sub	3	Sing	Aor. Act. Sub. 3 Sg.
+Aor	Fin		Act	Sub	1	Plur	Aor. Act. Sub. 1 Pl.
+Aor	Fin		Act	Sub	2	Plur	Aor. Act. Sub. 2 Pl.
+Aor	Fin		Act	Sub	3	Plur	Aor. Act. Sub. 3 Pl.
+Aor	Fin		Act	Opt	1	Sing	Aor. Act. Opt. 1 Sg.
+Aor	Fin		Act	Opt	2	Sing	Aor. Act. Opt. 2 Sg.
+Aor	Fin		Act	Opt	3	Sing	Aor. Act. Opt. 3 Sg.
+Aor	Fin		Act	Opt	1	Plur	Aor. Act. Opt. 1 Pl.
+Aor	Fin		Act	Opt	2	Plur	Aor. Act. Opt. 2 Pl.
+Aor	Fin		Act	Opt	3	Plur	Aor. Act. Opt. 3 Pl.
+Aor	Fin		Act	Imp	2	Sing	Aor. Act. Imp. 2 Sg.
+Aor	Fin		Act	Imp	2	Plur	Aor. Act. Imp. 2 Pl.
+Aor	Inf		Act			Aor. Act. Inf.	
+Fut	Fin		Act	Ind	1	Sing	Fut. Act. Ind. 1 Sg.
+Fut	Fin		Act	Ind	2	Sing	Fut. Act. Ind. 2 Sg.
+Fut	Fin		Act	Ind	3	Sing	Fut. Act. Ind. 3 Sg.
+Fut	Fin		Act	Ind	1	Plur	Fut. Act. Ind. 1 Pl.
+Fut	Fin		Act	Ind	2	Plur	Fut. Act. Ind. 2 Pl.
+Fut	Fin		Act	Ind	3	Plur	Fut. Act. Ind. 3 Pl.
+Perf	Fin		Act	Ind	1	Sing	Perf. Act. Ind. 1 Sg.
+Perf	Fin		Act	Ind	2	Sing	Perf. Act. Ind. 2 Sg.
+Perf	Fin		Act	Ind	3	Sing	Perf. Act. Ind. 3 Sg.
+Perf	Fin		Act	Ind	1	Plur	Perf. Act. Ind. 1 Pl.
+Perf	Fin		Act	Ind	2	Plur	Perf. Act. Ind. 2 Pl.
+Perf	Fin		Act	Ind	3	Plur	Perf. Act. Ind. 3 Pl.
+Pres	Fin		Mid	Ind	1	Sing	Pres. Mid. Ind. 1 Sg.
+Pres	Fin		Mid	Ind	2	Sing	Pres. Mid. Ind. 2 Sg.
+Pres	Fin		Mid	Ind	3	Sing	Pres. Mid. Ind. 3 Sg.
+Pres	Fin		Mid	Ind	1	Plur	Pres. Mid. Ind. 1 Pl.
+Pres	Fin		Mid	Ind	2	Plur	Pres. Mid. Ind. 2 Pl.
+Pres	Fin		Mid	Ind	3	Plur	Pres. Mid. Ind. 3 Pl.
+Pres	Inf		Mid			Pres. Mid. Inf.	
+Aor	Fin		Mid	Ind	1	Sing	Aor. Mid. Ind. 1 Sg.
+Aor	Fin		Mid	Ind	2	Sing	Aor. Mid. Ind. 2 Sg.
+Aor	Fin		Mid	Ind	3	Sing	Aor. Mid. Ind. 3 Sg.
+Aor	Fin		Mid	Ind	1	Plur	Aor. Mid. Ind. 1 Pl.
+Aor	Fin		Mid	Ind	2	Plur	Aor. Mid. Ind. 2 Pl.
+Aor	Fin		Mid	Ind	3	Plur	Aor. Mid. Ind. 3 Pl.
+Aor	Fin		Mid	Imp	2	Sing	Aor. Mid. Imp. 2 Sg.
+Aor	Fin		Mid	Imp	2	Plur	Aor. Mid. Imp. 2 Pl.
+Aor	Inf		Mid			Aor. Mid. Inf.	
+Pres	Fin		Pass	Ind	1	Sing	Pres. Pass. Ind. 1 Sg.
+Pres	Fin		Pass	Ind	2	Sing	Pres. Pass. Ind. 2 Sg.
+Pres	Fin		Pass	Ind	3	Sing	Pres. Pass. Ind. 3 Sg.
+Pres	Fin		Pass	Ind	1	Plur	Pres. Pass. Ind. 1 Pl.
+Pres	Fin		Pass	Ind	2	Plur	Pres. Pass. Ind. 2 Pl.
+Pres	Fin		Pass	Ind	3	Plur	Pres. Pass. Ind. 3 Pl.
+Aor	Fin		Pass	Ind	1	Sing	Aor. Pass. Ind. 1 Sg.
+Aor	Fin		Pass	Ind	2	Sing	Aor. Pass. Ind. 2 Sg.
+Aor	Fin		Pass	Ind	3	Sing	Aor. Pass. Ind. 3 Sg.
+Aor	Fin		Pass	Ind	1	Plur	Aor. Pass. Ind. 1 Pl.
+Aor	Fin		Pass	Ind	2	Plur	Aor. Pass. Ind. 2 Pl.
+Aor	Fin		Pass	Ind	3	Plur	Aor. Pass. Ind. 3 Pl.
+Pres			Act	Ind	1	Sing	Pres. Act. 1 Sg.
+Pres			Act	Ind	1	Plur	Pres. Act. 1 Pl.
+Pres			Act	Ind	2	Sing	Pres. Act. 2 Sg.
+Pres			Act	Ind	2	Plur	Pres. Act. 2 Pl.
+Pres			Act	Ind	3	Sing	Pres. Act. 3 Sg.
+Pres			Act	Ind	3	Plur	Pres. Act. 3 Pl.
+Pres			Pass	Ind	1	Sing	Pres. Pass. 1 Sg.
+Pres			Pass	Ind	1	Plur	Pres. Pass. 1 Pl.
+Pres			Pass	Ind	2	Sing	Pres. Pass. 2 Sg.
+Pres			Pass	Ind	2	Plur	Pres. Pass. 2 Pl.
+Pres			Pass	Ind	3	Sing	Pres. Pass. 3 Sg.
+Pres			Pass	Ind	3	Plur	Pres. Pass. 3 Pl.
+Past		Imp	Act	Ind	1	Sing	Impf. Act. 1 Sg.
+Past		Imp	Act	Ind	1	Plur	Impf. Act. 1 Pl.
+Past		Imp	Act	Ind	2	Sing	Impf. Act. 2 Sg.
+Past		Imp	Act	Ind	2	Plur	Impf. Act. 2 Pl.
+Past		Imp	Act	Ind	3	Sing	Impf. Act. 3 Sg.
+Past		Imp	Act	Ind	3	Plur	Impf. Act. 3 Pl.
+Past		Imp	Pass	Ind	1	Sing	Impf. Pass. 1 Sg.
+Past		Imp	Pass	Ind	1	Plur	Impf. Pass. 1 Pl.
+Past		Imp	Pass	Ind	2	Sing	Impf. Pass. 2 Sg.
+Past		Imp	Pass	Ind	2	Plur	Impf. Pass. 2 Pl.
+Past		Imp	Pass	Ind	3	Sing	Impf. Pass. 3 Sg.
+Past		Imp	Pass	Ind	3	Plur	Impf. Pass. 3 Pl.
+Past		Perf	Act	Ind	1	Sing	Aor. Act. 1 Sg.
+Past		Perf	Act	Ind	1	Plur	Aor. Act. 1 Pl.
+Past		Perf	Act	Ind	2	Sing	Aor. Act. 2 Sg.
+Past		Perf	Act	Ind	2	Plur	Aor. Act. 2 Pl.
+Past		Perf	Act	Ind	3	Sing	Aor. Act. 3 Sg.
+Past		Perf	Act	Ind	3	Plur	Aor. Act. 3 Pl.
+Past		Perf	Pass	Ind	1	Sing	Aor. Pass. 1 Sg.
+Past		Perf	Pass	Ind	1	Plur	Aor. Pass. 1 Pl.
+Past		Perf	Pass	Ind	2	Sing	Aor. Pass. 2 Sg.
+Past		Perf	Pass	Ind	2	Plur	Aor. Pass. 2 Pl.
+Past		Perf	Pass	Ind	3	Sing	Aor. Pass. 3 Sg.
+Past		Perf	Pass	Ind	3	Plur	Aor. Pass. 3 Pl.
+Fut		Imp	Act	Ind	1	Sing	Fut. Impf. Act. 1 Sg.
+Fut		Imp	Act	Ind	1	Plur	Fut. Impf. Act. 1 Pl.
+Fut		Imp	Act	Ind	2	Sing	Fut. Impf. Act. 2 Sg.
+Fut		Imp	Act	Ind	2	Plur	Fut. Impf. Act. 2 Pl.
+Fut		Imp	Act	Ind	3	Sing	Fut. Impf. Act. 3 Sg.
+Fut		Imp	Act	Ind	3	Plur	Fut. Impf. Act. 3 Pl.
+Fut		Imp	Pass	Ind	1	Sing	Fut. Impf. Pass. 1 Sg.
+Fut		Imp	Pass	Ind	1	Plur	Fut. Impf. Pass. 1 Pl.
+Fut		Imp	Pass	Ind	2	Sing	Fut. Impf. Pass. 2 Sg.
+Fut		Imp	Pass	Ind	2	Plur	Fut. Impf. Pass. 2 Pl.
+Fut		Imp	Pass	Ind	3	Sing	Fut. Impf. Pass. 3 Sg.
+Fut		Imp	Pass	Ind	3	Plur	Fut. Impf. Pass. 3 Pl.
+Fut		Perf	Act	Ind	1	Sing	Fut. Perf. Act. 1 Sg.
+Fut		Perf	Act	Ind	1	Plur	Fut. Perf. Act. 1 Pl.
+Fut		Perf	Act	Ind	2	Sing	Fut. Perf. Act. 2 Sg.
+Fut		Perf	Act	Ind	2	Plur	Fut. Perf. Act. 2 Pl.
+Fut		Perf	Act	Ind	3	Sing	Fut. Perf. Act. 3 Sg.
+Fut		Perf	Act	Ind	3	Plur	Fut. Perf. Act. 3 Pl.
+Fut		Perf	Pass	Ind	1	Sing	Fut. Perf. Pass. 1 Sg.
+Fut		Perf	Pass	Ind	1	Plur	Fut. Perf. Pass. 1 Pl.
+Fut		Perf	Pass	Ind	2	Sing	Fut. Perf. Pass. 2 Sg.
+Fut		Perf	Pass	Ind	2	Plur	Fut. Perf. Pass. 2 Pl.
+Fut		Perf	Pass	Ind	3	Sing	Fut. Perf. Pass. 3 Sg.
+Fut		Perf	Pass	Ind	3	Plur	Fut. Perf. Pass. 3 Pl.
+		Perf	Act	Sub	1	Sing	Subj. Act. 1 Sg.
+		Perf	Act	Sub	1	Plur	Subj. Act. 1 Pl.
+		Perf	Act	Sub	2	Sing	Subj. Act. 2 Sg.
+		Perf	Act	Sub	2	Plur	Subj. Act. 2 Pl.
+		Perf	Act	Sub	3	Sing	Subj. Act. 3 Sg.
+		Perf	Act	Sub	3	Plur	Subj. Act. 3 Pl.
+		Perf	Pass	Sub	1	Sing	Subj. Pass. 1 Sg.
+		Perf	Pass	Sub	1	Plur	Subj. Pass. 1 Pl.
+		Perf	Pass	Sub	2	Sing	Subj. Pass. 2 Sg.
+		Perf	Pass	Sub	2	Plur	Subj. Pass. 2 Pl.
+		Perf	Pass	Sub	3	Sing	Subj. Pass. 3 Sg.
+		Perf	Pass	Sub	3	Plur	Subj. Pass. 3 Pl.
+		Imp	Act	Imp	2	Sing	Imper. Impf. Act. 2 Sg.
+		Imp	Act	Imp	2	Plur	Imper. Impf. Act. 2 Pl.
+		Imp	Pass	Imp	2	Sing	Imper. Impf. Pass. 2 Sg.
+		Imp	Pass	Imp	2	Plur	Imper. Impf. Pass. 2 Pl.
+		Perf	Act	Imp	2	Sing	Imper. Perf. Act. 2 Sg.
+		Perf	Act	Imp	2	Plur	Imper. Perf. Act. 2 Pl.
+		Perf	Pass	Imp	2	Sing	Imper. Perf. Pass. 2 Sg.
+		Perf	Pass	Imp	2	Plur	Imper. Perf. Pass. 2 Pl.

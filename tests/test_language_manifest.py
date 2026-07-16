@@ -1,5 +1,4 @@
 """Language quality manifest tests."""
-import pytest
 import eee_project as eee
 
 

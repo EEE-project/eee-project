@@ -16,3 +16,12 @@ UniMorph citation:
   Batsuren et al. (2022). UniMorph 4.0: Universal Morphology.
   In Proceedings of LREC 2022.
   https://unimorph.github.io/
+
+The Classical Attic lexicon (lsj_verbs_lexicon.yaml / lsj_nouns_lexicon.yaml
+in greek-inflexion-eee) is hand-authored under the MIT License. Its principal
+parts and noun stems were verified against reference sources — Perseus/Morpheus
+(LSJ-derived, https://www.perseus.tufts.edu/) and Wiktionary
+(https://www.wiktionary.org/) — consulted as references only, not bulk-imported.
+Any future bulk-derived Attic data (e.g. an automated Morpheus/Wiktionary → YAML
+conversion) would inherit CC BY-SA 3.0 ShareAlike obligations and must be shipped
+as a separately-licensed file.

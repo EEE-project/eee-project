@@ -40,6 +40,17 @@ _FMT_GENDER = {
     "en": {"Masc": "m.", "Fem": "f.", "Neut": "n."},
     "el": {"Masc": "αρσ.", "Fem": "θηλ.", "Neut": "ουδ."},
 }
+_FMT_PRONTYPE = {
+    # "Prs": "личн.мест." (not the shorter "личн.") -- avoids colliding
+    # with _FMT_VFORM's "Fin": "личн." (VerbForm and PronType never
+    # co-occur in one feats dict today since verbs and pronouns are
+    # disjoint pos values, but a reader comparing labels across
+    # different tables shouldn't see the same abbreviation mean two
+    # unrelated things). Caught in code review.
+    "ru": {"Prs": "личн.мест.", "Dem": "указ.", "Rel": "относ.", "Int": "вопр.", "Ind": "неопр.", "Rcp": "взаимн."},
+    "en": {"Prs": "pers.", "Dem": "dem.", "Rel": "rel.", "Int": "int.", "Ind": "indef.", "Rcp": "recip."},
+    "el": {"Prs": "προσ.", "Dem": "δεικτ.", "Rel": "αναφ.", "Int": "ερωτ.", "Ind": "αόρ.", "Rcp": "αλληλ."},
+}
 
 
 def fmt_ud_feats(grammar_str: str, lang: str) -> str:
@@ -66,8 +77,11 @@ def fmt_ud_feats(grammar_str: str, lang: str) -> str:
     m   = _FMT_MOOD.get(lang,   _FMT_MOOD["en"])
     vf  = _FMT_VFORM.get(lang,  _FMT_VFORM["en"])
     g   = _FMT_GENDER.get(lang, _FMT_GENDER["en"])
+    pt  = _FMT_PRONTYPE.get(lang, _FMT_PRONTYPE["en"])
 
     parts = []
+    if "PronType" in feats:
+        parts.append(pt.get(feats["PronType"], feats["PronType"]))
     if "VerbForm" in feats:
         parts.append(vf.get(feats["VerbForm"], feats["VerbForm"]))
     if "Tense" in feats:
