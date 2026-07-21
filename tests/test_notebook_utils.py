@@ -428,6 +428,10 @@ class TestModernGreekConfig:
     def test_verb_labels_greek_pronouns(self):
         assert MODERN_GREEK.verb_labels[0] == 'εγώ'
 
+    def test_not_polytonic(self):
+        # Monotonic orthography (post-1982) -- no breathing/subscript marks needed.
+        assert MODERN_GREEK.polytonic is False
+
 
 class TestAncientGreekConfig:
     def test_language(self):
@@ -442,6 +446,9 @@ class TestAncientGreekConfig:
 
     def test_no_verb_prefix(self):
         assert ANCIENT_GREEK.verb_prefix == {}
+
+    def test_polytonic(self):
+        assert ANCIENT_GREEK.polytonic is True
 
     def test_adj_cases_with_dat(self):
         assert 'dat' in ANCIENT_GREEK.adj_cases
@@ -2056,6 +2063,14 @@ class TestMakeParadigmForm:
         labels.append("c:")
         assert len(w.labels) == 2
 
+    def test_polytonic_defaults_true(self):
+        w = make_paradigm_form(self._mo(), self._LABELS)
+        assert w.polytonic is True
+
+    def test_polytonic_false_stored(self):
+        w = make_paradigm_form(self._mo(), self._LABELS, polytonic=False)
+        assert w.polytonic is False
+
     def test_no_anywidget_raises(self):
         import eee_project.notebook_utils as _nu
         orig = _nu._ANYWIDGET_OK
@@ -2065,6 +2080,109 @@ class TestMakeParadigmForm:
                 make_paradigm_form(self._mo(), self._LABELS)
         finally:
             _nu._ANYWIDGET_OK = orig
+
+    def test_esm_filters_marks_by_polytonic_traitlet(self):
+        # The bar's mark set must be chosen from the live `polytonic` traitlet
+        # at render time, not baked in at module-load time -- same widget class
+        # serves both Ancient and Modern Greek instances.
+        import eee_project.notebook_utils as _nu
+        assert "model.get('polytonic')" in _nu._PARA_ESM
+        assert "MONOTONIC_MARKS" in _nu._PARA_ESM
+
+    def test_esm_focus_request_guards_against_late_reply_race(self):
+        # focus_request's Python round trip is async; if the user has already
+        # moved focus elsewhere by the time the reply lands (e.g. clicked past
+        # the auto-advance target to type in a later field), applying it would
+        # yank focus back to the field they intentionally skipped. The ESM must
+        # only honor the request if focus is still on the request's own origin
+        # field (tracked via pendingOrigin, not the racy enter_field_index
+        # traitlet, which a newer Enter can overwrite before this reply lands).
+        import eee_project.notebook_utils as _nu
+        assert "focusedInp!==inputs[originIdx]" in _nu._PARA_ESM
+
+    def test_esm_locks_origin_field_on_submit(self):
+        # A fast typist who doesn't wait for the round trip must not be able
+        # to keep typing into the field they just pressed Enter in -- that's
+        # what actually corrupted fields (text piling up in the wrong slot,
+        # or being select()ed and then erased by the very next keystroke).
+        # Locking it read-only the instant Enter fires closes that window
+        # entirely, instead of guessing after the fact whether it was hit.
+        import eee_project.notebook_utils as _nu
+        assert "inputs[idx].readOnly=true" in _nu._PARA_ESM
+        assert "pendingOrigin.set(reqId,idx)" in _nu._PARA_ESM
+
+    def test_esm_focus_request_matches_reply_to_exact_request(self):
+        # The reply must be matched to the specific request it answers (by
+        # the submit_count Python already echoes back) rather than merely
+        # "has anything changed since" -- a deterministic identity check,
+        # not a timing guess. A reply for a superseded request still
+        # releases that request's lock, but must not move focus.
+        import eee_project.notebook_utils as _nu
+        assert "pendingOrigin.get(request_id)" in _nu._PARA_ESM
+
+    def test_esm_submit_refuses_already_locked_field(self):
+        # fireSubmit itself won't re-lock or re-request a field that's
+        # already read-only (a reply is still in flight for it) -- this is
+        # what keeps a field's in-flight-request count at 1 in the common
+        # case (impatient repeat-Enter on the same still-locked field).
+        import eee_project.notebook_utils as _nu
+        assert "if(idx>=0&&idx<inputs.length&&inputs[idx].readOnly)return;" in _nu._PARA_ESM
+
+    def test_esm_lock_release_checks_for_other_pending_requests(self):
+        # Belt-and-suspenders: even though fireSubmit's own guard makes a
+        # second concurrent request for the same field unlikely, a field
+        # must still only actually unlock once no *other* pending request
+        # names it -- unlocking on the first of two replies, even a stale
+        # or superseded one, would reopen the corruption window for
+        # whichever request is still outstanding on that same field.
+        import eee_project.notebook_utils as _nu
+        assert "function releaseLock(idx){" in _nu._PARA_ESM
+        assert "for(const v of pendingOrigin.values())if(v===idx)return;" in _nu._PARA_ESM
+
+    def test_esm_reply_staleness_uses_submit_count_directly(self):
+        # submit_count already is the request id (fireSubmit sends the next
+        # value, every reply echoes back the one it answered) -- comparing
+        # against model.get('submit_count') directly means there's no
+        # separate "last sent" variable that could drift out of sync with it.
+        import eee_project.notebook_utils as _nu
+        assert "request_id!==(model.get('submit_count')||0)" in _nu._PARA_ESM
+        assert "let lastReqId" not in _nu._PARA_ESM
+
+    def test_esm_focus_request_is_a_named_dict_not_a_positional_pair(self):
+        # focus_request always carries an ack (request_id, to release the
+        # lock) and *optionally* a real navigation instruction (advance_to,
+        # null on a wrong answer or the last field). A plain [index, seq]
+        # pair made that "sometimes it's just an ack" dual purpose invisible
+        # in the shape itself -- a null advance_to says it directly.
+        import eee_project.notebook_utils as _nu
+        assert "const{request_id,advance_to}=model.get('focus_request')||{};" in _nu._PARA_ESM
+        assert "advance_to!=null&&advance_to<inputs.length" in _nu._PARA_ESM
+
+    def test_esm_submit_locks_release_on_timeout_backstop(self):
+        # If Python's reply for this exact request never arrives (e.g.
+        # coalesced away by a second Enter on a different field before the
+        # first was processed), the lock must not be permanent.
+        import eee_project.notebook_utils as _nu
+        assert "},3000);" in _nu._PARA_ESM
+
+    def test_esm_diacritic_composition_respects_readonly_lock(self):
+        # readOnly blocks the browser's native text insertion, but diacritic
+        # mark composition bypasses that entirely -- it calls
+        # e.preventDefault() in beforeinput and then assigns inp.value=...
+        # directly via JS, which readOnly does not block. Confirmed live: a
+        # locked field would still accept a composed accented character
+        # (e.g. clicking "acute" then typing a vowel) even though plain
+        # typing into the same locked field was correctly rejected. The
+        # handler must check readOnly itself.
+        import eee_project.notebook_utils as _nu
+        assert "if(inp.readOnly)return;" in _nu._PARA_ESM
+
+    def test_esm_clear_mark_button_respects_readonly_lock(self):
+        # Same bypass risk as composition: the "clear last mark" button
+        # also assigns inp.value= directly, on whatever focusedInp
+        # currently is -- which can be a locked field waiting on a reply.
+        import eee_project.notebook_utils as _nu
+        assert "if(!focusedInp||focusedInp.readOnly)return;" in _nu._PARA_ESM
 
 
 # ────────────────────────────────────────── paste fix in ESM strings ──
@@ -2117,6 +2235,21 @@ class TestCheckNounTest:
         ok, fb = gu.check_noun_test("ὁ ἀγρός", form)
         assert ok is False  # empty slot makes overall result False
 
+    def test_article_error_ordered_before_noun_error(self):
+        # Both parts wrong in the same slot: the article error must read
+        # first, matching the order the answer is actually written (ὁ ἀγρός)
+        # -- regression test for reordering _chk's error appends.
+        def _paradigm_fn(word, pos):
+            if pos != "noun":
+                return {}
+            return {"masc": {"sg": {"nom": {"ἀγρός"}}}}
+        gu = GreekUtils(_StubBackend(_paradigm_fn), _StubMo(), config=ANCIENT_GREEK)
+        form = self._form(["ἡ ΛΑΘΟΣ"], test_word="ὁ ἀγρός", ac=[["sg", "nom"]])
+        ok, fb = gu.check_noun_test("ὁ ἀγρός", form, article=True)
+        assert ok is False
+        assert "article" in fb and "noun" in fb
+        assert fb.index("article") < fb.index("noun")
+
     def test_word_without_leading_article_fallback(self, gu):
         # No leading article → _detected_genders stays None → _genders_at falls back to backend
         # _StubBackend returns {} for all genders → correct_arts empty → article not checked
@@ -2127,6 +2260,46 @@ class TestCheckNounTest:
         )
         ok, fb = gu.check_noun_test("λόγος", form)
         assert ok is False  # stub returns no forms → unknown → wrong
+
+    # ------------------------------------------------------- indefinite=True
+
+    @staticmethod
+    def _mg_paradigm_fn(word, pos):
+        if pos != "noun":
+            return {}
+        return {"masc": {"sg": {"nom": {"λόγος"}}}}
+
+    @pytest.fixture
+    def gu_mg(self):
+        return GreekUtils(_StubBackend(self._mg_paradigm_fn), _StubMo(), config=MODERN_GREEK)
+
+    def test_indefinite_true_checks_extra_slot(self, gu_mg):
+        # value has one extra entry past ac -- the indefinite-article slot
+        # for the sole (singular) case in ac
+        form = self._form(["ο λόγος", "ένας λόγος"], test_word="ο λόγος", ac=[["sg", "nom"]])
+        ok, fb = gu_mg.check_noun_test("ο λόγος", form, article=True, indefinite=True)
+        assert ok is True and fb == ""
+
+    def test_indefinite_true_wrong_indef_article_reported(self, gu_mg):
+        form = self._form(["ο λόγος", "μία λόγος"], test_word="ο λόγος", ac=[["sg", "nom"]])
+        ok, fb = gu_mg.check_noun_test("ο λόγος", form, article=True, indefinite=True)
+        assert ok is False
+        assert "article" in fb
+
+    def test_indefinite_false_ignores_extra_value_entries(self, gu_mg):
+        # Without indefinite=True, only zip(value, ac) is consulted -- an
+        # extra trailing value (even a wrong one) is simply never checked
+        form = self._form(["ο λόγος", "WRONG"], test_word="ο λόγος", ac=[["sg", "nom"]])
+        ok, fb = gu_mg.check_noun_test("ο λόγος", form, article=True, indefinite=False)
+        assert ok is True
+
+    def test_indefinite_no_op_without_config_indef_articles(self, gu):
+        # gu (this class's default fixture) is ANCIENT_GREEK-configured --
+        # indefinite=True has nothing to add, same result as indefinite=False
+        form = self._form(["ἀγρός"], test_word="ἀγρός", ac=[["sg", "nom"]])
+        with_indef = gu.check_noun_test("ἀγρός", form, indefinite=True)
+        without_indef = gu.check_noun_test("ἀγρός", form, indefinite=False)
+        assert with_indef == without_indef
 
 
 # ────────────────────────────────────────── check_verb_test ──
@@ -2272,6 +2445,64 @@ class TestCheckNounSlot:
             "ὁ ἀγρός", 0, "ἀγροῦ", article=False, active_cases=[("sg", "gen")]
         ) is True
 
+    # ------------------------------------------------------- indefinite=True
+
+    @staticmethod
+    def _mg_paradigm_fn(word, pos):
+        if pos != "noun":
+            return {}
+        return {"masc": {"sg": {"nom": {"λόγος"}, "gen": {"λόγου"}}}}
+
+    @pytest.fixture
+    def gu_mg(self):
+        return GreekUtils(_StubBackend(self._mg_paradigm_fn), _StubMo(), config=MODERN_GREEK)
+
+    def test_indefinite_slot_correct(self, gu_mg):
+        # index 2 == len(active_cases) -> first (and only) entry of the
+        # singular-only indef_cells subset, i.e. active_cases[0] again
+        assert gu_mg.check_noun_slot(
+            "ο λόγος", 2, "ένας λόγος",
+            active_cases=[("sg", "nom"), ("sg", "gen")], indefinite=True,
+        ) is True
+
+    def test_indefinite_slot_wrong_article(self, gu_mg):
+        assert gu_mg.check_noun_slot(
+            "ο λόγος", 2, "μία λόγος",
+            active_cases=[("sg", "nom"), ("sg", "gen")], indefinite=True,
+        ) is False
+
+    def test_indefinite_slot_always_requires_article(self, gu_mg):
+        # indefinite slots require their article regardless of `article`,
+        # which only controls the definite slots
+        assert gu_mg.check_noun_slot(
+            "ο λόγος", 2, "λόγος",
+            active_cases=[("sg", "nom"), ("sg", "gen")], indefinite=True, article=False,
+        ) is False
+
+    def test_indefinite_false_leaves_range_unchanged(self, gu_mg):
+        # without indefinite=True, index 2 (== len(active_cases)) is simply
+        # out of range, not reinterpreted as an indefinite slot
+        assert gu_mg.check_noun_slot(
+            "ο λόγος", 2, "ένας λόγος",
+            active_cases=[("sg", "nom"), ("sg", "gen")], indefinite=False,
+        ) is False
+
+    def test_indefinite_no_op_without_config_indef_articles(self, gu):
+        # gu (this class's default fixture) is ANCIENT_GREEK-configured --
+        # indef_articles is None, so indefinite=True adds no valid slots
+        assert gu.check_noun_slot(
+            "ὁ ἀγρός", 1, "τις ἀγρός", active_cases=[("sg", "nom")], indefinite=True,
+        ) is False
+
+    def test_indefinite_excludes_plural_cases(self, gu_mg):
+        # active_cases has one sg and one pl entry -> indef_cells is only
+        # the sg one, so index 2 (== len(active_cases)) is the sole valid
+        # indefinite slot and index 3 is out of range
+        assert gu_mg.check_noun_slot(
+            "ο λόγος", 3, "ένας λόγος",
+            active_cases=[("sg", "nom"), ("pl", "nom")], indefinite=True,
+        ) is False
+
 
 # ────────────────────────────────────────── save_entry ──
 
@@ -2297,6 +2528,63 @@ class TestSaveEntry:
     def test_custom_word_key(self, gu):
         result = gu.save_entry({}, {"Word": "λύω"}, _pdform(["a", "b"]), word_key="Word")
         assert result == {"λύω": ["a", "b"]}
+
+
+# ────────────────────────────────────────── make_paradigm_drill_state ──
+
+class _StateMo:
+    """Minimal mo stub with a real mo.state() -- unlike the rest of
+    GreekUtils, make_paradigm_drill_state actually calls self._mo.state()."""
+    @staticmethod
+    def state(v):
+        g, s, _ = _pair(v)
+        return g, s
+
+
+class TestMakeParadigmDrillState:
+    """Unit tests for GreekUtils.make_paradigm_drill_state."""
+
+    @pytest.fixture
+    def gu(self):
+        return GreekUtils(_StubBackend(), _StateMo(), config=ANCIENT_GREEK)
+
+    def test_returns_20_tuple(self, gu):
+        assert len(gu.make_paradigm_drill_state([])) == 20
+
+    def test_initial_words_seeded(self, gu):
+        vocab = [{"Word": "λύω"}, {"Word": "νέος"}]
+        words, *_ = gu.make_paradigm_drill_state(vocab)
+        assert words() == vocab
+        assert words() is not vocab  # a fresh copy, not the same list object
+
+    def test_everything_else_starts_empty(self, gu):
+        (_, _, hist, _, msg, _, cap, _, entered, _, sub_cnt, _, prev_cnt, _,
+         nxt_cnt, _, entercnt, _, restart_cnt, _) = gu.make_paradigm_drill_state([{"Word": "λύω"}])
+        assert hist() == []
+        assert msg() == ""
+        assert cap() is None
+        assert entered() == {}
+        assert sub_cnt() == 0
+        assert prev_cnt() == 0
+        assert nxt_cnt() == 0
+        assert entercnt() == 0
+        assert restart_cnt() == 0
+
+    def test_pairs_are_independent(self, gu):
+        words, set_words, hist, set_hist, *_ = gu.make_paradigm_drill_state([])
+        set_words(["x"])
+        set_hist(["y"])
+        assert words() == ["x"]
+        assert hist() == ["y"]
+
+    def test_order_matches_pack_paradigm_state(self, gu):
+        # The 20-tuple must unpack directly into the same positional order
+        # _pack_paradigm_state (and every *_paradigm_drill_form sibling)
+        # expects -- verify the mapping directly rather than trusting it.
+        state_tuple = gu.make_paradigm_drill_state([])
+        packed = gu._pack_paradigm_state(*state_tuple)
+        assert packed["words"] == (state_tuple[0], state_tuple[1])
+        assert packed["restart_cnt"] == (state_tuple[18], state_tuple[19])
 
 
 # ────────────────────────────────────────── reset_paradigm_drill_state ──
@@ -2403,6 +2691,21 @@ class TestParadigmDrillWidgets:
         import inspect
         assert "cap" not in inspect.signature(gu.paradigm_drill_widgets).parameters
 
+    def test_passes_config_polytonic_to_form(self, gu):
+        # gu's config is ANCIENT_GREEK (polytonic=True) — must reach make_paradigm_form,
+        # not silently default, so a Modern Greek GreekUtils instance gets polytonic=False.
+        with patch("eee_project.notebook_utils.make_paradigm_form",
+                   return_value=_pdform([""])) as mock_form:
+            gu.paradigm_drill_widgets(labels=["1 sg:"])
+        assert mock_form.call_args.kwargs["polytonic"] is True
+
+    def test_modern_greek_config_passes_polytonic_false(self):
+        gu = GreekUtils(_StubBackend(), _StubMo(), config=MODERN_GREEK)
+        with patch("eee_project.notebook_utils.make_paradigm_form",
+                   return_value=_pdform([""])) as mock_form:
+            gu.paradigm_drill_widgets(labels=["Sg. Nom.:"])
+        assert mock_form.call_args.kwargs["polytonic"] is False
+
     def test_prev_disabled_with_no_history(self, gu):
         with self._patched():
             _, prev_btn, _, _ = gu.paradigm_drill_widgets(labels=["1 sg:"], history_len=0)
@@ -2471,7 +2774,7 @@ def _pdform(values, submit_count=0, enter_field_index=0, focus_request=None):
     import types
     widget = types.SimpleNamespace(
         values=values, submit_count=submit_count,
-        enter_field_index=enter_field_index, focus_request=focus_request or [],
+        enter_field_index=enter_field_index, focus_request=focus_request or {},
     )
     return types.SimpleNamespace(widget=widget)
 
@@ -2567,7 +2870,18 @@ class TestVerbParadigmDrillForm(_ParadigmDrillFormBase):
         with patch.object(gu, "check_verb_slot", return_value=True), \
              patch.object(gu, "check_verb_test", return_value=(False, "")):
             self._call(gu, state, cv, form)
-        assert form.widget.focus_request == [1, 1]
+        assert form.widget.focus_request == {"request_id": 1, "advance_to": 1}
+
+    def test_enter_on_correct_last_slot_has_no_advance_target(self, gu):
+        # No field beyond the last one to advance to, but the JS side still
+        # needs a reply to release the lock it placed on this exact field.
+        cv = self._VOCAB[0]
+        state = self._state()
+        form = _pdform(["λύω"], submit_count=1, enter_field_index=0)
+        with patch.object(gu, "check_verb_slot", return_value=True), \
+             patch.object(gu, "check_verb_test", return_value=(False, "")):
+            self._call(gu, state, cv, form)
+        assert form.widget.focus_request == {"request_id": 1, "advance_to": None}
 
     def test_enter_on_wrong_slot_does_not_advance_focus(self, gu):
         cv = self._VOCAB[0]
@@ -2576,7 +2890,10 @@ class TestVerbParadigmDrillForm(_ParadigmDrillFormBase):
         with patch.object(gu, "check_verb_slot", return_value=False), \
              patch.object(gu, "check_verb_test", return_value=(False, "")):
             self._call(gu, state, cv, form)
-        assert form.widget.focus_request == []
+        # Still replies (advance_to=None, not omitted) -- the JS side locks
+        # the origin field on every Enter and needs a reply to release that
+        # lock, even when the answer was wrong.
+        assert form.widget.focus_request == {"request_id": 1, "advance_to": None}
 
     def test_next_button_persists_and_advances_regardless_of_correctness(self, gu):
         cv = self._VOCAB[0]
@@ -2662,8 +2979,57 @@ class TestNounParadigmDrillForm(_ParadigmDrillFormBase):
         with patch.object(gu, "check_noun_slot", return_value=True) as mock_slot, \
              patch.object(gu, "check_noun_test", return_value=(False, "")):
             self._call(gu, state, cv, form, meta)
-        assert form.widget.focus_request == [1, 1]
-        mock_slot.assert_called_once_with("ὁ ἀγρός", 0, "ἀγρός", article=True, active_cases=meta.active_cases)
+        assert form.widget.focus_request == {"request_id": 1, "advance_to": 1}
+        mock_slot.assert_called_once_with(
+            "ὁ ἀγρός", 0, "ἀγρός", article=True, active_cases=meta.active_cases, indefinite=False,
+        )
+
+    def test_article_false_passed_to_check_noun_slot(self, gu):
+        # article=False (e.g. a Modern Greek "simple" bare-noun mode toggle)
+        # must reach check_noun_slot instead of the hardcoded True default.
+        cv = self._VOCAB[0]
+        state = self._state()
+        form = _pdform(["ἀγρός", ""], submit_count=1, enter_field_index=0)
+        meta = self._meta(active_cases=[["sg", "nom"], ["sg", "gen"]])
+        with patch.object(gu, "check_noun_slot", return_value=True) as mock_slot, \
+             patch.object(gu, "check_noun_test", return_value=(False, "")):
+            self._call(gu, state, cv, form, meta, article=False)
+        mock_slot.assert_called_once_with(
+            "ὁ ἀγρός", 0, "ἀγρός", article=False, active_cases=meta.active_cases, indefinite=False,
+        )
+
+    def test_article_false_passed_to_check_noun_test(self, gu):
+        cv = self._VOCAB[0]
+        state = self._state()
+        with patch.object(gu, "check_noun_test", return_value=(True, "")) as mock_test:
+            self._call(gu, state, cv, _pdform(["ἀγρός", "ἀγροῦ"]), self._meta(), check_v=1, article=False)
+        assert mock_test.call_args.kwargs.get("article") is False
+
+    def test_indefinite_true_passed_to_check_noun_slot(self, gu):
+        cv = self._VOCAB[0]
+        state = self._state()
+        form = _pdform(["ἀγρός", ""], submit_count=1, enter_field_index=0)
+        meta = self._meta(active_cases=[["sg", "nom"], ["sg", "gen"]])
+        with patch.object(gu, "check_noun_slot", return_value=True) as mock_slot, \
+             patch.object(gu, "check_noun_test", return_value=(False, "")):
+            self._call(gu, state, cv, form, meta, indefinite=True)
+        mock_slot.assert_called_once_with(
+            "ὁ ἀγρός", 0, "ἀγρός", article=True, active_cases=meta.active_cases, indefinite=True,
+        )
+
+    def test_indefinite_true_passed_to_check_noun_test(self, gu):
+        cv = self._VOCAB[0]
+        state = self._state()
+        with patch.object(gu, "check_noun_test", return_value=(True, "")) as mock_test:
+            self._call(gu, state, cv, _pdform(["ἀγρός", "ἀγροῦ"]), self._meta(), check_v=1, indefinite=True)
+        assert mock_test.call_args.kwargs.get("indefinite") is True
+
+    def test_indefinite_defaults_to_false(self, gu):
+        cv = self._VOCAB[0]
+        state = self._state()
+        with patch.object(gu, "check_noun_test", return_value=(True, "")) as mock_test:
+            self._call(gu, state, cv, _pdform(["ἀγρός", "ἀγροῦ"]), self._meta(), check_v=1)
+        assert mock_test.call_args.kwargs.get("indefinite") is False
 
     def test_pluralia_tantum_snapshot_field_set(self, gu):
         cv = self._VOCAB[0]
@@ -2843,6 +3209,28 @@ class TestNounSlotLabels:
     def test_unknown_keys_pass_through(self):
         gu = GreekUtils(mo_module=_StubMo())
         assert gu.noun_slot_labels([("du", "abl")]) == ["Du. abl:"]
+
+
+class TestNounIndefCells:
+    """Unit tests for GreekUtils.noun_indef_cells — the shared singular-only
+    filter used by create_noun_test_ui, check_noun_test, check_noun_slot,
+    and notebooks building an indefinite=True label list."""
+
+    def test_filters_to_singular_only(self):
+        gu = GreekUtils(mo_module=_StubMo())  # default config is MODERN_GREEK
+        cells = [("sg", "nom"), ("sg", "acc"), ("pl", "nom"), ("pl", "acc")]
+        assert gu.noun_indef_cells(cells) == [("sg", "nom"), ("sg", "acc")]
+
+    def test_empty_input_returns_empty(self):
+        gu = GreekUtils(mo_module=_StubMo())
+        assert gu.noun_indef_cells([]) == []
+
+    def test_no_op_without_config_indef_articles(self):
+        # ANCIENT_GREEK has indef_articles=None -- no indefinite article
+        # exists, so no cells qualify, singular or not.
+        gu = GreekUtils(mo_module=_StubMo(), config=ANCIENT_GREEK)
+        cells = [("sg", "nom"), ("sg", "acc"), ("pl", "nom")]
+        assert gu.noun_indef_cells(cells) == []
 
 
 class TestVerbSlotLabels:
@@ -3638,7 +4026,7 @@ class TestAdjectiveParadigmDrillForm(_ParadigmDrillFormBase):
         with patch.object(gu, "check_adjective_slot", return_value=True), \
              patch.object(gu, "check_adjective_test", return_value=(False, "")):
             self._call(gu, state, cv, form)
-        assert form.widget.focus_request == [1, 1]
+        assert form.widget.focus_request == {"request_id": 1, "advance_to": 1}
 
     def test_next_button_persists_and_advances_regardless_of_correctness(self, gu):
         cv = self._VOCAB[0]

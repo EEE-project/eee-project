@@ -1074,7 +1074,7 @@ _PARA_CSS = _bar_css(".eee-para-bar", "margin:6px 0 8px") + """\
 """
 
 _PARA_ESM = r"""
-const MARKS=[
+const ALL_MARKS=[
   {ch:'ά',dia:'́',label:'acute', cat:'accent'},
   {ch:'ὰ',dia:'̀',label:'grave', cat:'accent'},
   {ch:'ᾶ',dia:'͂',label:'tilde', cat:'accent'},
@@ -1083,15 +1083,45 @@ const MARKS=[
   {ch:'ᾳ',dia:'ͅ',label:'iotsub',cat:'subscr'},
   {ch:'ϊ',dia:'̈',label:'diaer', cat:'diaer'},
 ];
+// Modern Greek monotonic orthography (post-1982) only uses the acute accent
+// and diaeresis -- grave/circumflex accent and breathing/iota-subscript are
+// polytonic-only and would confuse a Modern Greek exercise, not just clutter it.
+const MONOTONIC_MARKS=ALL_MARKS.filter(m=>m.label==='acute'||m.cat==='diaer');
 const EXCL={accent:['accent'],breath:['breath','diaer'],subscr:['subscr','diaer'],diaer:['diaer','breath','subscr']};
 const CAT_ORDER={breath:0,accent:1,diaer:2,subscr:3};
 const VOWELS=new Set('αεηιουωΑΕΗΙΟΥΩ');
 const DIA_VOWELS={'͂':new Set('αηιυωΑΗΙΥΩ'),'ͅ':new Set('αηωΑΗΩ'),'̈':new Set('ιυΙΥ')};
 
 function render({model,el}){
+  // anywidget calls this fresh for every new widget instance, and
+  // make_paradigm_form() always constructs a brand-new _ParadigmFormWidget
+  // (paradigm_drill_widgets() creates one per word, never reuses/caches
+  // one across words) -- so the lock state below is naturally scoped to
+  // one word's drill. If that ever changes (e.g. a widget instance gets
+  // reused/cached across words), the lock-request bookkeeping would need
+  // to be reset explicitly on each new word instead.
+  const MARKS=model.get('polytonic')?ALL_MARKS:MONOTONIC_MARKS;
   const activeMarks=new Map();
   let focusedInp=null;
   let biSnap=null;
+  // submit_count doubles as the request id (each fireSubmit sends the next
+  // value and every reply echoes back the one it answered), so no separate
+  // "last sent" counter is needed -- model.get('submit_count') after a
+  // model.set() already reads the just-sent value, synchronously, before
+  // save_changes() does the real network round trip.
+  const pendingOrigin=new Map();  // submit_count -> origin field index, while its reply is in flight
+
+  // A field can (rarely) have more than one request in flight -- fireSubmit
+  // itself refuses to re-lock an already-locked field, but the mobile "Go"
+  // form-submit path and the keydown path both funnel through it, so treat
+  // this as belt-and-suspenders rather than assuming it can't happen. Only
+  // actually unlock once no *other* pending request still names this field --
+  // unlocking on any single reply, even a stale or superseded one, would
+  // reopen the corruption window for whichever request is still outstanding.
+  function releaseLock(idx){
+    for(const v of pendingOrigin.values())if(v===idx)return;
+    inputs[idx].readOnly=false;
+  }
 
   function clearMarks(...cats){
     for(const cat of cats){const m=activeMarks.get(cat);if(m){m.btn.classList.remove('dia-active');activeMarks.delete(cat);}}
@@ -1136,7 +1166,7 @@ function render({model,el}){
   clrBtn.addEventListener('mousedown',e=>e.preventDefault());
   clrBtn.addEventListener('click',()=>{
     clearAllMarks();
-    if(!focusedInp)return;
+    if(!focusedInp||focusedInp.readOnly)return;
     const inp=focusedInp;
     const pos=inp.selectionStart??inp.value.length;
     if(pos===0){inp.focus();return;}
@@ -1158,12 +1188,35 @@ function render({model,el}){
 
   // shared by keydown-Enter and mobile "Go" (form submit) below — idx is
   // -1 (enter_field_index's own documented "unset" default) when nothing
-  // was focused, same sentinel change:focus_request already treats as a no-op
+  // was focused; fireSubmit skips locking/pendingOrigin entirely for it
+  // below, so change:focus_request's reply naturally finds no origin to
+  // act on instead of needing its own -1 check.
   function fireSubmit(idx){
+    // Already locked (a reply for this field is still in flight) -- a
+    // repeat Enter/"Go" while waiting can't mean anything new since the
+    // field is read-only and hasn't changed, so drop it instead of piling
+    // up a second concurrent request for the same field.
+    if(idx>=0&&idx<inputs.length&&inputs[idx].readOnly)return;
     clearTimeout(_debTimer);
     flushValues();
+    const reqId=(model.get('submit_count')||0)+1;
+    if(idx>=0&&idx<inputs.length){
+      // Lock the field the instant Enter fires. Python's validation is a
+      // real async round trip (a full reactive-cell rerun); without this,
+      // an impatient typist's next keystrokes land in this still-focused
+      // field instead of waiting -- which was the actual cause of both
+      // "focus jumps to a stale field" and "my typing erases itself" (a
+      // late .select() landing mid-keystroke). Released the moment the
+      // reply for reqId comes back, or after 3s as a backstop in case a
+      // reply never arrives for this exact request.
+      inputs[idx].readOnly=true;
+      pendingOrigin.set(reqId,idx);
+      setTimeout(()=>{
+        if(pendingOrigin.delete(reqId))releaseLock(idx);
+      },3000);
+    }
     model.set('enter_field_index',idx);
-    model.set('submit_count',(model.get('submit_count')||0)+1);
+    model.set('submit_count',reqId);
     model.save_changes();
   }
 
@@ -1193,6 +1246,12 @@ function render({model,el}){
     });
     inp.addEventListener('beforeinput',e=>{
       biSnap=null;
+      // readOnly blocks the browser's own native text insertion, but this
+      // handler bypasses that entirely with its own preventDefault()+manual
+      // inp.value= assignment below -- readOnly must be checked explicitly
+      // here too, or a locked field can still be edited via diacritic
+      // mark composition even though plain typing is correctly blocked.
+      if(inp.readOnly)return;
       if(!activeMarks.size||(e.inputType!=='insertText'&&e.inputType!=='insertCompositionText')||!e.data)return;
       const base=e.data.normalize('NFD')[0];
       if(!VOWELS.has(base)){clearAllMarks();return;}
@@ -1219,15 +1278,34 @@ function render({model,el}){
   });
   el.appendChild(form);
 
+  // Unlike the beforeinput/clrBtn guards above, this one doesn't need its
+  // own readOnly check: values is only ever written by flushValues() below
+  // (client -> server), so a change:values event is always an echo of data
+  // this same client just sent -- reapplying it to a locked field re-sets
+  // the same value already there, never a surprising external overwrite.
   model.on('change:values',()=>{
     const vals=model.get('values')||[];
     inputs.forEach((inp,i)=>{if(inp.value!==(vals[i]||''))inp.value=vals[i]||'';});
   });
 
   model.on('change:focus_request',()=>{
-    const req=model.get('focus_request')||[-1,0];
-    const idx=req[0];
-    if(idx>=0&&idx<inputs.length){inputs[idx].focus();inputs[idx].select();}
+    const{request_id,advance_to}=model.get('focus_request')||{};
+    const originIdx=pendingOrigin.get(request_id);
+    // No locked field matches this reply (nothing was focused when Enter
+    // fired, so fireSubmit never locked or recorded an origin for it) --
+    // nothing to unlock or apply.
+    if(originIdx===undefined)return;
+    pendingOrigin.delete(request_id);
+    releaseLock(originIdx);
+    // A newer Enter has been sent since this reply was computed -- it's
+    // for a request that's no longer the latest, so don't act on it.
+    if(request_id!==(model.get('submit_count')||0))return;
+    // The user has manually moved away (click/tab) from the origin field
+    // since submitting -- respect that instead of yanking focus back.
+    if(focusedInp!==inputs[originIdx])return;
+    // advance_to is null on a wrong answer or the last field -- this reply
+    // exists only to release the lock, there's nowhere to move focus to.
+    if(advance_to!=null&&advance_to<inputs.length){inputs[advance_to].focus();inputs[advance_to].select();}
   });
 }
 export default{render};
@@ -1241,12 +1319,13 @@ if _ANYWIDGET_OK:
         labels = _traitlets.List(_traitlets.Unicode()).tag(sync=True)
         values = _traitlets.List(_traitlets.Unicode()).tag(sync=True)
         submit_count = _traitlets.Int(0).tag(sync=True)
-        focus_request = _traitlets.List(_traitlets.Int()).tag(sync=True)
+        focus_request = _traitlets.Dict().tag(sync=True)
         enter_field_index = _traitlets.Int(-1).tag(sync=True)
+        polytonic = _traitlets.Bool(True).tag(sync=True)
 
 
-def make_paradigm_form(mo, labels, values=None):
-    """Multi-input paradigm drill form with shared polytonic diacritics bar.
+def make_paradigm_form(mo, labels, values=None, polytonic=True):
+    """Multi-input paradigm drill form with a shared diacritics bar.
 
     Returns a ``mo.ui.anywidget`` whose ``.widget.values`` is a list of strings
     (one per label), suitable for verb/noun paradigm exercises.
@@ -1256,24 +1335,41 @@ def make_paradigm_form(mo, labels, values=None):
     what was previously typed for this word when navigating back to it).
     Defaults to blank fields. Length must match ``labels`` if given.
 
+    ``polytonic``: ``True`` (default) shows the full mark set (acute, grave,
+    circumflex, rough/smooth breathing, iota subscript, diaeresis) for Ancient
+    Greek. ``False`` shows only acute accent and diaeresis — the two marks
+    Modern Greek's monotonic orthography actually uses; breathing marks and
+    iota subscript were dropped in the 1982 reform, so offering them for
+    Modern Greek content is confusing, not just unnecessary. Pass
+    ``config.polytonic`` (from :class:`GreekConfig`) rather than hardcoding.
+
     Pressing Enter in any field (desktop keydown, or a mobile virtual
     keyboard's "Go"/submit action — both wired) flushes the current values
     immediately (no debounce wait), records the triggering field's index in
     ``.widget.enter_field_index`` (``-1`` if none was focused), and increments
     ``.widget.submit_count`` — treat that counter as an additional "check"
     trigger alongside a submit button, the same way the button's own click
-    counter is watched.
+    counter is watched. The triggering field is locked read-only client-side
+    until a reply comes back (see below), so it can't take an "advance was
+    correct — jump here" reply based on a value the user already changed again.
 
-    Set ``.widget.focus_request = [index, seq]`` (e.g. pairing ``index`` with
-    the current ``submit_count`` as ``seq`` to guarantee change-detection) to
-    move focus to a field programmatically — e.g. to the next field after
-    confirming the current one is correct via a per-slot check.
+    Set ``.widget.focus_request = {"request_id": seq, "advance_to": index}``
+    (pair ``request_id`` with the current ``submit_count`` — both to
+    guarantee change-detection and because the JS side matches it against
+    the request it's still waiting on; a reply for any other ``request_id``
+    is superseded) to move focus to a field programmatically — e.g. to the
+    next field after confirming the current one is correct via a per-slot
+    check. Reply on *every* Enter, including a wrong answer or the last
+    field (``advance_to=None``) — the field stays locked until its exact
+    ``request_id`` gets a reply, so a reply that only unlocks and moves
+    nowhere is still required.
     """
     if not _ANYWIDGET_OK:
         raise ImportError("anywidget is required for make_paradigm_form")
     w = _ParadigmFormWidget()
     w.labels = list(labels)
     w.values = list(values) if values is not None else [""] * len(labels)
+    w.polytonic = polytonic
     return mo.ui.anywidget(w)
 
 
@@ -1601,6 +1697,7 @@ class GreekConfig:
     verb_labels: "list[str]"            # display label per verb slot
     adj_cases: "list[str]"              # cases for full adjective paradigm
     compare_diacritics: bool            # default diacritics flag for _ci
+    polytonic: bool                     # show breathing/subscript/diaeresis marks in make_paradigm_form's bar, not just the acute accent
 
 
 # ─────────────────────────────────────────────────── article tables ──
@@ -1700,6 +1797,7 @@ MODERN_GREEK = GreekConfig(
     verb_labels=['εγώ', 'εσύ', 'αυτός,-ή,-ό', 'εμείς', 'εσείς', 'αυτοί,-ές,-ά'],
     adj_cases=['nom', 'acc', 'gen'],
     compare_diacritics=True,
+    polytonic=False,
 )
 
 ANCIENT_GREEK = GreekConfig(
@@ -1724,6 +1822,7 @@ ANCIENT_GREEK = GreekConfig(
     verb_labels=['1 sg', '2 sg', '3 sg', '1 pl', '2 pl', '3 pl'],
     adj_cases=['nom', 'acc', 'gen', 'dat'],
     compare_diacritics=True,
+    polytonic=True,
 )
 
 
@@ -2122,6 +2221,18 @@ class GreekUtils:
         """
         return [f"{_QUIZ_NUM_LABEL.get(n, n)} {_QUIZ_CASE_LABEL.get(c, c)}:" for n, c in active_cases]
 
+    def noun_indef_cells(self, active_cases: list) -> list:
+        """The singular-only subset of *active_cases* indefinite-article
+        slots apply to — indefinite articles don't inflect for plural.
+
+        Returns ``[]`` when ``config.indef_articles`` is unset (e.g.
+        Ancient Greek), so callers (:meth:`create_noun_test_ui`,
+        :meth:`check_noun_test`, :meth:`check_noun_slot`, and notebooks
+        building an ``indefinite=True`` label list) can call this
+        unconditionally without checking the config themselves first.
+        """
+        return [c for c in active_cases if c[0] == 'sg'] if self._cfg.indef_articles else []
+
     def create_noun_test_ui(self, words_list, mode='simple'):
         mo = self._mo
         word = translation = noun_form = None
@@ -2131,10 +2242,7 @@ class GreekUtils:
             translation = entry.get('Translation', '') if isinstance(entry, dict) else ''
             meta = self.noun_drill_meta(word)
             is_pt, active_cases = meta.is_pluralia_tantum, meta.active_cases
-            indef_cells = (
-                [c for c in active_cases if c[0] == 'sg']
-                if self._cfg.indef_articles else []
-            )
+            indef_cells = self.noun_indef_cells(active_cases)
             if mode == 'simple':
                 labels = self.noun_slot_labels(active_cases)
             else:
@@ -2174,7 +2282,7 @@ class GreekUtils:
             return detected
         return [g for g in ('masc', 'fem', 'neut') if self._noun_forms_gender(nw, num, case, g)]
 
-    def check_noun_test(self, noun, noun_form, mode='simple', *, article: bool = False):
+    def check_noun_test(self, noun, noun_form, mode='simple', *, article: bool = False, indefinite: bool = False):
         """Check noun paradigm form against backend.
 
         Returns ``(ok, feedback_html)`` where ``feedback_html`` is a
@@ -2182,6 +2290,16 @@ class GreekUtils:
         ``article=True`` requires the definite article in each field (Ancient Greek drills).
         ``article=False`` (default): articles are validated if the user types one,
         but not required — a bare noun form is accepted.
+
+        ``indefinite=True`` (``mode='simple'`` only) additionally checks
+        extra indefinite-article slots appended after the definite ones, one
+        per singular case (indefinite articles don't inflect for plural) —
+        pass ``noun_form.value`` with that many extra entries, e.g. built via
+        ``noun_slot_labels(active_cases) + noun_slot_labels(noun_indef_cells(active_cases))``
+        (see :meth:`check_noun_slot`'s matching ``indefinite`` param for the
+        Enter-driven per-slot equivalent). No-ops when ``config.indef_articles``
+        is unset (e.g. Ancient Greek). ``mode='full'`` already tests both
+        halves unconditionally, independent of this param — see below.
         """
         if not noun or noun_form is None or not noun_form.value:
             return False, ""
@@ -2215,14 +2333,14 @@ class GreekUtils:
             _n = _QUIZ_NUM_LABEL.get(num, num)
             _c = _QUIZ_CASE_LABEL.get(case, case)
             errs = []
-            if not self._ci(uw, correct):
-                errs.append(f'❌ [{_n} {_c}]: noun **"{uw}"**, must be **{" / ".join(sorted(correct)) if correct else "?"}**')
             if art_table is not None:
                 if ua is None:
                     if require_art:
                         errs.append(f'❌ [{_n} {_c}]: article missing, must be **{" / ".join(sorted(correct_arts))}**')
                 elif not self._ci(ua, correct_arts):
                     errs.append(f'❌ [{_n} {_c}]: article **"{ua}"**, must be **{" / ".join(sorted(correct_arts))}**')
+            if not self._ci(uw, correct):
+                errs.append(f'❌ [{_n} {_c}]: noun **"{uw}"**, must be **{" / ".join(sorted(correct)) if correct else "?"}**')
             return not errs, errs
 
         def _collect(results):
@@ -2230,29 +2348,32 @@ class GreekUtils:
             errs = [e for r in results for e in r[1]]
             return ok, '<br>'.join(errs)
 
+        # 'full' mode is 'simple' with article/indefinite both forced True —
+        # it predates those two params and always tested both halves
+        # unconditionally, so it keeps its own hardcoded require_art=True
+        # rather than reading `article`, and never reads `indefinite` at all.
+        # noun_indef_cells already no-ops to [] without config.indef_articles,
+        # so the only thing left to gate on here is 'simple' mode's own
+        # indefinite opt-in — an empty indef_cells falls through harmlessly
+        # (zip against it yields no pairs), no separate early-return needed.
         if mode == 'simple':
-            return _collect([_chk(v, c[0], c[1], arts, require_art=article)
-                             for v, c in zip(noun_form.value, ac)])
+            def_res = [_chk(v, c[0], c[1], arts, require_art=article)
+                       for v, c in zip(noun_form.value, ac)]
+            indef_cells = self.noun_indef_cells(ac) if indefinite else []
         else:
-            indef_cells = [c for c in ac if c[0] == 'sg'] if indef_arts else []
-            def_res   = [_chk(v, c[0], c[1], arts) for v, c in zip(noun_form.value, ac)]
-            indef_res = [_chk(v, c[0], c[1], indef_arts)
-                         for v, c in zip(noun_form.value[len(ac):], indef_cells)]
-            return _collect(def_res + indef_res)
+            def_res = [_chk(v, c[0], c[1], arts, require_art=True)
+                       for v, c in zip(noun_form.value, ac)]
+            indef_cells = self.noun_indef_cells(ac)
+        indef_res = [_chk(v, c[0], c[1], indef_arts)
+                     for v, c in zip(noun_form.value[len(ac):], indef_cells)]
+        return _collect(def_res + indef_res)
 
-    def check_noun_slot(self, noun, slot_index, value, *, article=False, active_cases=None):
-        """Check a single noun-form slot (index into *active_cases* or config.noun_cells).
-
-        Same comparison rules as ``check_noun_test``'s per-slot logic (form +
-        required article), for one slot only — for incremental per-field
-        validation (e.g. on Enter) instead of a full-form check. Pass the same
-        ``active_cases`` the form was built with (e.g. pluralia tantum uses a
-        plural-only subset) so slot indices line up.
+    def _noun_slot_check(self, noun, num, case, value, art_table, require_art) -> bool:
+        """Shared form+article check for one (number, case) pair against one
+        article table — the boolean-only sibling of check_noun_test's _chk
+        (which additionally builds error messages, so isn't reused directly).
+        Used by check_noun_slot for both its definite and indefinite slots.
         """
-        cells = active_cases if active_cases is not None else self._cfg.noun_cells
-        if not (0 <= slot_index < len(cells)):
-            return False
-        num, case = cells[slot_index]
         parts = noun.split()
         nw = parts[1].strip() if len(parts) > 1 else noun.strip()
         val = (value or '').strip()
@@ -2262,8 +2383,7 @@ class GreekUtils:
         uw, ua = ws[-1].strip(), (ws[0].strip() if len(ws) > 1 else None)
         if not self._ci(uw, self._noun_forms(nw, num, case)):
             return False
-        arts = self._cfg.articles
-        if not article or not arts:
+        if not require_art or not art_table:
             return True
         if ua is None:
             return False
@@ -2271,8 +2391,38 @@ class GreekUtils:
         genders = self._noun_genders_at(nw, num, case, detected)
         correct_arts = set()
         for g in genders:
-            correct_arts.update(arts.get(g, {}).get(num, {}).get(case, set()))
+            correct_arts.update(art_table.get(g, {}).get(num, {}).get(case, set()))
         return self._ci(ua, correct_arts)
+
+    def check_noun_slot(self, noun, slot_index, value, *, article=False, active_cases=None, indefinite=False):
+        """Check a single noun-form slot (index into *active_cases* or config.noun_cells).
+
+        Same comparison rules as ``check_noun_test``'s per-slot logic (form +
+        required article), for one slot only — for incremental per-field
+        validation (e.g. on Enter) instead of a full-form check. Pass the same
+        ``active_cases`` the form was built with (e.g. pluralia tantum uses a
+        plural-only subset) so slot indices line up.
+
+        ``indefinite=True`` extends the valid slot range past ``active_cases``:
+        indices ``len(active_cases)`` onward index into its singular-only
+        subset (indefinite articles don't inflect for plural), checked against
+        ``config.indef_articles`` instead of ``config.articles`` — an
+        indefinite slot always requires its article (that's the whole point
+        of the slot), independent of ``article``, which only controls the
+        definite slots. A ``False`` (or missing ``config.indef_articles``,
+        e.g. Ancient Greek) leaves the valid range unchanged.
+        """
+        cells = active_cases if active_cases is not None else self._cfg.noun_cells
+        if 0 <= slot_index < len(cells):
+            num, case = cells[slot_index]
+            return self._noun_slot_check(noun, num, case, value, self._cfg.articles, article)
+        if indefinite:
+            indef_cells = self.noun_indef_cells(cells)
+            j = slot_index - len(cells)
+            if 0 <= j < len(indef_cells):
+                num, case = indef_cells[j]
+                return self._noun_slot_check(noun, num, case, value, self._cfg.indef_articles, True)
+        return False
 
     # ------------------------------------------------------------------ verbs
 
@@ -2772,6 +2922,46 @@ Translation: **{translation}**
             return entered
         return {**entered, cv[word_key]: list(form.widget.values)}
 
+    def make_paradigm_drill_state(self, initial_words: list) -> tuple:
+        """Create the 10 ``mo.state()`` pairs a paradigm-drill exercise
+        needs, as a flat 20-tuple in the same order
+        :meth:`_pack_paradigm_state` takes them positionally — unpack
+        directly in the notebook cell that owns these names::
+
+            (words, set_words, hist, set_hist, msg, set_msg, cap, set_cap,
+             entered, set_entered, sub_cnt, set_sub_cnt, prev_cnt, set_prev_cnt,
+             nxt_cnt, set_nxt_cnt, entercnt, set_entercnt, restart_cnt,
+             set_restart_cnt) = gu.make_paradigm_drill_state(initial_words)
+
+        Safe to call directly from a notebook cell (unlike
+        :meth:`_pack_paradigm_state`, which is internal-only) — the names
+        above are literal assignment targets in the calling cell's own
+        source, so marimo's static reactivity tracking sees them exactly
+        as if the cell had called ``mo.state()`` ten times itself; nothing
+        crosses a cell boundary through a dict/attribute lookup.
+
+        ``initial_words`` seeds the word queue (e.g. already shuffled via
+        ``random.sample`` for a randomized drill order); everything else
+        starts empty/zero/``None``, matching what
+        :meth:`reset_paradigm_drill_state` resets back to.
+        """
+        mo = self._mo
+        words, set_words = mo.state(list(initial_words))
+        hist, set_hist = mo.state([])
+        msg, set_msg = mo.state("")
+        cap, set_cap = mo.state(None)
+        entered, set_entered = mo.state({})
+        sub_cnt, set_sub_cnt = mo.state(0)
+        prev_cnt, set_prev_cnt = mo.state(0)
+        nxt_cnt, set_nxt_cnt = mo.state(0)
+        entercnt, set_entercnt = mo.state(0)
+        restart_cnt, set_restart_cnt = mo.state(0)
+        return (
+            words, set_words, hist, set_hist, msg, set_msg, cap, set_cap,
+            entered, set_entered, sub_cnt, set_sub_cnt, prev_cnt, set_prev_cnt,
+            nxt_cnt, set_nxt_cnt, entercnt, set_entercnt, restart_cnt, set_restart_cnt,
+        )
+
     def reset_paradigm_drill_state(self, vocab: list, set_words, set_hist, set_msg, set_cap,
                                     set_entered, set_sub_cnt, set_prev_cnt, set_nxt_cnt) -> None:
         """Reset a hand-rolled paradigm-drill exercise back to its initial state
@@ -2865,7 +3055,7 @@ Translation: **{translation}**
             prev_label = _PARADIGM_PREV.get(lang, "◂ Prev")
         if restart_label is None:
             restart_label = _PARADIGM_RESTART.get(lang, "↺ Start over")
-        form = make_paradigm_form(self._mo, labels, values=values)
+        form = make_paradigm_form(self._mo, labels, values=values, polytonic=self._cfg.polytonic)
         prev_btn = self._mo.ui.button(label=prev_label, on_click=_INC, disabled=history_len == 0)
         nxt_btn = self._mo.ui.button(label=next_label, on_click=_INC, disabled=remaining_len <= 1)
         restart_btn = self._mo.ui.button(label=restart_label, on_click=_INC)
@@ -2971,10 +3161,14 @@ Translation: **{translation}**
                 set_cap(snap)
             if _enter and not _click:
                 i = _w.enter_field_index
-                if 0 <= i < len(_live) and slot_ok(i, _live[i]):
-                    nxt_i = i + 1
-                    if nxt_i < len(_live):
-                        _w.focus_request = [nxt_i, _w.submit_count]
+                advance_to = None
+                if 0 <= i < len(_live) and slot_ok(i, _live[i]) and i + 1 < len(_live):
+                    advance_to = i + 1
+                # Always reply, even on a wrong answer or the last field --
+                # the JS side locks the origin field the instant Enter
+                # fires and only releases it once this exact submit_count
+                # comes back, so a dropped reply would leave it stuck.
+                _w.focus_request = {"request_id": _w.submit_count, "advance_to": advance_to}
 
         cap = get_cap()
         ok = False
@@ -3089,6 +3283,8 @@ Translation: **{translation}**
         *,
         vocab: list,
         noun_meta: Any,
+        article: bool = True,
+        indefinite: bool = False,
         word_key: str = "form",
         meaning_key: str = "meaning",
         meaning_label: str = "Meaning",
@@ -3102,6 +3298,24 @@ Translation: **{translation}**
         :meth:`create_noun_test_ui`) for its ``active_cases``/
         ``is_pluralia_tantum`` — nouns' active cases vary per word (pluralia
         tantum), unlike a verb's fixed slot list.
+
+        ``article``: ``True`` (default) requires the definite article in
+        each slot's answer (e.g. Ancient Greek drills always want this).
+        ``False`` checks the bare noun form only — pass ``mode_selector.value
+        == 'article'`` (or equivalent) to let a notebook toggle between the
+        two, e.g. for a Modern Greek course offering both a "simple" and an
+        "article" noun-test mode.
+
+        ``indefinite``: ``False`` (default). ``True`` expects ``form`` to
+        carry extra slots after the definite ones — one per singular case
+        (indefinite articles don't inflect for plural) — each always
+        requiring the indefinite article, independent of ``article``. Build
+        the matching label list as ``gu.noun_slot_labels(active_cases) +
+        [f"Ind. {l}" for l in gu.noun_slot_labels(gu.noun_indef_cells(active_cases))]``
+        before constructing ``form``. No-ops (no extra slots expected) when
+        ``config.indef_articles`` is unset (e.g. Ancient Greek) — safe to
+        pass unconditionally from a notebook that doesn't check the config
+        itself.
         """
         active_cases = getattr(noun_meta, "active_cases", [])
         state = self._pack_paradigm_state(
@@ -3126,8 +3340,9 @@ Translation: **{translation}**
                 if cv is not None and noun_meta is not None and live else None),
             slot_ok=lambda i, v: (
                 cv is not None and noun_meta is not None
-                and self.check_noun_slot(cv[word_key], i, v, article=True, active_cases=active_cases)),
-            full_check=lambda cap: self.check_noun_test(cv[word_key], cap, article=True),
+                and self.check_noun_slot(cv[word_key], i, v, article=article,
+                                          active_cases=active_cases, indefinite=indefinite)),
+            full_check=lambda cap: self.check_noun_test(cv[word_key], cap, article=article, indefinite=indefinite),
         )
 
     def adjective_paradigm_drill_form(

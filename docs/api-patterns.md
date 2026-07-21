@@ -96,8 +96,11 @@ The notebook sees only domain-level calls (`check_verb`, `check_noun`);
 | `indef_articles` | ένας / μια / ένα | `None` |
 | `verb_prefix` | `{'future': 'θα'}` | `{}` |
 | `compare_diacritics` | `True` (keep accents) | `True` (keep polytonic) |
+| `polytonic` | `False` (acute + diaeresis only) | `True` (full mark set) |
 
-`MODERN_GREEK` is the default — existing notebooks require no change.
+`MODERN_GREEK` is the default — existing notebooks require no change. `polytonic` also drives `make_paradigm_form`'s diacritics bar automatically via `paradigm_drill_widgets` — no separate setting needed.
+
+`indef_articles` is data the config carries, not something any Pattern A method reads on its own — pass `noun_paradigm_drill_form(..., indefinite=True)` to actually test it: appends one indefinite-article slot per singular case (indefinite articles don't inflect for plural) after the definite ones, each requiring its article regardless of the separate `article` param. Build the matching label list as `noun_slot_labels(active_cases) + [f"Ind. {l}" for l in noun_slot_labels(noun_indef_cells(active_cases))]`. `noun_indef_cells` no-ops safely (returns `[]`) when `config.indef_articles` is `None` (Ancient Greek) — fine to pass unconditionally from a notebook that doesn't branch on config itself.
 
 **When `eee_module` is omitted**, `GreekUtils` falls back to calling the
 backend's `.paradigm()` method directly — same results, bypasses the eee
@@ -707,6 +710,76 @@ gu.word_drill_form(
 again on restart. Prev/Next navigation replays history; the pre-fill
 `restore_entry` shows the previous answer so the student can review it.
 
+### Paradigm drill (3-cell API)
+
+For exercises where the student fills in an entire paradigm at once (every
+verb-tense form, every noun case) rather than one field — the high-level
+sibling of Pattern C's hand-rolled `make_paradigm_form` recipe below.
+`paradigm_drill_widgets` + `verb_paradigm_drill_form` / `noun_paradigm_drill_form`
+/ `adjective_paradigm_drill_form` collapse that recipe's seven cells down to
+three:
+
+```python
+# Cell 1 — state (the 10 mo.state() pairs, as one flat call)
+(words, set_words, hist, set_hist, msg, set_msg, cap, set_cap,
+ entered, set_entered, sub_cnt, set_sub_cnt, prev_cnt, set_prev_cnt,
+ nxt_cnt, set_nxt_cnt, entercnt, set_entercnt, restart_cnt,
+ set_restart_cnt) = gu.make_paradigm_drill_state(list(VERBS))
+```
+
+```python
+# Cell 2 — widgets (form + Prev/Next/Restart) + check button, separately
+cv = words()[0] if words() else None
+form, prev_btn, nxt_btn, restart_btn = gu.paradigm_drill_widgets(
+    labels=gu.verb_slot_labels(),
+    values=entered().get(cv["form"]) if cv else None,
+    history_len=len(hist()), remaining_len=len(words()),
+)
+check_btn = gu.dirty_check_button(form, cap, cv, "verb_word")
+```
+
+```python
+# Cell 3 — handler + display in one call (last expression in the cell)
+gu.verb_paradigm_drill_form(
+    words, set_words, hist, set_hist, msg, set_msg, cap, set_cap,
+    entered, set_entered, sub_cnt, set_sub_cnt, prev_cnt, set_prev_cnt,
+    nxt_cnt, set_nxt_cnt, entercnt, set_entercnt, restart_cnt, set_restart_cnt,
+    cv, form, check_btn, prev_btn, nxt_btn, restart_btn,
+    vocab=VERBS, title="## Упражнение 5",
+)
+```
+
+The state tuple from Cell 1 unpacks directly as the first 20 positional args
+of Cell 3's call — same order, no repacking. `check_btn` is built in its own
+cell (not bundled into `paradigm_drill_widgets`) because it depends on `cap`,
+which changes on every check; bundling it would rebuild `form` from scratch
+on each check and lose whatever the student just typed.
+
+For nouns, swap in `noun_paradigm_drill_form` and pass `noun_meta` (from
+`gu.noun_drill_meta(cv["form"])` — active cases vary per word for pluralia
+tantum) plus two independent toggles:
+
+- `article: bool = True` — require the definite article in each answer
+  (`False` checks the bare noun only).
+- `indefinite: bool = False` — when `True`, `form`'s labels/slots must
+  include one indefinite-article slot per singular case (indefinite
+  articles don't inflect for plural), appended after the definite ones and
+  always requiring the article regardless of `article`. Build the label
+  list as `gu.noun_slot_labels(active_cases) + [f"Ind. {l}" for l in
+  gu.noun_slot_labels(gu.noun_indef_cells(active_cases))]`. No-ops safely
+  when `config.indef_articles` is unset (Ancient Greek) — fine to pass
+  unconditionally from a notebook that doesn't branch on config itself.
+
+For adjectives, swap in `adjective_paradigm_drill_form` and pass
+`mode: str = "simple"` (nominative only, 6 slots — matches
+`adjective_slot_labels("simple")`; anything else drills every case in
+`config.adj_cases`).
+
+Pressing Enter in any field locks it read-only until the reply for that
+Enter comes back (correct → advance focus to the next field; wrong or last
+field → just unlocks) — this recipe implements the reply side of that
+protocol correctly, unlike Pattern C's raw `make_paradigm_form` recipe.
+
 ---
 
 ### Ancient Greek paradigm tables (Odyssey-style)
@@ -822,6 +895,10 @@ from eee_project import make_paradigm_form
 `make_paradigm_form(mo, labels)` returns a `mo.ui.anywidget` whose
 `.widget.values` is a list of strings (one per label). Use it as the input
 surface; wire submission via a button cell that reads `.widget.values`.
+Pass `polytonic=False` (or better, `polytonic=config.polytonic` — this is
+exactly what `paradigm_drill_widgets` does automatically) to limit the
+diacritics bar to acute accent + diaeresis for Modern Greek content, instead
+of the full polytonic mark set (default `True`, unchanged behavior).
 
 ### Verb paradigm (6 slots)
 
@@ -953,6 +1030,15 @@ return noun_fb, noun_ok
 - Paste is handled correctly: active diacritic marks are not applied to pasted
   text (Chrome's `insertFromPaste` inputType is whitelisted).
 - Requires `anywidget`; raises `ImportError` if not installed.
+- Pressing Enter in any field locks it read-only client-side until
+  `.widget.focus_request` replies with that field's current
+  `.widget.submit_count` as `request_id` (see `make_paradigm_form`'s
+  docstring) — this recipe above never does, since it only reacts to the
+  Check button, so an Enter press here just locks and self-releases after
+  3s with no other effect. Harmless, but if you want Enter to actually
+  advance focus, don't hand-roll it on top of this recipe — use the
+  "Paradigm drill (3-cell API)" recipe above, which already implements the
+  reply side of this protocol correctly.
 
 ---
 

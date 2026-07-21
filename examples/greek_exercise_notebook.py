@@ -25,7 +25,7 @@ Run from within the repo (uses local packages):
 
 import marimo
 
-__generated_with = "0.23.8"
+__generated_with = "0.23.14"
 app = marimo.App(width="medium")
 
 
@@ -282,6 +282,7 @@ def _(mo):
             label="Part of speech",
             inline=True,
         )
+
     return (make_pos_switcher,)
 
 
@@ -398,19 +399,30 @@ def _(make_pos_switcher):
 
 
 @app.cell(hide_code=True)
-def _(ADJS, NOUNS, WORDS, mo, pos_sel):
+def _(mo):
+    # Kept in its own cell, undisplayed here: a cell that both builds this
+    # widget and displays it conditionally on pos_sel would rerun (and reset
+    # the toggle back to its default) on every part-of-speech switch, since
+    # marimo reruns a cell whole when any of its own dependencies change.
+    # The next cell displays it conditionally instead, without recreating it.
+    article_toggle_ag = mo.ui.switch(label="Require article (noun)", value=True)
+    return (article_toggle_ag,)
+
+
+@app.cell(hide_code=True)
+def _(article_toggle_ag, mo, pos_sel):
+    article_toggle_ag if pos_sel.value == "noun" else mo.md("")
+    return
+
+
+@app.cell(hide_code=True)
+def _(ADJS, NOUNS, WORDS, gu_ag, mo, pos_sel):
     # Re-created whenever the part of speech changes — switching resets the drill.
     _vv = {"verb": WORDS, "noun": NOUNS, "adjective": ADJS}.get(pos_sel.value, [])
-    w4t_p, set_w4t_p = mo.state(list(_vv))
-    hist_p, set_hist_p = mo.state([])
-    msg_p, set_msg_p = mo.state("")
-    cap_p, set_cap_p = mo.state(None)
-    entered_p, set_entered_p = mo.state({})
-    sub_cnt_p, set_sub_cnt_p = mo.state(0)
-    prev_cnt_p, set_prev_cnt_p = mo.state(0)
-    nxt_cnt_p, set_nxt_cnt_p = mo.state(0)
-    entercnt_p, set_entercnt_p = mo.state(0)
-    restart_cnt_p, set_restart_cnt_p = mo.state(0)
+    (w4t_p, set_w4t_p, hist_p, set_hist_p, msg_p, set_msg_p, cap_p, set_cap_p,
+     entered_p, set_entered_p, sub_cnt_p, set_sub_cnt_p, prev_cnt_p, set_prev_cnt_p,
+     nxt_cnt_p, set_nxt_cnt_p, entercnt_p, set_entercnt_p, restart_cnt_p,
+     set_restart_cnt_p) = gu_ag.make_paradigm_drill_state(_vv)
     cvw_p, set_cvw_p = mo.state(None)
     remaining_p, set_remaining_p = mo.state(None)
     score_p, set_score_p = mo.state({"correct": 0, "total": 0})
@@ -562,6 +574,7 @@ def _(
     ADVERBS,
     NOUNS,
     WORDS,
+    article_toggle_ag,
     cap_p,
     check_btn_p,
     cur_p,
@@ -631,6 +644,7 @@ def _(
             cur_p, drill_form_p, check_btn_p, prev_btn_p, nxt_btn_p, restart_btn_p,
             vocab=NOUNS,
             noun_meta=noun_meta_p,
+            article=article_toggle_ag.value,
             done_message="Done — every noun drilled!",
         )
     elif pos_sel.value == "adjective":
@@ -656,6 +670,224 @@ def _(
             lang="en",
         )
     _out
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Exercise 6 · Modern Greek Paradigm Drill
+
+    Same `paradigm_drill_widgets` / `*_paradigm_drill_form` mechanism as
+    Exercise 5, but wired to `gu_mg` (`config=MODERN_GREEK`) instead of
+    `gu_ag` -- the diacritics bar switches to the monotonic mark set (acute
+    accent + diaeresis only), matching `GreekConfig.polytonic`. Switch part
+    of speech below, same as Exercise 5 -- verb / noun / adjective only, no
+    adverb here, since that path uses the separate `word_drill_widgets`
+    mechanism, not `paradigm_drill_widgets`.
+
+    For nouns specifically: `article` switches between a bare-noun answer and
+    one requiring the definite article; `indefinite` additionally appends an
+    indefinite-article slot for each singular case (indefinite articles
+    don't inflect for plural) -- `config.indef_articles` is `None` for
+    Ancient Greek, so this toggle only does something here.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    pos_sel_mg = mo.ui.radio(
+        options=["verb", "noun", "adjective"],
+        value="noun",
+        label="Part of speech",
+        inline=True,
+    )
+    pos_sel_mg
+    return (pos_sel_mg,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    # Toggles kept in their own cell, undisplayed here -- same reason as
+    # article_toggle_ag above: a cell depending on pos_sel_mg to decide
+    # whether to display them would rerun (and reset them) on every
+    # part-of-speech switch. The next cell displays them conditionally.
+    MG_WORDS = [{"form": "γράφω", "meaning": "I write"}, {"form": "διαβάζω", "meaning": "I read"}]
+    MG_NOUNS = [{"form": "το μήνυμα", "meaning": "message"}, {"form": "ο φίλος", "meaning": "friend"}]
+    MG_ADJS = [{"form": "καλός", "meaning": "good"}, {"form": "μεγάλος", "meaning": "big"}]
+    article_toggle_mg = mo.ui.switch(label="Require article (noun)", value=True)
+    indefinite_toggle_mg = mo.ui.switch(label="Also test indefinite article (noun)", value=False)
+    return MG_ADJS, MG_NOUNS, MG_WORDS, article_toggle_mg, indefinite_toggle_mg
+
+
+@app.cell(hide_code=True)
+def _(article_toggle_mg, indefinite_toggle_mg, mo, pos_sel_mg):
+    mo.hstack([article_toggle_mg, indefinite_toggle_mg]) if pos_sel_mg.value == "noun" else mo.md("")
+    return
+
+
+@app.cell(hide_code=True)
+def _(MG_ADJS, MG_NOUNS, MG_WORDS, gu_mg, pos_sel_mg):
+    _vv = {"verb": MG_WORDS, "noun": MG_NOUNS, "adjective": MG_ADJS}.get(pos_sel_mg.value, [])
+    (w4t_mg, set_w4t_mg, hist_mg, set_hist_mg, msg_mg, set_msg_mg, cap_mg, set_cap_mg,
+     entered_mg, set_entered_mg, sub_cnt_mg, set_sub_cnt_mg, prev_cnt_mg, set_prev_cnt_mg,
+     nxt_cnt_mg, set_nxt_cnt_mg, entercnt_mg, set_entercnt_mg, restart_cnt_mg,
+     set_restart_cnt_mg) = gu_mg.make_paradigm_drill_state(_vv)
+    return (
+        cap_mg,
+        entercnt_mg,
+        entered_mg,
+        hist_mg,
+        msg_mg,
+        nxt_cnt_mg,
+        prev_cnt_mg,
+        restart_cnt_mg,
+        set_cap_mg,
+        set_entercnt_mg,
+        set_entered_mg,
+        set_hist_mg,
+        set_msg_mg,
+        set_nxt_cnt_mg,
+        set_prev_cnt_mg,
+        set_restart_cnt_mg,
+        set_sub_cnt_mg,
+        set_w4t_mg,
+        sub_cnt_mg,
+        w4t_mg,
+    )
+
+
+@app.cell(hide_code=True)
+def _(
+    entered_mg,
+    gu_mg,
+    hist_mg,
+    indefinite_toggle_mg,
+    pos_sel_mg,
+    set_entercnt_mg,
+    set_nxt_cnt_mg,
+    set_prev_cnt_mg,
+    w4t_mg,
+):
+    cur_mg = w4t_mg()[0] if w4t_mg() else None
+    noun_meta_mg = None
+    if pos_sel_mg.value == "verb":
+        _labels = gu_mg.verb_slot_labels()
+    elif pos_sel_mg.value == "noun":
+        noun_meta_mg = gu_mg.noun_drill_meta(cur_mg["form"]) if cur_mg else None
+        _ac = getattr(noun_meta_mg, "active_cases", [])
+        _labels = gu_mg.noun_slot_labels(_ac)
+        if indefinite_toggle_mg.value:
+            _labels = _labels + [f"Ind. {l}" for l in gu_mg.noun_slot_labels(gu_mg.noun_indef_cells(_ac))]
+    else:
+        _labels = gu_mg.adjective_slot_labels("simple")
+    drill_form_mg, prev_btn_mg, nxt_btn_mg, restart_btn_mg = gu_mg.paradigm_drill_widgets(
+        labels=_labels,
+        values=entered_mg().get(cur_mg["form"]) if cur_mg else None,
+        history_len=len(hist_mg()),
+        remaining_len=len(w4t_mg()),
+        lang="en",
+    )
+    set_prev_cnt_mg(0)
+    set_nxt_cnt_mg(0)
+    set_entercnt_mg(0)
+    return (
+        cur_mg,
+        drill_form_mg,
+        noun_meta_mg,
+        nxt_btn_mg,
+        prev_btn_mg,
+        restart_btn_mg,
+    )
+
+
+@app.cell(hide_code=True)
+def _(cap_mg, cur_mg, drill_form_mg, gu_mg, pos_sel_mg):
+    check_btn_mg = gu_mg.dirty_check_button(
+        drill_form_mg, cap_mg, cur_mg,
+        {"verb": "verb_word", "noun": "test_word", "adjective": "adj_word"}[pos_sel_mg.value],
+        label="Check",
+    )
+    return (check_btn_mg,)
+
+
+@app.cell(hide_code=True)
+def _(
+    MG_ADJS,
+    MG_NOUNS,
+    MG_WORDS,
+    article_toggle_mg,
+    cap_mg,
+    check_btn_mg,
+    cur_mg,
+    drill_form_mg,
+    entercnt_mg,
+    entered_mg,
+    gu_mg,
+    hist_mg,
+    indefinite_toggle_mg,
+    msg_mg,
+    noun_meta_mg,
+    nxt_btn_mg,
+    nxt_cnt_mg,
+    pos_sel_mg,
+    prev_btn_mg,
+    prev_cnt_mg,
+    restart_btn_mg,
+    restart_cnt_mg,
+    set_cap_mg,
+    set_entercnt_mg,
+    set_entered_mg,
+    set_hist_mg,
+    set_msg_mg,
+    set_nxt_cnt_mg,
+    set_prev_cnt_mg,
+    set_restart_cnt_mg,
+    set_sub_cnt_mg,
+    set_w4t_mg,
+    sub_cnt_mg,
+    w4t_mg,
+):
+    if pos_sel_mg.value == "verb":
+        _out_mg = gu_mg.verb_paradigm_drill_form(
+            w4t_mg, set_w4t_mg, hist_mg, set_hist_mg, msg_mg, set_msg_mg,
+            cap_mg, set_cap_mg, entered_mg, set_entered_mg,
+            sub_cnt_mg, set_sub_cnt_mg, prev_cnt_mg, set_prev_cnt_mg,
+            nxt_cnt_mg, set_nxt_cnt_mg, entercnt_mg, set_entercnt_mg,
+            restart_cnt_mg, set_restart_cnt_mg,
+            cur_mg, drill_form_mg, check_btn_mg, prev_btn_mg, nxt_btn_mg, restart_btn_mg,
+            vocab=MG_WORDS,
+            tense="present",
+            done_message="Done -- every verb drilled!",
+        )
+    elif pos_sel_mg.value == "noun":
+        _out_mg = gu_mg.noun_paradigm_drill_form(
+            w4t_mg, set_w4t_mg, hist_mg, set_hist_mg, msg_mg, set_msg_mg,
+            cap_mg, set_cap_mg, entered_mg, set_entered_mg,
+            sub_cnt_mg, set_sub_cnt_mg, prev_cnt_mg, set_prev_cnt_mg,
+            nxt_cnt_mg, set_nxt_cnt_mg, entercnt_mg, set_entercnt_mg,
+            restart_cnt_mg, set_restart_cnt_mg,
+            cur_mg, drill_form_mg, check_btn_mg, prev_btn_mg, nxt_btn_mg, restart_btn_mg,
+            vocab=MG_NOUNS,
+            noun_meta=noun_meta_mg,
+            article=article_toggle_mg.value,
+            indefinite=indefinite_toggle_mg.value,
+            done_message="Done -- both nouns drilled!",
+        )
+    else:
+        _out_mg = gu_mg.adjective_paradigm_drill_form(
+            w4t_mg, set_w4t_mg, hist_mg, set_hist_mg, msg_mg, set_msg_mg,
+            cap_mg, set_cap_mg, entered_mg, set_entered_mg,
+            sub_cnt_mg, set_sub_cnt_mg, prev_cnt_mg, set_prev_cnt_mg,
+            nxt_cnt_mg, set_nxt_cnt_mg, entercnt_mg, set_entercnt_mg,
+            restart_cnt_mg, set_restart_cnt_mg,
+            cur_mg, drill_form_mg, check_btn_mg, prev_btn_mg, nxt_btn_mg, restart_btn_mg,
+            vocab=MG_ADJS,
+            mode="simple",
+            done_message="Done -- both adjectives drilled!",
+        )
+    _out_mg
     return
 
 

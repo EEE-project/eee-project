@@ -134,6 +134,8 @@ limitations, see its own README: [modern-greek-backend-eee](https://codeberg.org
 
 ## Changelog
 
+**v0.7.0** — `GreekConfig.polytonic` field for Modern Greek's monotonic diacritics; `noun_paradigm_drill_form` gains `article`/`indefinite` toggles; new `make_paradigm_drill_state` helper; fixed an Enter-key focus-lock race in `make_paradigm_form`; new Modern Greek paradigm-drill exercise in `examples/`.
+
 **v0.6.0** — paradigm-drill exercises, diachronic paradigm tables through Modern Greek, clickable interactive text, stanza-match/translation-presence quizzes, Byzantine lexicon rung, pronoun POS support, `magnify_image()` click-to-zoom images, refactored `eee_topbar`; mobile "Go" button support for `make_paradigm_form`; fixes to `parent_back_url()`/`eee_topbar()` link targets on molab; Google Analytics actually firing (real `anywidget`, not an inert inline `<script>`); notebook markdown tables rendering left-aligned; a dead CSS selector removed.
 
 **v0.5.0** — `GreekUtils` and `notebook_utils`; slot template system; Latin, Russian, Spanish, Turkish added; new example notebooks.
@@ -144,4 +146,4 @@ limitations, see its own README: [modern-greek-backend-eee](https://codeberg.org
 
 ## Status
 
-v0.6.0
+v0.7.0
