@@ -7,5 +7,7 @@ dist/
 .venv/
 *.egg-info/
 .coverage
+coverage.json
 htmlcov/
 **/__marimo__/
+.codegraph/

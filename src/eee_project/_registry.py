@@ -5,7 +5,6 @@ Initialize chains from a single thread before spawning workers.
 """
 from __future__ import annotations
 
-import importlib
 import importlib.metadata
 import importlib.resources
 
@@ -26,13 +25,6 @@ _fallback: object | None = None        # catch-all backend
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
-
-
-def _load_class(class_path: str) -> type:
-    """Import and return a class from 'module.path:ClassName'."""
-    module_path, class_name = class_path.split(":", 1)
-    module = importlib.import_module(module_path)
-    return getattr(module, class_name)
 
 
 def _load_ep_instance(group: str, ep_name: str, cache_key: str, error_code: str) -> object | None:

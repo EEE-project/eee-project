@@ -4,29 +4,30 @@ Part of [Ελληνικά Εκπαιδευτικά Εργαλεία (EEE) — Gr
 
 Language-agnostic morphology umbrella for the EEE project. Same API for Modern Greek (`el`), Ancient Greek (`grc`), and any future language. Language codes follow [ISO 639](https://en.wikipedia.org/wiki/ISO_639).
 
-`eee-project` is a pure framework — no backends are bundled. Install the backend packages you need alongside it.
+## Greek diachronic coverage
 
-## Development
+Greek has a continuous documented history of ~3,500 years with substantial
+morphological and phonological change across periods. Current backends primarily
+target two ends of this spectrum, with limited incidental coverage of
+intermediate historical stages through `unimorph grc`. This table spans multiple
+backends and packages, so it lives here rather than in any single backend's README.
 
-```bash
-make test                     # run all tests (quiet)
-make test-v                   # run all tests (verbose)
+| Variety | Approx. dates | Status |
+|---------|--------------|--------|
+| Mycenaean (Linear B) | ~1490–1200 BCE | Not covered |
+| Arcado-Cypriot (Cypriot Syllabary) | ~1100–300 BCE | Not covered |
+| Homeric/Archaic | 800–500 BCE | **Covered (verbs)** — `AncientGreekBackend(lexicons=["homer"])` provides ~2,335 Homeric verb stems with full paradigm generation; nouns/adjectives: Pratt lexicon only (~23/4) |
+| Classical Attic | 480–323 BCE | **Partly covered** — hand-authored `lsj` lexicon adds Classical-Attic verbs + nouns via `AncientGreekBackend(lexicons=["pratt","ltrg","lsj"])`; Pratt is the teaching base (20 verbs); `unimorph grc` adds ~2,400 nouns/adjectives but skews Koine/NT |
+| Koine / Hellenistic | 323 BCE – 400 CE | **Primary coverage of `unimorph grc`** — Wiktionary-derived dataset is heavily Koine/NT; for verbs: `AncientGreekBackend(lexicons=["lxx","morphgnt"])` adds ~3,300 stems |
+| New Testament Greek | ~50–100 CE | **Well covered** — `unimorph grc` (nouns/adj); `AncientGreekBackend(lexicons=["morphgnt"])` (~1,848 verb stems) |
+| Byzantine | 400–1453 CE | No dedicated support; some overlap with late Koine via `unimorph grc` |
+| Katharevousa | 1830–1976 CE | Partially supported — many forms work, some explicitly suppressed in `modern-greek` |
+| Standard Demotic | 1976–present | **Covered** — `modern-greek` (any lemma); UniMorph ell (fixed vocabulary) |
 
-make -C examples help         # list example script targets
-make -C examples el           # run examples/modern_greek.py
-make -C examples grc          # run examples/ancient_greek.py
-make -C examples unimorph     # run examples/unimorph.py
-make -C examples backends     # run examples/backend_selection.py
-make -C examples chain        # run examples/backend_chain.py
-make -C examples hooks        # run examples/chain_hooks.py
-make -C examples comparison        # run examples/backend_comparison.py
-make -C examples notebook-el       # open examples/modern_greek_notebook.py
-make -C examples notebook-grc      # open examples/ancient_greek_notebook.py
-make -C examples notebook          # open examples/greek_notebook.py
-make -C examples notebook-unimorph # open examples/unimorph_notebook.py
-make -C examples notebook-exercise # open examples/greek_exercise_notebook.py
-make -C examples notebook-config   # open examples/config_store_notebook.py
-```
+The major alphabetic dialects (Attic, Ionic, Doric, Aeolic) share the same
+morphological paradigms; differences are primarily phonological and orthographic
+(e.g. Attic -ττ- vs Ionic -σσ-, loss of digamma in Ionic). The `ancient-greek`
+backend targets Classical Attic and is not optimised for other dialects.
 
 ## Installation
 
@@ -40,6 +41,16 @@ pip install git+https://codeberg.org/EEE-project/ancient-greek-backend-eee.git
 ```
 
 Requires Python 3.12+.
+
+`eee-project` is a pure framework — no backends are bundled. Install the backend packages you need alongside it.
+
+## Development
+
+```bash
+make test                     # run all tests (quiet)
+make test-v                   # run all tests (verbose)
+make check                    # run ruff (curated rule set - see [tool.ruff.lint] in pyproject.toml)
+```
 
 ## Quick Start
 
@@ -63,7 +74,8 @@ Feature keys follow [Universal Dependencies FEATS](https://universaldependencies
 
 ### Named backends and chains
 
-When multiple backends cover the same language, register them by name and configure a chain:
+When multiple backends cover the same language, register them by name and configure a chain.
+See [`docs/chains.md`](docs/chains.md) for the full chain API, `stop="all"` union mode, and hook extension points.
 
 ```python
 from modern_greek_backend_eee import ModernGreekBackend
@@ -85,100 +97,20 @@ print(result.tried)    # ["el:modern-greek"]
 
 ## Examples
 
-All examples are in `examples/`:
-
-| File | Description |
-|------|-------------|
-| `examples/modern_greek.py` | Verbs, nouns, adjectives — full paradigms (el) |
-| `examples/ancient_greek.py` | Verbs, nouns, adjectives — full paradigms (grc) |
-| `examples/unimorph.py` | UniMorph TSV backend — nouns/adjectives for el and grc |
-| `examples/backend_selection.py` | Named `backend=` selectors |
-| `examples/backend_chain.py` | Fallback chain setup and usage |
-| `examples/chain_hooks.py` | Pre/post hook examples |
-| `examples/backend_comparison.py` | Side-by-side: dedicated vs UniMorph coverage |
-| `examples/modern_greek_notebook.py` | Interactive paradigm viewer — Modern Greek (Marimo) |
-| `examples/ancient_greek_notebook.py` | Interactive paradigm viewer — Ancient Greek (Marimo) |
-| `examples/greek_notebook.py` | Combined interactive notebook — el + grc (Marimo) |
-| `examples/unimorph_notebook.py` | Interactive browser for all 187 UniMorph languages with slot template support |
-| `examples/greek_exercise_notebook.py` | `GreekUtils` full demo — verb drills, custom drill, `greek_compare`, vocab quiz (MG + AG) |
-| `examples/config_store_notebook.py` | `ConfigStore` demo — `from_url`, `from_file`, `from_dict` with `eee_topbar` |
-
-```bash
-uv run python examples/modern_greek.py
-uv run python examples/unimorph.py
-uv run marimo edit examples/greek_notebook.py --no-token
-uv run marimo edit examples/unimorph_notebook.py --no-token
-uv run marimo edit examples/greek_exercise_notebook.py --no-token
-uv run marimo edit examples/config_store_notebook.py --no-token
-```
+13 runnable scripts and notebooks in `examples/` — verbs/nouns/adjectives for
+el and grc, UniMorph, named backends, chains, hooks, and interactive Marimo
+viewers. See [docs/examples.md](docs/examples.md) for the full catalog and how
+to run each one.
 
 ## API
 
-### `eee.inflect(lemma, features, pos, *, language, backend=None) → set[str]`
-
-Returns inflected forms matching the UD feature bundle. Returns an empty set if the form doesn't exist in the paradigm.
-
-- `pos`: `"verb"`, `"noun"`, `"adjective"`, `"adverb"`
-- `language`: IETF tag — `"el"`, `"grc"`, etc. Required unless `backend` names a single-language backend (e.g. `backend="modern-greek"` infers `language="el"`).
-- `backend`: named variant — `"unimorph"`, `"modern-greek"`, `"ancient-greek"`. `None` selects the default or runs the registered chain.
-
-### `eee.inflect_traced(lemma, features, pos, *, language, backend=None, chain=None, stop="first") → InflectResult`
-
-Like `inflect()` but returns an `InflectResult` with `.forms`, `.source`, `.tried`, and `.by_backend`.
-
-### `eee.supported_languages() → dict[str, list[str]]`
-
-Returns `{language_code: [entry_point_value, ...]}` for entry-point-discovered backends. Multiple backends may register for the same language code; all are listed. Does not include explicitly registered backends or the fallback.
-
-### `eee.register_backend(code, instance, backend=None) → None`
-
-Register a backend instance. Pass `backend='name'` to register a named variant alongside the default.
-
-### `eee.set_fallback_backend(instance) → None`
-
-Catch-all for all unregistered language codes.
-
-### `eee.set_chain(language, backends, *, pre_hook=None, post_hook=None) → None`
-
-Register an ordered list of backend names for a language. Backends are tried in order; the first non-empty result is returned (`stop="first"`).
-
-- `pre_hook`: `callable(lemma, features, pos, ctx) → (lemma, features, pos)` — transform inputs before the chain runs.
-- `post_hook`: `callable(forms, ctx) → set[str]` — transform or supplement results after the chain runs. Used as an LLM gap-filler when `not forms`.
-
-### `eee.language_info(code) → dict | None`
-
-Return the manifest entry for a language code (name, tier, pos list), or `None` if unknown.
-
-### Slot templates
-
-Slot templates map human-readable labels to backend-native tags, enabling structured inflection tables for any language.
-
-```python
-from eee_project import SlotTemplate, inflect_slot, get_slot_templates, register_tag_type
-
-# Inflect a single slot
-slot = SlotTemplate(label="Present 3sg", tag_type="unimorph", tag="V;PRS;3;SG")
-forms = eee.inflect_slot("λύω", slot, "verb", language="el")  # → {"λύει"}
-
-# Pass an explicit backend instance (required for non-registered languages)
-from unimorph_backend_eee import UniMorphBackend
-backend = UniMorphBackend("jpn")
-forms = eee.inflect_slot("歌う", slot, "verb", language="jpn", backend=backend)
-
-# Load a saved TOML template via the active backend
-slots = eee.get_slot_templates("verb", terms_lang="en", lang="ail")
-# → list[SlotTemplate] or None
-
-# Register a custom tag type
-eee.register_tag_type("mytags", lambda backend, lemma, slot, pos, lang: {slot.tag})
-```
-
-`SlotTemplate` fields: `label` (str), `tag_type` (str), `tag` (str), `features` (Mapping[str, str] | None).
-Built-in tag types: `"unimorph"` (direct tag lookup), `"ud"` (UD features dict via `slot.features`).
-
-For `tag_type="ud"`, `tag` is auto-derived as feature values joined in sorted-key order (e.g. `{"Case": "Nom", "Number": "Sing"}` → `"Nom;Sing"`).
-
-`inflect_slot` accepts an optional `backend=` keyword: a named variant string (e.g. `"unimorph"`), an explicit backend instance, or `None` to use the default registered backend. Pass an instance for languages not registered with eee (e.g. non-bundled UniMorph languages).
+Core functions: `inflect()` and `inflect_traced()` (shown in Quick Start above),
+`register_backend()`, `set_chain()`, `set_fallback_backend()`,
+`supported_languages()`, `language_info()` — plus a slot-template system for
+building structured inflection tables, and two exception types
+(`UnsupportedLanguageError`, `BackendLoadError`) with chain-aware failure
+handling. Full signatures, the slot-template API, writing a new backend, and
+exception semantics: [docs/api-reference.md](docs/api-reference.md).
 
 ## Backends
 
@@ -195,41 +127,14 @@ For `tag_type="ud"`, `tag` is auto-derived as feature values joined in sorted-ke
 
 The two `grc` backends have **complementary coverage**: θεός is in `ancient-greek` only; βοηθός is in `unimorph` only.
 
-See [`docs/backends.md`](docs/backends.md) for each backend's source, lemma counts, and known differences.
-
-## Adding a Language
-
-Implement two methods and register:
-
-```python
-class MyBackend:
-    language = "xx"
-    def inflect(self, lemma, features, pos, language=None, **kw): ...
-
-eee.register_backend("xx", MyBackend())
-# Named variant:
-eee.register_backend("xx", MyBackend(), backend="my-backend")
-```
-
-Or ship as a package with an entry point (auto-discovered on install):
-
-```toml
-[project.entry-points."eee_project.backends.v1"]
-xx = "my_xx_eee.backend:MyBackend"
-
-# Optional: register a friendly name so callers can use backend="my-backend"
-[project.entry-points."eee_project.named_backends.v1"]
-my-backend = "my_xx_eee.backend:MyBackend"
-```
-
-## Exceptions
-
-| Exception | Raised when |
-|-----------|-------------|
-| `eee.UnsupportedLanguageError` | No backend registered for `language` / `backend` combination |
-| `eee.BackendLoadError` | Backend found but failed to load |
+For each backend's source, license, implementation notes, lemma counts, and known
+limitations, see its own README: [modern-greek-backend-eee](https://codeberg.org/EEE-project/modern-greek-backend-eee#readme),
+[ancient-greek-backend-eee](https://codeberg.org/EEE-project/ancient-greek-backend-eee#readme),
+[unimorph-backend-eee](https://codeberg.org/EEE-project/unimorph-backend-eee#readme).
 
 ## Changelog
+
+**v0.6.0** — paradigm-drill exercises, diachronic paradigm tables through Modern Greek, clickable interactive text, stanza-match/translation-presence quizzes, Byzantine lexicon rung, pronoun POS support, `magnify_image()` click-to-zoom images, refactored `eee_topbar`; mobile "Go" button support for `make_paradigm_form`; fixes to `parent_back_url()`/`eee_topbar()` link targets on molab; Google Analytics actually firing (real `anywidget`, not an inert inline `<script>`); notebook markdown tables rendering left-aligned; a dead CSS selector removed.
 
 **v0.5.0** — `GreekUtils` and `notebook_utils`; slot template system; Latin, Russian, Spanish, Turkish added; new example notebooks.
 
@@ -239,4 +144,4 @@ my-backend = "my_xx_eee.backend:MyBackend"
 
 ## Status
 
-v0.5.0
+v0.6.0

@@ -4,7 +4,6 @@ Integration tests for the Ancient Greek (grc) backend via eee public API.
 Requires ancient-greek-morphology-eee installed (dev dependency).
 The backend is auto-discovered via the eee.backends.v1 entry point.
 """
-import pytest
 import eee_project as eee
 
 

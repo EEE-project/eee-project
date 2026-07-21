@@ -1,89 +1,169 @@
-Tense	VerbForm	Voice	Mood	Person	Number	label
-Pres	Fin	Act	Ind	1	Sing	Наст. акт. изъяв. 1 ед.
-Pres	Fin	Act	Ind	2	Sing	Наст. акт. изъяв. 2 ед.
-Pres	Fin	Act	Ind	3	Sing	Наст. акт. изъяв. 3 ед.
-Pres	Fin	Act	Ind	1	Plur	Наст. акт. изъяв. 1 мн.
-Pres	Fin	Act	Ind	2	Plur	Наст. акт. изъяв. 2 мн.
-Pres	Fin	Act	Ind	3	Plur	Наст. акт. изъяв. 3 мн.
-Pres	Fin	Act	Sub	1	Sing	Наст. акт. сосл. 1 ед.
-Pres	Fin	Act	Sub	2	Sing	Наст. акт. сосл. 2 ед.
-Pres	Fin	Act	Sub	3	Sing	Наст. акт. сосл. 3 ед.
-Pres	Fin	Act	Sub	1	Plur	Наст. акт. сосл. 1 мн.
-Pres	Fin	Act	Sub	2	Plur	Наст. акт. сосл. 2 мн.
-Pres	Fin	Act	Sub	3	Plur	Наст. акт. сосл. 3 мн.
-Pres	Fin	Act	Opt	1	Sing	Наст. акт. опт. 1 ед.
-Pres	Fin	Act	Opt	2	Sing	Наст. акт. опт. 2 ед.
-Pres	Fin	Act	Opt	3	Sing	Наст. акт. опт. 3 ед.
-Pres	Fin	Act	Opt	1	Plur	Наст. акт. опт. 1 мн.
-Pres	Fin	Act	Opt	2	Plur	Наст. акт. опт. 2 мн.
-Pres	Fin	Act	Opt	3	Plur	Наст. акт. опт. 3 мн.
-Pres	Fin	Act	Imp	2	Sing	Наст. акт. повел. 2 ед.
-Pres	Fin	Act	Imp	2	Plur	Наст. акт. повел. 2 мн.
-Pres	Inf	Act			Наст. акт. инф.
-Imp	Fin	Act	Ind	1	Sing	Имперф. акт. изъяв. 1 ед.
-Imp	Fin	Act	Ind	2	Sing	Имперф. акт. изъяв. 2 ед.
-Imp	Fin	Act	Ind	3	Sing	Имперф. акт. изъяв. 3 ед.
-Imp	Fin	Act	Ind	1	Plur	Имперф. акт. изъяв. 1 мн.
-Imp	Fin	Act	Ind	2	Plur	Имперф. акт. изъяв. 2 мн.
-Imp	Fin	Act	Ind	3	Plur	Имперф. акт. изъяв. 3 мн.
-Aor	Fin	Act	Ind	1	Sing	Аор. акт. изъяв. 1 ед.
-Aor	Fin	Act	Ind	2	Sing	Аор. акт. изъяв. 2 ед.
-Aor	Fin	Act	Ind	3	Sing	Аор. акт. изъяв. 3 ед.
-Aor	Fin	Act	Ind	1	Plur	Аор. акт. изъяв. 1 мн.
-Aor	Fin	Act	Ind	2	Plur	Аор. акт. изъяв. 2 мн.
-Aor	Fin	Act	Ind	3	Plur	Аор. акт. изъяв. 3 мн.
-Aor	Fin	Act	Sub	1	Sing	Аор. акт. сосл. 1 ед.
-Aor	Fin	Act	Sub	2	Sing	Аор. акт. сосл. 2 ед.
-Aor	Fin	Act	Sub	3	Sing	Аор. акт. сосл. 3 ед.
-Aor	Fin	Act	Sub	1	Plur	Аор. акт. сосл. 1 мн.
-Aor	Fin	Act	Sub	2	Plur	Аор. акт. сосл. 2 мн.
-Aor	Fin	Act	Sub	3	Plur	Аор. акт. сосл. 3 мн.
-Aor	Fin	Act	Opt	1	Sing	Аор. акт. опт. 1 ед.
-Aor	Fin	Act	Opt	2	Sing	Аор. акт. опт. 2 ед.
-Aor	Fin	Act	Opt	3	Sing	Аор. акт. опт. 3 ед.
-Aor	Fin	Act	Opt	1	Plur	Аор. акт. опт. 1 мн.
-Aor	Fin	Act	Opt	2	Plur	Аор. акт. опт. 2 мн.
-Aor	Fin	Act	Opt	3	Plur	Аор. акт. опт. 3 мн.
-Aor	Fin	Act	Imp	2	Sing	Аор. акт. повел. 2 ед.
-Aor	Fin	Act	Imp	2	Plur	Аор. акт. повел. 2 мн.
-Aor	Inf	Act			Аор. акт. инф.
-Fut	Fin	Act	Ind	1	Sing	Буд. акт. изъяв. 1 ед.
-Fut	Fin	Act	Ind	2	Sing	Буд. акт. изъяв. 2 ед.
-Fut	Fin	Act	Ind	3	Sing	Буд. акт. изъяв. 3 ед.
-Fut	Fin	Act	Ind	1	Plur	Буд. акт. изъяв. 1 мн.
-Fut	Fin	Act	Ind	2	Plur	Буд. акт. изъяв. 2 мн.
-Fut	Fin	Act	Ind	3	Plur	Буд. акт. изъяв. 3 мн.
-Perf	Fin	Act	Ind	1	Sing	Перф. акт. изъяв. 1 ед.
-Perf	Fin	Act	Ind	2	Sing	Перф. акт. изъяв. 2 ед.
-Perf	Fin	Act	Ind	3	Sing	Перф. акт. изъяв. 3 ед.
-Perf	Fin	Act	Ind	1	Plur	Перф. акт. изъяв. 1 мн.
-Perf	Fin	Act	Ind	2	Plur	Перф. акт. изъяв. 2 мн.
-Perf	Fin	Act	Ind	3	Plur	Перф. акт. изъяв. 3 мн.
-Pres	Fin	Mid	Ind	1	Sing	Наст. сред. изъяв. 1 ед.
-Pres	Fin	Mid	Ind	2	Sing	Наст. сред. изъяв. 2 ед.
-Pres	Fin	Mid	Ind	3	Sing	Наст. сред. изъяв. 3 ед.
-Pres	Fin	Mid	Ind	1	Plur	Наст. сред. изъяв. 1 мн.
-Pres	Fin	Mid	Ind	2	Plur	Наст. сред. изъяв. 2 мн.
-Pres	Fin	Mid	Ind	3	Plur	Наст. сред. изъяв. 3 мн.
-Pres	Inf	Mid			Наст. сред. инф.
-Aor	Fin	Mid	Ind	1	Sing	Аор. сред. изъяв. 1 ед.
-Aor	Fin	Mid	Ind	2	Sing	Аор. сред. изъяв. 2 ед.
-Aor	Fin	Mid	Ind	3	Sing	Аор. сред. изъяв. 3 ед.
-Aor	Fin	Mid	Ind	1	Plur	Аор. сред. изъяв. 1 мн.
-Aor	Fin	Mid	Ind	2	Plur	Аор. сред. изъяв. 2 мн.
-Aor	Fin	Mid	Ind	3	Plur	Аор. сред. изъяв. 3 мн.
-Aor	Fin	Mid	Imp	2	Sing	Аор. сред. повел. 2 ед.
-Aor	Fin	Mid	Imp	2	Plur	Аор. сред. повел. 2 мн.
-Aor	Inf	Mid			Аор. сред. инф.
-Pres	Fin	Pass	Ind	1	Sing	Наст. страд. изъяв. 1 ед.
-Pres	Fin	Pass	Ind	2	Sing	Наст. страд. изъяв. 2 ед.
-Pres	Fin	Pass	Ind	3	Sing	Наст. страд. изъяв. 3 ед.
-Pres	Fin	Pass	Ind	1	Plur	Наст. страд. изъяв. 1 мн.
-Pres	Fin	Pass	Ind	2	Plur	Наст. страд. изъяв. 2 мн.
-Pres	Fin	Pass	Ind	3	Plur	Наст. страд. изъяв. 3 мн.
-Aor	Fin	Pass	Ind	1	Sing	Аор. страд. изъяв. 1 ед.
-Aor	Fin	Pass	Ind	2	Sing	Аор. страд. изъяв. 2 ед.
-Aor	Fin	Pass	Ind	3	Sing	Аор. страд. изъяв. 3 ед.
-Aor	Fin	Pass	Ind	1	Plur	Аор. страд. изъяв. 1 мн.
-Aor	Fin	Pass	Ind	2	Plur	Аор. страд. изъяв. 2 мн.
-Aor	Fin	Pass	Ind	3	Plur	Аор. страд. изъяв. 3 мн.
+Tense	VerbForm	Aspect	Voice	Mood	Person	Number	label
+Pres	Fin		Act	Ind	1	Sing	Наст. акт. изъяв. 1 ед.
+Pres	Fin		Act	Ind	2	Sing	Наст. акт. изъяв. 2 ед.
+Pres	Fin		Act	Ind	3	Sing	Наст. акт. изъяв. 3 ед.
+Pres	Fin		Act	Ind	1	Plur	Наст. акт. изъяв. 1 мн.
+Pres	Fin		Act	Ind	2	Plur	Наст. акт. изъяв. 2 мн.
+Pres	Fin		Act	Ind	3	Plur	Наст. акт. изъяв. 3 мн.
+Pres	Fin		Act	Sub	1	Sing	Наст. акт. сосл. 1 ед.
+Pres	Fin		Act	Sub	2	Sing	Наст. акт. сосл. 2 ед.
+Pres	Fin		Act	Sub	3	Sing	Наст. акт. сосл. 3 ед.
+Pres	Fin		Act	Sub	1	Plur	Наст. акт. сосл. 1 мн.
+Pres	Fin		Act	Sub	2	Plur	Наст. акт. сосл. 2 мн.
+Pres	Fin		Act	Sub	3	Plur	Наст. акт. сосл. 3 мн.
+Pres	Fin		Act	Opt	1	Sing	Наст. акт. опт. 1 ед.
+Pres	Fin		Act	Opt	2	Sing	Наст. акт. опт. 2 ед.
+Pres	Fin		Act	Opt	3	Sing	Наст. акт. опт. 3 ед.
+Pres	Fin		Act	Opt	1	Plur	Наст. акт. опт. 1 мн.
+Pres	Fin		Act	Opt	2	Plur	Наст. акт. опт. 2 мн.
+Pres	Fin		Act	Opt	3	Plur	Наст. акт. опт. 3 мн.
+Pres	Fin		Act	Imp	2	Sing	Наст. акт. повел. 2 ед.
+Pres	Fin		Act	Imp	2	Plur	Наст. акт. повел. 2 мн.
+Pres	Inf		Act			Наст. акт. инф.	
+Imp	Fin		Act	Ind	1	Sing	Имперф. акт. изъяв. 1 ед.
+Imp	Fin		Act	Ind	2	Sing	Имперф. акт. изъяв. 2 ед.
+Imp	Fin		Act	Ind	3	Sing	Имперф. акт. изъяв. 3 ед.
+Imp	Fin		Act	Ind	1	Plur	Имперф. акт. изъяв. 1 мн.
+Imp	Fin		Act	Ind	2	Plur	Имперф. акт. изъяв. 2 мн.
+Imp	Fin		Act	Ind	3	Plur	Имперф. акт. изъяв. 3 мн.
+Aor	Fin		Act	Ind	1	Sing	Аор. акт. изъяв. 1 ед.
+Aor	Fin		Act	Ind	2	Sing	Аор. акт. изъяв. 2 ед.
+Aor	Fin		Act	Ind	3	Sing	Аор. акт. изъяв. 3 ед.
+Aor	Fin		Act	Ind	1	Plur	Аор. акт. изъяв. 1 мн.
+Aor	Fin		Act	Ind	2	Plur	Аор. акт. изъяв. 2 мн.
+Aor	Fin		Act	Ind	3	Plur	Аор. акт. изъяв. 3 мн.
+Aor	Fin		Act	Sub	1	Sing	Аор. акт. сосл. 1 ед.
+Aor	Fin		Act	Sub	2	Sing	Аор. акт. сосл. 2 ед.
+Aor	Fin		Act	Sub	3	Sing	Аор. акт. сосл. 3 ед.
+Aor	Fin		Act	Sub	1	Plur	Аор. акт. сосл. 1 мн.
+Aor	Fin		Act	Sub	2	Plur	Аор. акт. сосл. 2 мн.
+Aor	Fin		Act	Sub	3	Plur	Аор. акт. сосл. 3 мн.
+Aor	Fin		Act	Opt	1	Sing	Аор. акт. опт. 1 ед.
+Aor	Fin		Act	Opt	2	Sing	Аор. акт. опт. 2 ед.
+Aor	Fin		Act	Opt	3	Sing	Аор. акт. опт. 3 ед.
+Aor	Fin		Act	Opt	1	Plur	Аор. акт. опт. 1 мн.
+Aor	Fin		Act	Opt	2	Plur	Аор. акт. опт. 2 мн.
+Aor	Fin		Act	Opt	3	Plur	Аор. акт. опт. 3 мн.
+Aor	Fin		Act	Imp	2	Sing	Аор. акт. повел. 2 ед.
+Aor	Fin		Act	Imp	2	Plur	Аор. акт. повел. 2 мн.
+Aor	Inf		Act			Аор. акт. инф.	
+Fut	Fin		Act	Ind	1	Sing	Буд. акт. изъяв. 1 ед.
+Fut	Fin		Act	Ind	2	Sing	Буд. акт. изъяв. 2 ед.
+Fut	Fin		Act	Ind	3	Sing	Буд. акт. изъяв. 3 ед.
+Fut	Fin		Act	Ind	1	Plur	Буд. акт. изъяв. 1 мн.
+Fut	Fin		Act	Ind	2	Plur	Буд. акт. изъяв. 2 мн.
+Fut	Fin		Act	Ind	3	Plur	Буд. акт. изъяв. 3 мн.
+Perf	Fin		Act	Ind	1	Sing	Перф. акт. изъяв. 1 ед.
+Perf	Fin		Act	Ind	2	Sing	Перф. акт. изъяв. 2 ед.
+Perf	Fin		Act	Ind	3	Sing	Перф. акт. изъяв. 3 ед.
+Perf	Fin		Act	Ind	1	Plur	Перф. акт. изъяв. 1 мн.
+Perf	Fin		Act	Ind	2	Plur	Перф. акт. изъяв. 2 мн.
+Perf	Fin		Act	Ind	3	Plur	Перф. акт. изъяв. 3 мн.
+Pres	Fin		Mid	Ind	1	Sing	Наст. сред. изъяв. 1 ед.
+Pres	Fin		Mid	Ind	2	Sing	Наст. сред. изъяв. 2 ед.
+Pres	Fin		Mid	Ind	3	Sing	Наст. сред. изъяв. 3 ед.
+Pres	Fin		Mid	Ind	1	Plur	Наст. сред. изъяв. 1 мн.
+Pres	Fin		Mid	Ind	2	Plur	Наст. сред. изъяв. 2 мн.
+Pres	Fin		Mid	Ind	3	Plur	Наст. сред. изъяв. 3 мн.
+Pres	Inf		Mid			Наст. сред. инф.	
+Aor	Fin		Mid	Ind	1	Sing	Аор. сред. изъяв. 1 ед.
+Aor	Fin		Mid	Ind	2	Sing	Аор. сред. изъяв. 2 ед.
+Aor	Fin		Mid	Ind	3	Sing	Аор. сред. изъяв. 3 ед.
+Aor	Fin		Mid	Ind	1	Plur	Аор. сред. изъяв. 1 мн.
+Aor	Fin		Mid	Ind	2	Plur	Аор. сред. изъяв. 2 мн.
+Aor	Fin		Mid	Ind	3	Plur	Аор. сред. изъяв. 3 мн.
+Aor	Fin		Mid	Imp	2	Sing	Аор. сред. повел. 2 ед.
+Aor	Fin		Mid	Imp	2	Plur	Аор. сред. повел. 2 мн.
+Aor	Inf		Mid			Аор. сред. инф.	
+Pres	Fin		Pass	Ind	1	Sing	Наст. страд. изъяв. 1 ед.
+Pres	Fin		Pass	Ind	2	Sing	Наст. страд. изъяв. 2 ед.
+Pres	Fin		Pass	Ind	3	Sing	Наст. страд. изъяв. 3 ед.
+Pres	Fin		Pass	Ind	1	Plur	Наст. страд. изъяв. 1 мн.
+Pres	Fin		Pass	Ind	2	Plur	Наст. страд. изъяв. 2 мн.
+Pres	Fin		Pass	Ind	3	Plur	Наст. страд. изъяв. 3 мн.
+Aor	Fin		Pass	Ind	1	Sing	Аор. страд. изъяв. 1 ед.
+Aor	Fin		Pass	Ind	2	Sing	Аор. страд. изъяв. 2 ед.
+Aor	Fin		Pass	Ind	3	Sing	Аор. страд. изъяв. 3 ед.
+Aor	Fin		Pass	Ind	1	Plur	Аор. страд. изъяв. 1 мн.
+Aor	Fin		Pass	Ind	2	Plur	Аор. страд. изъяв. 2 мн.
+Aor	Fin		Pass	Ind	3	Plur	Аор. страд. изъяв. 3 мн.
+Pres			Act	Ind	1	Sing	Наст. акт. 1 ед.
+Pres			Act	Ind	1	Plur	Наст. акт. 1 мн.
+Pres			Act	Ind	2	Sing	Наст. акт. 2 ед.
+Pres			Act	Ind	2	Plur	Наст. акт. 2 мн.
+Pres			Act	Ind	3	Sing	Наст. акт. 3 ед.
+Pres			Act	Ind	3	Plur	Наст. акт. 3 мн.
+Pres			Pass	Ind	1	Sing	Наст. страд. 1 ед.
+Pres			Pass	Ind	1	Plur	Наст. страд. 1 мн.
+Pres			Pass	Ind	2	Sing	Наст. страд. 2 ед.
+Pres			Pass	Ind	2	Plur	Наст. страд. 2 мн.
+Pres			Pass	Ind	3	Sing	Наст. страд. 3 ед.
+Pres			Pass	Ind	3	Plur	Наст. страд. 3 мн.
+Past		Imp	Act	Ind	1	Sing	Имперф. акт. 1 ед.
+Past		Imp	Act	Ind	1	Plur	Имперф. акт. 1 мн.
+Past		Imp	Act	Ind	2	Sing	Имперф. акт. 2 ед.
+Past		Imp	Act	Ind	2	Plur	Имперф. акт. 2 мн.
+Past		Imp	Act	Ind	3	Sing	Имперф. акт. 3 ед.
+Past		Imp	Act	Ind	3	Plur	Имперф. акт. 3 мн.
+Past		Imp	Pass	Ind	1	Sing	Имперф. страд. 1 ед.
+Past		Imp	Pass	Ind	1	Plur	Имперф. страд. 1 мн.
+Past		Imp	Pass	Ind	2	Sing	Имперф. страд. 2 ед.
+Past		Imp	Pass	Ind	2	Plur	Имперф. страд. 2 мн.
+Past		Imp	Pass	Ind	3	Sing	Имперф. страд. 3 ед.
+Past		Imp	Pass	Ind	3	Plur	Имперф. страд. 3 мн.
+Past		Perf	Act	Ind	1	Sing	Аор. акт. 1 ед.
+Past		Perf	Act	Ind	1	Plur	Аор. акт. 1 мн.
+Past		Perf	Act	Ind	2	Sing	Аор. акт. 2 ед.
+Past		Perf	Act	Ind	2	Plur	Аор. акт. 2 мн.
+Past		Perf	Act	Ind	3	Sing	Аор. акт. 3 ед.
+Past		Perf	Act	Ind	3	Plur	Аор. акт. 3 мн.
+Past		Perf	Pass	Ind	1	Sing	Аор. страд. 1 ед.
+Past		Perf	Pass	Ind	1	Plur	Аор. страд. 1 мн.
+Past		Perf	Pass	Ind	2	Sing	Аор. страд. 2 ед.
+Past		Perf	Pass	Ind	2	Plur	Аор. страд. 2 мн.
+Past		Perf	Pass	Ind	3	Sing	Аор. страд. 3 ед.
+Past		Perf	Pass	Ind	3	Plur	Аор. страд. 3 мн.
+Fut		Imp	Act	Ind	1	Sing	Буд. несов. акт. 1 ед.
+Fut		Imp	Act	Ind	1	Plur	Буд. несов. акт. 1 мн.
+Fut		Imp	Act	Ind	2	Sing	Буд. несов. акт. 2 ед.
+Fut		Imp	Act	Ind	2	Plur	Буд. несов. акт. 2 мн.
+Fut		Imp	Act	Ind	3	Sing	Буд. несов. акт. 3 ед.
+Fut		Imp	Act	Ind	3	Plur	Буд. несов. акт. 3 мн.
+Fut		Imp	Pass	Ind	1	Sing	Буд. несов. страд. 1 ед.
+Fut		Imp	Pass	Ind	1	Plur	Буд. несов. страд. 1 мн.
+Fut		Imp	Pass	Ind	2	Sing	Буд. несов. страд. 2 ед.
+Fut		Imp	Pass	Ind	2	Plur	Буд. несов. страд. 2 мн.
+Fut		Imp	Pass	Ind	3	Sing	Буд. несов. страд. 3 ед.
+Fut		Imp	Pass	Ind	3	Plur	Буд. несов. страд. 3 мн.
+Fut		Perf	Act	Ind	1	Sing	Буд. сов. акт. 1 ед.
+Fut		Perf	Act	Ind	1	Plur	Буд. сов. акт. 1 мн.
+Fut		Perf	Act	Ind	2	Sing	Буд. сов. акт. 2 ед.
+Fut		Perf	Act	Ind	2	Plur	Буд. сов. акт. 2 мн.
+Fut		Perf	Act	Ind	3	Sing	Буд. сов. акт. 3 ед.
+Fut		Perf	Act	Ind	3	Plur	Буд. сов. акт. 3 мн.
+Fut		Perf	Pass	Ind	1	Sing	Буд. сов. страд. 1 ед.
+Fut		Perf	Pass	Ind	1	Plur	Буд. сов. страд. 1 мн.
+Fut		Perf	Pass	Ind	2	Sing	Буд. сов. страд. 2 ед.
+Fut		Perf	Pass	Ind	2	Plur	Буд. сов. страд. 2 мн.
+Fut		Perf	Pass	Ind	3	Sing	Буд. сов. страд. 3 ед.
+Fut		Perf	Pass	Ind	3	Plur	Буд. сов. страд. 3 мн.
+		Perf	Act	Sub	1	Sing	Сосл. акт. 1 ед.
+		Perf	Act	Sub	1	Plur	Сосл. акт. 1 мн.
+		Perf	Act	Sub	2	Sing	Сосл. акт. 2 ед.
+		Perf	Act	Sub	2	Plur	Сосл. акт. 2 мн.
+		Perf	Act	Sub	3	Sing	Сосл. акт. 3 ед.
+		Perf	Act	Sub	3	Plur	Сосл. акт. 3 мн.
+		Perf	Pass	Sub	1	Sing	Сосл. страд. 1 ед.
+		Perf	Pass	Sub	1	Plur	Сосл. страд. 1 мн.
+		Perf	Pass	Sub	2	Sing	Сосл. страд. 2 ед.
+		Perf	Pass	Sub	2	Plur	Сосл. страд. 2 мн.
+		Perf	Pass	Sub	3	Sing	Сосл. страд. 3 ед.
+		Perf	Pass	Sub	3	Plur	Сосл. страд. 3 мн.
+		Imp	Act	Imp	2	Sing	Повел. несов. акт. 2 ед.
+		Imp	Act	Imp	2	Plur	Повел. несов. акт. 2 мн.
+		Imp	Pass	Imp	2	Sing	Повел. несов. страд. 2 ед.
+		Imp	Pass	Imp	2	Plur	Повел. несов. страд. 2 мн.
+		Perf	Act	Imp	2	Sing	Повел. сов. акт. 2 ед.
+		Perf	Act	Imp	2	Plur	Повел. сов. акт. 2 мн.
+		Perf	Pass	Imp	2	Sing	Повел. сов. страд. 2 ед.
+		Perf	Pass	Imp	2	Plur	Повел. сов. страд. 2 мн.

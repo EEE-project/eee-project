@@ -17,11 +17,16 @@ from eee_project._tag_registry import register_tag_type
 from eee_project._grammar_fmt import fmt_ud_feats
 from eee_project.notebook_utils import (
     GreekUtils, GreekConfig, MODERN_GREEK, ANCIENT_GREEK,
-    eee_topbar, eee_footer, strip_diacritics, greek_compare,
+    eee_topbar, eee_footer, magnify_image, strip_diacritics, greek_compare,
     load_ga_config, ConfigStore,
+    build_grc_paradigm_table, build_modern_paradigm_table, build_grc_lexicon_tabs,
+    make_paradigm_form, interactive_text, setup_ancient_greek, add_labels,
+    filter_grc_quiz_words, grc_coverage_words, norm_grc_surface, resolve_clicked_word,
+    LEXICON_TAG_POS, LEXICON_TAG_POS_ALIASES, TRANSLATION_PRESENCE_CONTENT_POS,
+    _INC as increment_counter,
 )
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 
 _UNSET = object()  # sentinel distinguishing "not provided" from explicit None
 
@@ -69,11 +74,27 @@ __all__ = [
     "ANCIENT_GREEK",
     "eee_topbar",
     "eee_footer",
+    "magnify_image",
     "strip_diacritics",
     "greek_compare",
     "fmt_ud_feats",
     "load_ga_config",
     "ConfigStore",
+    "build_grc_paradigm_table",
+    "build_modern_paradigm_table",
+    "build_grc_lexicon_tabs",
+    "make_paradigm_form",
+    "interactive_text",
+    "setup_ancient_greek",
+    "add_labels",
+    "filter_grc_quiz_words",
+    "grc_coverage_words",
+    "norm_grc_surface",
+    "resolve_clicked_word",
+    "increment_counter",
+    "LEXICON_TAG_POS",
+    "LEXICON_TAG_POS_ALIASES",
+    "TRANSLATION_PRESENCE_CONTENT_POS",
 ]
 
 
@@ -96,11 +117,19 @@ def _resolve_chain_args(
             _eff_hook(post_hook, entry.get("post_hook")))
 
 
-def _run_named_backend(
-    lang: str, backend: str, lemma: str, features: "dict[str, str] | str", pos: str,
+def _run_single_backend(
+    lang: str, key: str, backend_instance: object,
+    lemma: str, features: "dict[str, str] | str", pos: str,
     pre_hook, post_hook,
-) -> tuple[set[str], str]:
-    """Run a single named backend with optional pre/post hooks. Returns (result, key)."""
+) -> set[str]:
+    """Apply pre/post hooks around one backend.inflect() call.
+
+    Shared by the named-backend path (_run_named_backend) and the no-chain
+    default-backend path in inflect_traced() — both call exactly one backend,
+    unlike BackendChain which iterates a list and silently skips backends
+    that fail to load or raise (wrong here: an explicit backend= or the
+    resolved default backend must propagate failures, not be swallowed).
+    """
     _pre = _eff_hook(pre_hook, None)
     _post = _eff_hook(post_hook, None)
     _lemma, _features, _pos = lemma, features, pos
@@ -108,13 +137,24 @@ def _run_named_backend(
         _ctx = HookContext(lemma=_lemma, features=_features, pos=_pos,
                            language=lang, tried=[], stop="first")
         _lemma, _features, _pos = _pre(_lemma, _features, _pos, _ctx)
-    key = f"{lang}:{backend}"
-    result = set(_registry.get_backend(lang, backend=backend).inflect(
-        _lemma, _features, _pos, language=lang))
+    result = set(backend_instance.inflect(_lemma, _features, _pos, language=lang))
     if _post is not None:
         _ctx = HookContext(lemma=_lemma, features=_features, pos=_pos,
                            language=lang, tried=[key], stop="first")
         result = set(_post(result, _ctx))
+    return result
+
+
+def _run_named_backend(
+    lang: str, backend: str, lemma: str, features: "dict[str, str] | str", pos: str,
+    pre_hook, post_hook,
+) -> tuple[set[str], str]:
+    """Run a single named backend with optional pre/post hooks. Returns (result, key)."""
+    key = f"{lang}:{backend}"
+    result = _run_single_backend(
+        lang, key, _registry.get_backend(lang, backend=backend),
+        lemma, features, pos, pre_hook, post_hook,
+    )
     return result, key
 
 
@@ -153,40 +193,10 @@ def inflect(
     UnsupportedLanguageError  if language cannot be resolved or no backend found
     BackendLoadError          if a backend is found but fails to load
     """
-    _validate_dispatch_args(backend, chain)
-
-    lang = _registry.resolve_language(language, backend)
-
-    if backend is not None:
-        result, _key = _run_named_backend(lang, backend, lemma, features, pos, pre_hook, post_hook)
-        return result
-
-    effective_backends, effective_pre, effective_post = _resolve_chain_args(
-        lang, chain, pre_hook, post_hook
-    )
-
-    if effective_backends:
-        from eee_project._chain import BackendChain
-        return BackendChain(
-            language=lang,
-            backends=effective_backends,
-            stop="first",
-            pre_hook=effective_pre,
-            post_hook=effective_post,
-        ).run(lemma, features, pos).forms
-
-    # No-chain single-backend path — apply per-call hooks if provided
-    _lemma, _features, _pos = lemma, features, pos
-    if effective_pre is not None:
-        _ctx = HookContext(lemma=_lemma, features=_features, pos=_pos,
-                           language=lang, tried=[], stop="first")
-        _lemma, _features, _pos = effective_pre(_lemma, _features, _pos, _ctx)
-    result = set(_registry.get_backend(lang).inflect(_lemma, _features, _pos, language=lang))
-    if effective_post is not None:
-        _ctx = HookContext(lemma=_lemma, features=_features, pos=_pos,
-                           language=lang, tried=[f"{lang}:default"], stop="first")
-        result = set(effective_post(result, _ctx))
-    return result
+    return inflect_traced(
+        lemma, features, pos, language=language, backend=backend, chain=chain,
+        pre_hook=pre_hook, post_hook=post_hook,
+    ).forms
 
 
 def inflect_traced(
@@ -211,8 +221,6 @@ def inflect_traced(
 
     lang = _registry.resolve_language(language, backend)
 
-    from eee_project._chain import BackendChain
-
     if backend is not None:
         result, key = _run_named_backend(lang, backend, lemma, features, pos, pre_hook, post_hook)
         source = key if result else None
@@ -223,13 +231,18 @@ def inflect_traced(
     )
 
     if effective_backends:
+        from eee_project._chain import BackendChain
         return BackendChain(
             language=lang, backends=effective_backends, stop=stop,
             pre_hook=effective_pre, post_hook=effective_post,
         ).run(lemma, features, pos)
 
-    result = set(_registry.get_backend(lang).inflect(lemma, features, pos, language=lang))
+    # No-chain single-backend path — apply per-call hooks if provided
     backend_key = f"{lang}:default"
+    result = _run_single_backend(
+        lang, backend_key, _registry.get_backend(lang),
+        lemma, features, pos, effective_pre, effective_post,
+    )
     source = backend_key if result else None
     return InflectResult(forms=result, source=source, tried=[backend_key], by_backend={backend_key: set(result)})
 

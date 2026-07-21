@@ -58,6 +58,27 @@ def test_inflect_traced_per_call_post_hook_overrides_chain_hook():
     assert not chain_called
 
 
+def test_inflect_traced_no_chain_applies_post_hook():
+    _reg.register_backend("grc", MockBackend({"θεός"}))
+    _reg._chains.pop("grc", None)   # remove YAML default chain for this test
+    result = eee.inflect_traced("θεός", {}, "noun", language="grc",
+                                post_hook=lambda forms, ctx: forms | {"call_form"})
+    assert result.forms == {"θεός", "call_form"}
+
+
+def test_inflect_traced_no_chain_applies_pre_hook():
+    _reg.register_backend("grc", MockBackend({"θεός"}))
+    _reg._chains.pop("grc", None)   # remove YAML default chain for this test
+    seen = []
+
+    def pre_hook(lemma, features, pos, ctx):
+        seen.append(lemma)
+        return lemma, features, pos
+
+    eee.inflect_traced("λόγος", {}, "noun", language="grc", pre_hook=pre_hook)
+    assert seen == ["λόγος"]
+
+
 def test_inflect_traced_stop_all_by_backend():
     register("grc", "a", MockBackend({"α"}))
     register("grc", "b", MockBackend({"β"}))

@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.12"
 # dependencies = [
-#     "marimo>=0.23.8",
+#     "marimo>=0.23.13",
 #     "eee-project @ git+https://codeberg.org/EEE-project/eee-project.git",
 # ]
 #
@@ -110,8 +110,8 @@ def _(mo):
     `lessons.tsv` (tab-separated, same columns as above):
 
     ```
-    nb_id   icon  greek        label       title      desc            index_url
-    nb_AAA  Α     Μάθημα α'   Lesson 1    Alphabet   Letters         https://...
+    url             icon  greek        label       title      desc            index_url
+    https://...     Α     Μάθημα α'   Lesson 1    Alphabet   Letters         https://...
     ```
 
     `ga.json`:

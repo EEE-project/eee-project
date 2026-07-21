@@ -12,7 +12,7 @@ class InflectResult:
 
     forms: set[str]
     source: str | None           # None for stop="all" or all-empty stop="first"
-    tried: list[str]             # unavailable backends suffixed " (unavailable)"
+    tried: list[str]             # unavailable backends suffixed " (unavailable)", errored ones " (error)"
     by_backend: dict[str, set[str]] = field(default_factory=dict)
     # Maps each backend key that ran → forms it returned (empty set if it returned nothing).
     # Backends that were unavailable or raised exceptions are excluded.

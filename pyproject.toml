@@ -1,10 +1,10 @@
 [project]
 name = "eee-project"
-version = "0.5.0"
+version = "0.6.0"
 requires-python = ">=3.12"
 dependencies = [
     "anywidget>=0.9",
-    "marimo>=0.23.8",
+    "marimo>=0.23.13",
     "pyyaml>=6",
     "tomlkit>=0.15.0",
 ]
@@ -23,18 +23,32 @@ allow-direct-references = true
 [tool.pytest.ini_options]
 markers = ["integration: requires optional deps or network (skipped in CI)"]
 
+[tool.ruff.lint]
+# F = pyflakes (unused imports/vars, undefined names - real defects).
+# E9 = pycodestyle syntax errors.
+# Deliberately NOT ruff's other defaults (E4 import-position, E7
+# lambda-assignment/one-line-if/ambiguous-name style): pure style
+# preference this project has never adopted, not defects. Several E402
+# ("import not at top") hits are deliberate, placed next to the
+# specific test section that uses them, not oversights.
+select = ["E9", "F"]
+
 [tool.uv.sources]
-modern-greek-backend-eee = { path = "../modern-greek-backend-eee" }
-unimorph-backend-eee = { path = "../unimorph-backend-eee" }
-ancient-greek-backend-eee = { path = "../ancient-greek-backend-eee" }
+# modern-greek-backend-eee = { path = "../modern-greek-backend-eee" }
+modern-greek-backend-eee = { git = "https://codeberg.org/EEE-project/modern-greek-backend-eee.git" }
+# unimorph-backend-eee = { path = "../unimorph-backend-eee" }
+unimorph-backend-eee = { git = "https://codeberg.org/EEE-project/unimorph-backend-eee.git" }
+# ancient-greek-backend-eee = { path = "../ancient-greek-backend-eee" }
+ancient-greek-backend-eee = { git = "https://codeberg.org/EEE-project/ancient-greek-backend-eee.git" }
 
 [dependency-groups]
 dev = [
-    "marimo>=0.19.4",
+    "marimo>=0.23.13",
     "pandas",
     "pytest>=8",
     "pytest-cov",
     "modern-greek-backend-eee",
     "unimorph-backend-eee",
     "ancient-greek-backend-eee",
+    "ruff>=0.15.20",
 ]

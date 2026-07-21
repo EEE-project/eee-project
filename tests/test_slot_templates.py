@@ -5,7 +5,7 @@ import dataclasses
 import pytest
 
 import eee_project as eee
-from eee_project import SlotTemplate, SupportsSlotTemplates
+from eee_project import SlotTemplate
 from eee_project._tag_registry import _get_tag_dispatch, register_tag_type
 
 

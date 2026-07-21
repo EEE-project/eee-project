@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.12"
 # dependencies = [
-#     "marimo>=0.19.4",
+#     "marimo>=0.23.13",
 #     "eee-project @ git+https://codeberg.org/EEE-project/eee.git",
 #     "unimorph-backend-eee @ git+https://codeberg.org/EEE-project/unimorph-backend-eee.git",
 #     "ancient-greek-backend-eee @ git+https://codeberg.org/EEE-project/ancient-greek-backend-eee.git",
@@ -23,7 +23,7 @@ Run from within the repo (uses local packages):
 
 import marimo
 
-__generated_with = "0.23.8"
+__generated_with = "0.23.13"
 app = marimo.App(width="medium")
 
 
@@ -36,6 +36,25 @@ def _():
 
     eee.register_backend("grc", AncientGreekBackend())
     eee.register_backend("grc", UniMorphBackend(language="grc"), backend="unimorph")
+
+    # One named backend per bundled period/corpus lexicon, so this general demo
+    # notebook can show off any of them -- not just the tiny Pratt teaching set
+    # the bare default above uses. New lexicons (e.g. "byzantine") only need a
+    # line here, not a whole new example notebook.
+    for _period_name, _period_lexicons in [
+        ("ag-homer", ["homer"]),
+        ("ag-lsj", ["pratt", "ltrg", "lsj"]),
+        ("ag-lxx", ["lxx"]),
+        ("ag-morphgnt", ["morphgnt"]),
+        # byzantine is a sparse exceptions layer (specific attested
+        # divergences from an already-known classical paradigm, not a
+        # standalone stemming engine -- see greek-inflexion-eee's README)
+        # -- merge it onto a Koine/Attic base so it inherits that base's
+        # full lemma coverage and only overrides the specific cells it
+        # actually documents, falling through cleanly everywhere else.
+        ("ag-byzantine", ["lxx", "morphgnt", "pratt", "ltrg", "lsj", "byzantine"]),
+    ]:
+        eee.register_backend("grc", AncientGreekBackend(lexicons=_period_lexicons), backend=_period_name)
 
     return eee, mo
 
@@ -65,8 +84,16 @@ def _(mo):
         label="Gender",
     )
     backend_selector = mo.ui.dropdown(
-        options={"ancient-greek": None, "unimorph": "unimorph"},
-        value="ancient-greek",
+        options={
+            "ancient-greek (pratt)": None,
+            "Epic Greek (homer)": "ag-homer",
+            "Classical Attic (lsj)": "ag-lsj",
+            "Hellenistic Koine (lxx)": "ag-lxx",
+            "Roman Koine (morphgnt)": "ag-morphgnt",
+            "Byzantine Greek (byzantine)": "ag-byzantine",
+            "unimorph": "unimorph",
+        },
+        value="ancient-greek (pratt)",
         label="Backend",
     )
     return backend_selector, gender_selector, pos_selector

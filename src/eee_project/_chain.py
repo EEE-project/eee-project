@@ -33,7 +33,7 @@ class BackendChain:
     def run(
         self,
         lemma: str,
-        features: dict[str, str],
+        features: "dict[str, str] | str",
         pos: str,
     ) -> InflectResult:
         """Execute the chain and return InflectResult."""

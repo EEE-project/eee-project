@@ -11,7 +11,6 @@ does satisfy it because spec builds a real attribute map.
 """
 from unittest.mock import MagicMock
 
-import pytest
 
 from eee_project._protocol import MorphologyBackend
 

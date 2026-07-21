@@ -40,10 +40,6 @@ def test_no_yaml_default_chains():
     assert _reg._chains_default == {}
 
 
-def test_language_without_chain_returns_empty():
-    assert get_chain("la") == []
-
-
 def test_set_chain_stores_hooks():
     pre = lambda lemma, features, pos, ctx: (lemma, features, pos)
     post = lambda forms, ctx: forms
