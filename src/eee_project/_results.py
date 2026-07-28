@@ -24,3 +24,17 @@ class LemmaEntry:
 
     lemma: str
     source: str
+
+
+@dataclass(frozen=True)
+class AnalysisEntry:
+    """One candidate reverse-lookup analysis + its source backend, from analyze_traced().
+
+    Not hashable (features is a dict).
+    """
+
+    lemma: str
+    pos: str
+    tag: str
+    features: dict
+    source: str

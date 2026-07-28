@@ -147,6 +147,30 @@ Fut		Perf	Pass	Ind	2	Sing	Буд. сов. страд. 2 ед.
 Fut		Perf	Pass	Ind	2	Plur	Буд. сов. страд. 2 мн.
 Fut		Perf	Pass	Ind	3	Sing	Буд. сов. страд. 3 ед.
 Fut		Perf	Pass	Ind	3	Plur	Буд. сов. страд. 3 мн.
+Pres		Perf	Act	Ind	1	Sing	Перф. акт. 1 ед.
+Pres		Perf	Act	Ind	1	Plur	Перф. акт. 1 мн.
+Pres		Perf	Act	Ind	2	Sing	Перф. акт. 2 ед.
+Pres		Perf	Act	Ind	2	Plur	Перф. акт. 2 мн.
+Pres		Perf	Act	Ind	3	Sing	Перф. акт. 3 ед.
+Pres		Perf	Act	Ind	3	Plur	Перф. акт. 3 мн.
+Pres		Perf	Pass	Ind	1	Sing	Перф. страд. 1 ед.
+Pres		Perf	Pass	Ind	1	Plur	Перф. страд. 1 мн.
+Pres		Perf	Pass	Ind	2	Sing	Перф. страд. 2 ед.
+Pres		Perf	Pass	Ind	2	Plur	Перф. страд. 2 мн.
+Pres		Perf	Pass	Ind	3	Sing	Перф. страд. 3 ед.
+Pres		Perf	Pass	Ind	3	Plur	Перф. страд. 3 мн.
+Pqp			Act	Ind	1	Sing	Плюскв. акт. 1 ед.
+Pqp			Act	Ind	1	Plur	Плюскв. акт. 1 мн.
+Pqp			Act	Ind	2	Sing	Плюскв. акт. 2 ед.
+Pqp			Act	Ind	2	Plur	Плюскв. акт. 2 мн.
+Pqp			Act	Ind	3	Sing	Плюскв. акт. 3 ед.
+Pqp			Act	Ind	3	Plur	Плюскв. акт. 3 мн.
+Pqp			Pass	Ind	1	Sing	Плюскв. страд. 1 ед.
+Pqp			Pass	Ind	1	Plur	Плюскв. страд. 1 мн.
+Pqp			Pass	Ind	2	Sing	Плюскв. страд. 2 ед.
+Pqp			Pass	Ind	2	Plur	Плюскв. страд. 2 мн.
+Pqp			Pass	Ind	3	Sing	Плюскв. страд. 3 ед.
+Pqp			Pass	Ind	3	Plur	Плюскв. страд. 3 мн.
 		Perf	Act	Sub	1	Sing	Сосл. акт. 1 ед.
 		Perf	Act	Sub	1	Plur	Сосл. акт. 1 мн.
 		Perf	Act	Sub	2	Sing	Сосл. акт. 2 ед.

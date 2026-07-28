@@ -17,6 +17,22 @@ Returns inflected forms matching the UD feature bundle. Returns an empty set if 
 
 Like `inflect()` but returns an `InflectResult` with `.forms`, `.source`, `.tried`, and `.by_backend`.
 
+### `eee.list_lemmas(pos, language=None, backend=None) → list[str]`
+
+Returns lemmas available in the backend's corpus for `pos`. With `backend=None` and a chain registered, queries every chain backend and returns a deduplicated union. Returns `[]` for algorithm-based backends with no finite vocabulary, or backends without `list_lemmas()`.
+
+### `eee.list_lemmas_traced(pos, language, backend=None) → list[LemmaEntry]`
+
+Like `list_lemmas()` but returns one `LemmaEntry(lemma, source)` per `(lemma, backend)` pair — duplicates across chain backends are **not** collapsed, so a lemma present in two backends appears twice with different `.source` values.
+
+### `eee.analyze(form, language=None, backend=None) → list[dict]`
+
+Reverse lookup: candidate morphological analyses for a surface form, each a `{"lemma", "pos", "tag", "features"}` dict (`features` is a UD FEATS dict). With `backend=None` and a chain registered, queries every chain backend and returns a deduplicated union (by lemma+pos+tag). Returns `[]` for a form matching nothing, or for backends without `analyze()`. Ambiguous by design — a syncretic surface form commonly yields multiple candidates; disambiguation is left to the caller.
+
+### `eee.analyze_traced(form, language, backend=None) → list[AnalysisEntry]`
+
+Like `analyze()` but returns one `AnalysisEntry(lemma, pos, tag, features, source)` per `(candidate, backend)` pair — duplicates across chain backends are **not** collapsed.
+
 ### `eee.supported_languages() → dict[str, list[str]]`
 
 Returns `{language_code: [entry_point_value, ...]}` for entry-point-discovered backends. Multiple backends may register for the same language code; all are listed. Does not include explicitly registered backends or the fallback.

@@ -469,7 +469,7 @@ backend-internal identifiers from ancient-greek-backend-eee. `GreekUtils`
 methods use `eee.inflect` with UD FEATS directly — the same level as
 `_verb_forms`, `_noun_forms` etc.
 
-### Vocabulary TSV (`ensure_file` + `load_vocab_tsv`)
+### Vocabulary TSV (`ensure_file` + `load_vocab_tsv` / `load_inflected_vocab_tsv`)
 
 For notebooks that show a vocabulary table and run word-quiz / word-drill
 exercises, use this pair:
@@ -480,17 +480,29 @@ from pathlib import Path as _Path
 NB_DIR    = _Path(__file__).parent
 NB_REMOTE = f"{cfg.raw_base}/2026_06_23"   # Codeberg raw URL for this lesson
 
-# vocab load cell
+# vocab load cell — flat vocab (Word/Translation columns)
 VOCAB_WORDS = gu.load_vocab_tsv(
     "verbs.tsv", "nouns.tsv",          # one or more TSV filenames
     nb_dir=NB_DIR, remote_base=NB_REMOTE,
 )
 # → [{"form": "λύω", "meaning": "освобождать"}, ...]
+
+# vocab load cell — inflected-text vocab (form/lemma/pos/context/meaning columns)
+QUIZ_WORDS_RAW = gu.resolve_word_grammar(
+    gu.load_inflected_vocab_tsv("vocab.tsv", nb_dir=NB_DIR, remote_base=NB_REMOTE),
+    ag_backend, lang,
+)
+# → [{"form": "ἔγνω", "lemma": "γιγνώσκω", "pos": "verb", "context": "...",
+#     "meaning": "узнал", "grammar_label": "..."}, ...]
 ```
 
 `load_vocab_tsv` calls `ensure_file` for each filename, then concatenates the
 `Word` / `Translation` columns into the standard vocab dict shape consumed by
-`word_quiz_form` and `word_drill_form`.
+`word_quiz_form` and `word_drill_form`. `load_inflected_vocab_tsv` is its
+peer for inflected-text sources (Odyssey): same `ensure_file`-backed
+local-then-remote loading, but the TSV's own `form`/`lemma`/`pos`/`context`/
+`meaning` columns are returned as-is (nothing to remap, unlike the flat
+case) — pair it with `resolve_word_grammar` to add `grammar_label`.
 
 **`form`/`lemma` and `meaning`/`context` — a real distinction, not aliasing.**
 `form` is the surface form being tested; `lemma` is the dictionary/citation
@@ -498,7 +510,7 @@ form used for lookup and paradigm generation. Flat vocab (`load_vocab_tsv`
 above) has no inflection concept, so `lemma`/`context` are simply absent —
 consumers (`word_quiz_feedback`, `build_grc_paradigm_table`) fall back to
 `form`/`meaning`. Inflected-text vocab (e.g. Odyssey, built from
-`resolve_word_grammar` rather than `load_vocab_tsv`) supplies a real `lemma`
+`load_inflected_vocab_tsv` + `resolve_word_grammar`) supplies a real `lemma`
 that can differ from `form` — e.g. surface `ἔγνω` with lemma `γιγνώσκω` —
 and `word_quiz_feedback` shows a "form → lemma" arrow in that case instead of
 just the bare form. Don't "simplify" the vocab dict shape by dropping
@@ -626,11 +638,9 @@ future, set_future           = mo.state([])
 ```python
 # Cell 2 — widgets (must reference cv() and restore_entry() so marimo resets on each word)
 _ = cv(); _ = restore_entry()
-_done = gu.word_drill_done(cv(), remaining())
 answer_radio, next_btn, prev_btn = gu.word_quiz_widgets(
-    cv=cv(), vocab=VOCAB,
+    cv=cv(), remaining=remaining(), vocab=VOCAB,
     restore_entry=restore_entry(),
-    done=_done,
     history_len=len(history()),
 )
 ```
@@ -685,10 +695,9 @@ future, set_future           = mo.state([])
 ```python
 # Cell 2 — widgets (must reference cv() and restore_entry() so marimo resets on each word)
 _ = cv(); _ = restore_entry()
-_done = gu.word_drill_done(cv(), remaining())
 write_input, dia, check_btn, prev_btn, next_btn = gu.word_drill_widgets(
+    cv=cv(), remaining=remaining(),
     restore_entry=restore_entry(),
-    done=_done,
     history_len=len(history()),
 )
 ```

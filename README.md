@@ -105,7 +105,8 @@ to run each one.
 ## API
 
 Core functions: `inflect()` and `inflect_traced()` (shown in Quick Start above),
-`register_backend()`, `set_chain()`, `set_fallback_backend()`,
+`list_lemmas()`/`list_lemmas_traced()`, `analyze()`/`analyze_traced()` (reverse
+lookup), `register_backend()`, `set_chain()`, `set_fallback_backend()`,
 `supported_languages()`, `language_info()` — plus a slot-template system for
 building structured inflection tables, and two exception types
 (`UnsupportedLanguageError`, `BackendLoadError`) with chain-aware failure
@@ -134,6 +135,8 @@ limitations, see its own README: [modern-greek-backend-eee](https://codeberg.org
 
 ## Changelog
 
+**v0.9.0** — `analyze(form)`/`analyze_traced(form)`: reverse lookup from a surface form to candidate `{lemma, pos, tag, features}` analyses, mirroring `list_lemmas`/`list_lemmas_traced`'s chain-walk + dedup shape (a differently-shaped `analyze()` existed pre-v0.4.0 and was removed as unimplemented dead protocol surface; this is a fresh, chain-aware design, not a revival of the old one), plus a shared chain-walk helper extracted for both. `build_grc_paradigm_table`'s verb branch now renders a pluperfect column (`"YAI"`, labelled "Плюскв."), matching the `XAI`/"Перф." fix shipped alongside the Byzantine lexicon; new verb `perfect`/`pluperfect` TSV labels. `word_drill_widgets`/`word_quiz_widgets`/`stanza_match_widgets`/`translation_presence_widgets` now derive `done` internally via `word_drill_done` instead of requiring callers to precompute and pass it. `AncientGreekBackend.for_period()` used in the example notebook; `GreekUtils.load_inflected_vocab_tsv()` alongside `load_vocab_tsv()`; `grc_lexicon_sources()` full-coverage lexicon-confirmation check. Widget internals: shared JS constants extracted from the diacritics/paradigm ESM templates, `submit_count`+`enter_field_index` merged into `submit_request`, mark-button JS helpers (`makeMarkButton`/`makeClearButton`/`toggleMark`/`stripLastDiacritic`) extracted.
+
 **v0.8.0** — `GreekUtils.ui_label`/`tense_dropdown_options` multi-language (EN/RU/EL) labels; `magnify_image(prefer_local=)`; `parse_stanza_text`/`parse_stanza_translations` (shared poem-file parser, replacing 7 duplicated Odyssey copies); translation-presence caption no longer hardcodes "Ancient Greek".
 
 **v0.7.0** — `GreekConfig.polytonic` field for Modern Greek's monotonic diacritics; `noun_paradigm_drill_form` gains `article`/`indefinite` toggles; new `make_paradigm_drill_state` helper; fixed an Enter-key focus-lock race in `make_paradigm_form`; new Modern Greek paradigm-drill exercise in `examples/`.
@@ -148,4 +151,4 @@ limitations, see its own README: [modern-greek-backend-eee](https://codeberg.org
 
 ## Status
 
-v0.8.0
+v0.9.0

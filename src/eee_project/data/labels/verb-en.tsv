@@ -147,6 +147,30 @@ Fut		Perf	Pass	Ind	2	Sing	Fut. Perf. Pass. 2 Sg.
 Fut		Perf	Pass	Ind	2	Plur	Fut. Perf. Pass. 2 Pl.
 Fut		Perf	Pass	Ind	3	Sing	Fut. Perf. Pass. 3 Sg.
 Fut		Perf	Pass	Ind	3	Plur	Fut. Perf. Pass. 3 Pl.
+Pres		Perf	Act	Ind	1	Sing	Perf. Act. 1 Sg.
+Pres		Perf	Act	Ind	1	Plur	Perf. Act. 1 Pl.
+Pres		Perf	Act	Ind	2	Sing	Perf. Act. 2 Sg.
+Pres		Perf	Act	Ind	2	Plur	Perf. Act. 2 Pl.
+Pres		Perf	Act	Ind	3	Sing	Perf. Act. 3 Sg.
+Pres		Perf	Act	Ind	3	Plur	Perf. Act. 3 Pl.
+Pres		Perf	Pass	Ind	1	Sing	Perf. Pass. 1 Sg.
+Pres		Perf	Pass	Ind	1	Plur	Perf. Pass. 1 Pl.
+Pres		Perf	Pass	Ind	2	Sing	Perf. Pass. 2 Sg.
+Pres		Perf	Pass	Ind	2	Plur	Perf. Pass. 2 Pl.
+Pres		Perf	Pass	Ind	3	Sing	Perf. Pass. 3 Sg.
+Pres		Perf	Pass	Ind	3	Plur	Perf. Pass. 3 Pl.
+Pqp			Act	Ind	1	Sing	Plup. Act. 1 Sg.
+Pqp			Act	Ind	1	Plur	Plup. Act. 1 Pl.
+Pqp			Act	Ind	2	Sing	Plup. Act. 2 Sg.
+Pqp			Act	Ind	2	Plur	Plup. Act. 2 Pl.
+Pqp			Act	Ind	3	Sing	Plup. Act. 3 Sg.
+Pqp			Act	Ind	3	Plur	Plup. Act. 3 Pl.
+Pqp			Pass	Ind	1	Sing	Plup. Pass. 1 Sg.
+Pqp			Pass	Ind	1	Plur	Plup. Pass. 1 Pl.
+Pqp			Pass	Ind	2	Sing	Plup. Pass. 2 Sg.
+Pqp			Pass	Ind	2	Plur	Plup. Pass. 2 Pl.
+Pqp			Pass	Ind	3	Sing	Plup. Pass. 3 Sg.
+Pqp			Pass	Ind	3	Plur	Plup. Pass. 3 Pl.
 		Perf	Act	Sub	1	Sing	Subj. Act. 1 Sg.
 		Perf	Act	Sub	1	Plur	Subj. Act. 1 Pl.
 		Perf	Act	Sub	2	Sing	Subj. Act. 2 Sg.

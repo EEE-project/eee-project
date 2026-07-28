@@ -37,6 +37,7 @@ from eee_project.notebook_utils import (
     add_labels,
     filter_grc_quiz_words,
     grc_coverage_words,
+    grc_lexicon_sources,
     norm_grc_surface,
     resolve_clicked_word,
     _norm_grc,
@@ -106,10 +107,10 @@ class TestModernVerbLabels:
         return ModernGreekBackend().get_slot_templates("el", "verb", terms)
 
     def test_el_verb_labels_resolve_all_langs(self):
-        # CONTRACT: every one of the 80 verb bundles resolves in every language
+        # CONTRACT: every one of the 104 verb bundles resolves in every language
         for terms in ("ru", "en", "el"):
             slots = self._tpls(terms)
-            assert slots and len(slots) == 80
+            assert slots and len(slots) == 104
             for s in slots:
                 assert "|" not in s.label, f"unresolved [{terms}] {s.tag} -> {s.label}"
 
@@ -125,6 +126,8 @@ class TestModernVerbLabels:
         assert by_tag["Past.Perf|Ind|Act|3|Plur"] == "Аор. акт. 3 мн."
         assert by_tag["Sub.Perf|Pass|1|Sing"] == "Сосл. страд. 1 ед."
         assert by_tag["Imp.Perf|Act|2|Sing"] == "Повел. сов. акт. 2 ед."
+        assert by_tag["Pres.Perf|Ind|Act|1|Sing"] == "Перф. акт. 1 ед."
+        assert by_tag["Pqp|Ind|Pass|3|Plur"] == "Плюскв. страд. 3 мн."
 
 
 # ──────────────────────────── build_modern_paradigm_table (el renderer) ──
@@ -1761,33 +1764,45 @@ class TestWordDrillWidgets:
     def test_returns_five_tuple(self, gu_form):
         wi = MagicMock(); wi._ui = MagicMock()
         with patch.object(gu_form, "diacritics_text", return_value=wi):
-            result = gu_form.word_drill_widgets()
+            result = gu_form.word_drill_widgets(cv={}, remaining=[])
         assert len(result) == 5
 
     def test_prev_disabled_with_no_history(self, gu_form):
         wi = MagicMock(); wi._ui = MagicMock()
         with patch.object(gu_form, "diacritics_text", return_value=wi):
-            _, _, _, prev_btn, _ = gu_form.word_drill_widgets(history_len=0)
+            _, _, _, prev_btn, _ = gu_form.word_drill_widgets(cv={}, remaining=[], history_len=0)
         assert prev_btn.disabled is True
 
     def test_prev_enabled_with_history(self, gu_form):
         wi = MagicMock(); wi._ui = MagicMock()
         with patch.object(gu_form, "diacritics_text", return_value=wi):
-            _, _, _, prev_btn, _ = gu_form.word_drill_widgets(history_len=3)
+            _, _, _, prev_btn, _ = gu_form.word_drill_widgets(cv={}, remaining=[], history_len=3)
         assert prev_btn.disabled is False
 
     def test_label_overrides_check_button_text(self, gu_form):
         wi = MagicMock(); wi._ui = MagicMock()
         with patch.object(gu_form, "diacritics_text", return_value=wi):
-            _, _, check_btn, _, _ = gu_form.word_drill_widgets(label="Check")
+            _, _, check_btn, _, _ = gu_form.word_drill_widgets(cv={}, remaining=[], label="Check")
         assert check_btn.label == "Check"
 
     def test_lang_en_changes_nav_button_labels(self, gu_form):
         wi = MagicMock(); wi._ui = MagicMock()
         with patch.object(gu_form, "diacritics_text", return_value=wi):
-            _, _, _, prev_btn, next_btn = gu_form.word_drill_widgets(lang="en")
+            _, _, _, prev_btn, next_btn = gu_form.word_drill_widgets(cv={}, remaining=[], lang="en")
         assert next_btn.label == "Next"
         assert prev_btn.label == "Prev"
+
+    def test_done_true_when_cv_none_and_remaining_empty(self, gu_form):
+        wi = MagicMock(); wi._ui = MagicMock()
+        with patch.object(gu_form, "diacritics_text", return_value=wi):
+            _, _, _, _, next_btn = gu_form.word_drill_widgets(cv=None, remaining=[])
+        assert next_btn.label == "Пройти снова"
+
+    def test_done_false_when_cv_present(self, gu_form):
+        wi = MagicMock(); wi._ui = MagicMock()
+        with patch.object(gu_form, "diacritics_text", return_value=wi):
+            _, _, _, _, next_btn = gu_form.word_drill_widgets(cv={"form": "λύω"}, remaining=[])
+        assert next_btn.label == "Следующий"
 
 
 # ────────────────────────────────────────── make_renew_button ──
@@ -1877,11 +1892,11 @@ class TestResetQuizState:
 
 class TestWordDrillWidgetsLangDefaults:
     def test_check_label_defaults_per_lang(self, gu_form):
-        _, _, check_btn, _, _ = gu_form.word_drill_widgets(lang="en")
+        _, _, check_btn, _, _ = gu_form.word_drill_widgets(cv={}, remaining=[], lang="en")
         assert check_btn.label == "Check"
 
     def test_default_lang_stays_russian(self, gu_form):
-        _, _, check_btn, _, _ = gu_form.word_drill_widgets()
+        _, _, check_btn, _, _ = gu_form.word_drill_widgets(cv={}, remaining=[])
         assert check_btn.label == "Проверить"
 
 
@@ -2001,33 +2016,33 @@ class TestWordDrillForm:
 
 class TestWordQuizWidgets:
     def test_no_cv_placeholder_radio(self, gu_form):
-        radio, _, _ = gu_form.word_quiz_widgets(cv=None, vocab=_WQ_VOCAB)
+        radio, _, _ = gu_form.word_quiz_widgets(cv=None, remaining=[], vocab=_WQ_VOCAB)
         assert radio.options == [""]
 
     def test_cv_gives_multiple_options(self, gu_form):
-        radio, _, _ = gu_form.word_quiz_widgets(cv=_WQ_VOCAB[0], vocab=_WQ_VOCAB)
+        radio, _, _ = gu_form.word_quiz_widgets(cv=_WQ_VOCAB[0], remaining=_WQ_VOCAB[1:], vocab=_WQ_VOCAB)
         assert len(radio.options) > 1
 
     def test_done_flag_changes_next_label(self, gu_form):
-        _, next_btn, _ = gu_form.word_quiz_widgets(cv=None, vocab=_WQ_VOCAB, done=True)
+        _, next_btn, _ = gu_form.word_quiz_widgets(cv=None, remaining=[], vocab=_WQ_VOCAB)
         assert "снова" in next_btn.label
 
     def test_lang_en_changes_button_and_radio_labels(self, gu_form):
         radio, next_btn, prev_btn = gu_form.word_quiz_widgets(
-            cv=_WQ_VOCAB[0], vocab=_WQ_VOCAB, lang="en"
+            cv=_WQ_VOCAB[0], remaining=_WQ_VOCAB[1:], vocab=_WQ_VOCAB, lang="en"
         )
         assert next_btn.label == "Next"
         assert prev_btn.label == "Prev"
         assert "Form in text:" in radio.label
 
     def test_prev_disabled_when_no_history(self, gu_form):
-        _, _, prev_btn = gu_form.word_quiz_widgets(cv=None, vocab=_WQ_VOCAB, history_len=0)
+        _, _, prev_btn = gu_form.word_quiz_widgets(cv=None, remaining=_WQ_VOCAB, vocab=_WQ_VOCAB, history_len=0)
         assert prev_btn.disabled is True
 
     def test_restore_entry_sets_radio_value(self, gu_form):
         w = _WQ_VOCAB[0]
         radio, _, _ = gu_form.word_quiz_widgets(
-            cv=w, vocab=_WQ_VOCAB,
+            cv=w, remaining=_WQ_VOCAB[1:], vocab=_WQ_VOCAB,
             restore_entry={"answer": w["form"], "correct": True},
         )
         assert radio.value == w["form"]
@@ -2319,8 +2334,8 @@ class TestMakeParadigmForm:
         # the auto-advance target to type in a later field), applying it would
         # yank focus back to the field they intentionally skipped. The ESM must
         # only honor the request if focus is still on the request's own origin
-        # field (tracked via pendingOrigin, not the racy enter_field_index
-        # traitlet, which a newer Enter can overwrite before this reply lands).
+        # field (tracked via pendingOrigin, not the racy submit_request.field_index,
+        # which a newer Enter can overwrite before this reply lands).
         import eee_project.notebook_utils as _nu
         assert "focusedInp!==inputs[originIdx]" in _nu._PARA_ESM
 
@@ -2337,7 +2352,7 @@ class TestMakeParadigmForm:
 
     def test_esm_focus_request_matches_reply_to_exact_request(self):
         # The reply must be matched to the specific request it answers (by
-        # the submit_count Python already echoes back) rather than merely
+        # the request_id Python already echoes back) rather than merely
         # "has anything changed since" -- a deterministic identity check,
         # not a timing guess. A reply for a superseded request still
         # releases that request's lock, but must not move focus.
@@ -2363,14 +2378,22 @@ class TestMakeParadigmForm:
         assert "function releaseLock(idx){" in _nu._PARA_ESM
         assert "for(const v of pendingOrigin.values())if(v===idx)return;" in _nu._PARA_ESM
 
-    def test_esm_reply_staleness_uses_submit_count_directly(self):
-        # submit_count already is the request id (fireSubmit sends the next
-        # value, every reply echoes back the one it answered) -- comparing
-        # against model.get('submit_count') directly means there's no
-        # separate "last sent" variable that could drift out of sync with it.
+    def test_esm_reply_staleness_uses_submit_request_directly(self):
+        # submit_request.request_id already is the request id (fireSubmit
+        # sends the next value, every reply echoes back the one it
+        # answered) -- comparing against model.get('submit_request')
+        # directly means there's no separate "last sent" variable that
+        # could drift out of sync with it.
         import eee_project.notebook_utils as _nu
-        assert "request_id!==(model.get('submit_count')||0)" in _nu._PARA_ESM
+        assert "request_id!==(model.get('submit_request').request_id||0)" in _nu._PARA_ESM
         assert "let lastReqId" not in _nu._PARA_ESM
+
+    def test_esm_submit_request_bundles_both_fields_in_one_set(self):
+        # request_id and field_index only mean something together -- one
+        # model.set() call for both, not two separate traits that could
+        # (even if only theoretically today) be observed mid-update.
+        import eee_project.notebook_utils as _nu
+        assert "model.set('submit_request',{request_id:reqId,field_index:idx});" in _nu._PARA_ESM
 
     def test_esm_focus_request_is_a_named_dict_not_a_positional_pair(self):
         # focus_request always carries an ack (request_id, to release the
@@ -2994,11 +3017,15 @@ class TestParadigmDrillWidgets:
 # ────────────────────────────────────────── verb_paradigm_drill_form / noun_paradigm_drill_form ──
 
 def _pdform(values, submit_count=0, enter_field_index=0, focus_request=None):
-    """Fake make_paradigm_form() return value: .widget.values/.submit_count/etc."""
+    """Fake make_paradigm_form() return value: .widget.values/.submit_request/etc.
+    Keeps the caller-facing submit_count/enter_field_index parameter names
+    (every call site in this file uses them) even though the widget itself
+    now bundles both into one submit_request dict."""
     import types
     widget = types.SimpleNamespace(
-        values=values, submit_count=submit_count,
-        enter_field_index=enter_field_index, focus_request=focus_request or {},
+        values=values,
+        submit_request={"request_id": submit_count, "field_index": enter_field_index},
+        focus_request=focus_request or {},
     )
     return types.SimpleNamespace(widget=widget)
 
@@ -4613,6 +4640,61 @@ class TestLoadVocabTsv:
         assert len(result) == 1
 
 
+# ──────────────────────────────── load_inflected_vocab_tsv ──
+
+class TestLoadInflectedVocabTsv:
+    def test_basic_load(self, gu_marimo, tmp_path):
+        tsv = tmp_path / "vocab.tsv"
+        tsv.write_text(
+            "form\tlemma\tpos\tcontext\tmeaning\n"
+            "Ἄνδρα\tἀνήρ\tnoun\tI.1: Ἄνδρα μοι ἔννεπε\tмужа\n",
+            encoding="utf-8",
+        )
+        result = gu_marimo.load_inflected_vocab_tsv("vocab.tsv", nb_dir=tmp_path)
+        assert len(result) == 1
+        assert result[0]["form"] == "Ἄνδρα"
+        assert result[0]["lemma"] == "ἀνήρ"
+        assert result[0]["pos"] == "noun"
+        assert result[0]["context"] == "I.1: Ἄνδρα μοι ἔννεπε"
+        assert result[0]["meaning"] == "мужа"
+
+    def test_form_can_differ_from_lemma(self, gu_marimo, tmp_path):
+        tsv = tmp_path / "vocab.tsv"
+        tsv.write_text(
+            "form\tlemma\tpos\tcontext\tmeaning\nἔγνω\tγιγνώσκω\tverb\t...\tузнал\n",
+            encoding="utf-8",
+        )
+        result = gu_marimo.load_inflected_vocab_tsv("vocab.tsv", nb_dir=tmp_path)
+        assert result[0]["form"] != result[0]["lemma"]
+
+    def test_multiple_files(self, gu_marimo, tmp_path):
+        (tmp_path / "a.tsv").write_text(
+            "form\tlemma\tpos\tcontext\tmeaning\nἔγνω\tγιγνώσκω\tverb\t...\tузнал\n", encoding="utf-8")
+        (tmp_path / "b.tsv").write_text(
+            "form\tlemma\tpos\tcontext\tmeaning\nθεός\tθεός\tnoun\t...\tбог\n", encoding="utf-8")
+        result = gu_marimo.load_inflected_vocab_tsv("a.tsv", "b.tsv", nb_dir=tmp_path)
+        assert len(result) == 2
+
+    def test_missing_no_remote_raises(self, gu_marimo, tmp_path):
+        with pytest.raises(FileNotFoundError):
+            gu_marimo.load_inflected_vocab_tsv("missing.tsv", nb_dir=tmp_path)
+
+    def test_missing_remote_fetch_fails_raises(self, gu_marimo, tmp_path):
+        with patch("urllib.request.urlretrieve", side_effect=Exception("net")):
+            with pytest.raises(FileNotFoundError):
+                gu_marimo.load_inflected_vocab_tsv("missing.tsv", nb_dir=tmp_path,
+                                   remote_base="https://example.com")
+
+    def test_remote_fetch_success(self, gu_marimo, tmp_path):
+        content = "form\tlemma\tpos\tcontext\tmeaning\nἔγνω\tγιγνώσκω\tverb\t...\tузнал\n"
+        def fake_retrieve(url, dest):
+            Path(dest).write_text(content, encoding="utf-8")
+        with patch("urllib.request.urlretrieve", side_effect=fake_retrieve):
+            result = gu_marimo.load_inflected_vocab_tsv("remote.tsv", nb_dir=tmp_path,
+                                        remote_base="https://example.com")
+        assert len(result) == 1
+
+
 # ──────────────────────────────── word_write_question ──
 
 class TestWordWriteQuestion:
@@ -4653,7 +4735,7 @@ class _GrcVerbBackend:
     _PS = ["1S", "2S", "3S", "1P", "2P", "3P"]
     def get_slot_templates(self, lang, pos, terms_lang="en"):
         if pos == "verb":
-            slots = [_SlotTag(f"{t}.{ps}") for t in ["PAI","IAI","AAI","AMI","API","XAI"] for ps in self._PS]
+            slots = [_SlotTag(f"{t}.{ps}") for t in ["PAI","IAI","AAI","AMI","API","XAI","YAI"] for ps in self._PS]
             slots += [_SlotTag("PAN"), _SlotTag("PAD.2S"), _SlotTag("PAD.2P"),
                       _SlotTag("AAD.2S"), _SlotTag("AMD.2S")]
             # dual -- only for the tense/voice combos the real engine supports
@@ -4790,6 +4872,21 @@ class TestBuildGrcParadigmTableWithData:
         assert "εγνωκαν" in result
         assert "отсутствует" not in result
 
+    def test_verb_pluperfect_tense_column(self):
+        """YAI (pluperfect active indicative) must render as its own
+        column, labelled "Плюскв." -- same fix shape as XAI/perfect above:
+        odyssey_morpheus_verbs_lexicon's ἄνωγα/ὄρνυμι forms: overrides were
+        already correct but had no column to ever surface in (2026-07-27)."""
+        fn = build_grc_paradigm_table(_GrcVerbBackend(), _EmptyGrcBackend())
+        def fake_inflect(word, slot, pos, *, language, backend):
+            return {"ηνωγεα"} if slot.tag == "YAI.1S" else set()
+        with patch("eee_project.inflect_slot", side_effect=fake_inflect):
+            result = fn({"lemma": "ανωγα", "pos": "verb", "form": "ηνωγεα"})
+        assert result is not None
+        assert "Плюскв." in result
+        assert "ηνωγεα" in result
+        assert "отсутствует" not in result
+
     def test_verb_no_perfect_data_omits_column(self):
         """A verb with only present-tense data must not show an empty
         Перф. column -- tenses are only included when at least one cell in
@@ -4801,6 +4898,16 @@ class TestBuildGrcParadigmTableWithData:
             result = fn({"lemma": "λυω", "pos": "verb", "form": "λυω"})
         assert result is not None
         assert "Перф." not in result
+
+    def test_verb_no_pluperfect_data_omits_column(self):
+        """Same negative case as no_perfect_data_omits_column, for YAI."""
+        fn = build_grc_paradigm_table(_GrcVerbBackend(), _EmptyGrcBackend())
+        def fake_inflect(word, slot, pos, *, language, backend):
+            return {"λυω"} if slot.tag == "PAI.1S" else set()
+        with patch("eee_project.inflect_slot", side_effect=fake_inflect):
+            result = fn({"lemma": "λυω", "pos": "verb", "form": "λυω"})
+        assert result is not None
+        assert "Плюскв." not in result
 
     def test_verb_dual_row(self):
         """2D/3D rows render for tenses the engine supports (Pres/Imp/Fut/
@@ -5204,6 +5311,101 @@ class TestGrcCoverageWords:
         assert result == {"ποτνι"}
 
 
+class _FakeParadigmBackend:
+    """paradigm(lemma, pos) returns a fixed {tag: {forms}} dict for one lemma/pos,
+    or raises if `raises` is set — mirrors AncientGreekBackend.paradigm()'s shape."""
+    def __init__(self, table=None, *, raises=False):
+        self._table = table or {}
+        self._raises = raises
+
+    def paradigm(self, lemma, pos):
+        if self._raises:
+            raise ValueError("boom")
+        return self._table.get((lemma, pos), {})
+
+
+class TestGrcLexiconSources:
+    """Extracted from _lexicon_tag, duplicated identically across all 7 Odyssey
+    lesson notebooks (each with its own hand-maintained _LEXICONS list and an
+    exact-string match blind to case/accent/movable-nu variation)."""
+
+    def test_non_lexicon_tag_pos_returns_empty(self):
+        w = {"lemma": "καλός", "form": "καλός", "pos": "adv"}
+        result = grc_lexicon_sources(w, lexicons={"homer": _FakeParadigmBackend()})
+        assert result == []
+
+    def test_matches_single_lexicon(self):
+        w = {"lemma": "λόγος", "form": "λόγος", "pos": "noun"}
+        backend = _FakeParadigmBackend({("λόγος", "noun"): {".NSM": {"λόγος"}}})
+        result = grc_lexicon_sources(w, lexicons={"homer": backend})
+        assert result == ["homer"]
+
+    def test_no_match_anywhere_returns_empty(self):
+        w = {"lemma": "λόγος", "form": "λόγος", "pos": "noun"}
+        backend = _FakeParadigmBackend({("λόγος", "noun"): {".NSM": {"ἄλλος"}}})
+        result = grc_lexicon_sources(w, lexicons={"homer": backend})
+        assert result == []
+
+    def test_sorted_names_across_multiple_matching_lexicons(self):
+        w = {"lemma": "λόγος", "form": "λόγος", "pos": "noun"}
+        backend = _FakeParadigmBackend({("λόγος", "noun"): {".NSM": {"λόγος"}}})
+        result = grc_lexicon_sources(
+            w, lexicons={"morphgnt": backend, "homer": backend, "lsj": backend},
+        )
+        assert result == ["homer", "lsj", "morphgnt"]
+
+    def test_only_matching_lexicons_included(self):
+        w = {"lemma": "λόγος", "form": "λόγος", "pos": "noun"}
+        hit = _FakeParadigmBackend({("λόγος", "noun"): {".NSM": {"λόγος"}}})
+        miss = _FakeParadigmBackend({("λόγος", "noun"): {".NSM": {"ἄλλος"}}})
+        result = grc_lexicon_sources(w, lexicons={"homer": hit, "lsj": miss})
+        assert result == ["homer"]
+
+    def test_case_insensitive_match(self):
+        """Sentence-initial capital in running text (e.g. Ἄνδρα) vs. the
+        lowercase form every backend actually generates."""
+        w = {"lemma": "ἀνήρ", "form": "Ἄνδρα", "pos": "noun"}
+        backend = _FakeParadigmBackend({("ἀνήρ", "noun"): {".ASM": {"ἄνδρα"}}})
+        result = grc_lexicon_sources(w, lexicons={"homer": backend})
+        assert result == ["homer"]
+
+    def test_accent_insensitive_match(self):
+        """Grave-for-acute accent shift in connected running text (θεοὶ) vs.
+        the citation-form acute every backend generates (θεοί)."""
+        w = {"lemma": "θεός", "form": "θεοὶ", "pos": "noun"}
+        backend = _FakeParadigmBackend({("θεός", "noun"): {".NPM": {"θεοί"}}})
+        result = grc_lexicon_sources(w, lexicons={"homer": backend})
+        assert result == ["homer"]
+
+    def test_movable_nu_insensitive_match(self):
+        w = {"lemma": "ἀληθής", "form": "ἀληθέσιν", "pos": "adj"}
+        backend = _FakeParadigmBackend({("ἀληθής", "adjective"): {".DPN": {"ἀληθέσι(ν)"}}})
+        result = grc_lexicon_sources(w, lexicons={"homer": backend})
+        assert result == ["homer"]
+
+    def test_adj_pos_aliased_to_adjective_for_paradigm_call(self):
+        w = {"lemma": "καλός", "form": "καλός", "pos": "adj"}
+        backend = _FakeParadigmBackend({("καλός", "adjective"): {".NSM": {"καλός"}}})
+        result = grc_lexicon_sources(w, lexicons={"homer": backend})
+        assert result == ["homer"]
+
+    def test_paradigm_exception_excludes_that_lexicon_only(self):
+        w = {"lemma": "λόγος", "form": "λόγος", "pos": "noun"}
+        ok = _FakeParadigmBackend({("λόγος", "noun"): {".NSM": {"λόγος"}}})
+        broken = _FakeParadigmBackend(raises=True)
+        result = grc_lexicon_sources(w, lexicons={"homer": ok, "lsj": broken})
+        assert result == ["homer"]
+
+    def test_participle_form_matches(self):
+        """Unlike build_grc_paradigm_table's study-table view (indicative/
+        infinitive/imperative only), grc_lexicon_sources checks the full
+        paradigm() result, including participle cells."""
+        w = {"lemma": "φεύγω", "form": "πεφευγότες", "pos": "verb"}
+        backend = _FakeParadigmBackend({("φεύγω", "verb"): {"XAP.NPM": {"πεφευγότες"}}})
+        result = grc_lexicon_sources(w, lexicons={"homer": backend})
+        assert result == ["homer"]
+
+
 class TestNormGrcSurface:
     """norm_grc_surface: made public (was _norm_grc_surface) for section-03 of the
     odyssey interactive-text project — the panel needs to normalize a single
@@ -5523,20 +5725,20 @@ class TestStanzaMatchQuestion:
 
 class TestStanzaMatchWidgets:
     def test_no_cv_placeholder_radio(self, gu_form):
-        radio, _, _ = gu_form.stanza_match_widgets(cv=None, stanzas=_SM_STANZAS)
+        radio, _, _ = gu_form.stanza_match_widgets(cv=None, remaining=[], stanzas=_SM_STANZAS)
         assert radio.options == [""]
 
     def test_cv_gives_multiple_options(self, gu_form):
-        radio, _, _ = gu_form.stanza_match_widgets(cv=_SM_STANZAS[0], stanzas=_SM_STANZAS)
+        radio, _, _ = gu_form.stanza_match_widgets(cv=_SM_STANZAS[0], remaining=_SM_STANZAS[1:], stanzas=_SM_STANZAS)
         assert len(radio.options) > 1
 
     def test_done_flag_changes_next_label(self, gu_form):
-        _, next_btn, _ = gu_form.stanza_match_widgets(cv=None, stanzas=_SM_STANZAS, done=True)
+        _, next_btn, _ = gu_form.stanza_match_widgets(cv=None, remaining=[], stanzas=_SM_STANZAS)
         assert "снова" in next_btn.label
 
     def test_restore_entry_sets_radio_value(self, gu_form):
         radio, _, _ = gu_form.stanza_match_widgets(
-            cv=_SM_STANZAS[0], stanzas=_SM_STANZAS,
+            cv=_SM_STANZAS[0], remaining=_SM_STANZAS[1:], stanzas=_SM_STANZAS,
             restore_entry={"answer": "Мужа мне назови, Муза, многообразного, который очень много — подстрочник"},
         )
         assert radio.value == "Мужа мне назови, Муза, многообразного, который очень много — подстрочник"
@@ -6032,21 +6234,21 @@ class TestTranslationPresenceWidgets:
     _ITEM = TestTranslationPresenceQuestion._ITEM
 
     def test_no_cv_placeholder_radio(self, gu_form):
-        radio, _, _, _ = gu_form.translation_presence_widgets(cv=None, items=[self._ITEM])
+        radio, _, _, _ = gu_form.translation_presence_widgets(cv=None, remaining=[], items=[self._ITEM])
         assert radio.options == [""]
 
     def test_cv_gives_da_net_options(self, gu_form):
-        radio, _, _, _ = gu_form.translation_presence_widgets(cv=self._ITEM, items=[self._ITEM])
+        radio, _, _, _ = gu_form.translation_presence_widgets(cv=self._ITEM, remaining=[], items=[self._ITEM])
         assert set(radio.options) == {"да", "нет"}
 
     def test_done_flag_changes_next_label(self, gu_form):
-        _, next_btn, _, _ = gu_form.translation_presence_widgets(cv=None, items=[self._ITEM], done=True)
+        _, next_btn, _, _ = gu_form.translation_presence_widgets(cv=None, remaining=[], items=[self._ITEM])
         assert "снова" in next_btn.label
 
     def test_source_switch_starts_showing_translation(self, gu_form):
         # "On every step begin from translation" -- a fresh switch each round,
         # defaulting to False (translation view), never the original.
-        _, _, _, source_switch = gu_form.translation_presence_widgets(cv=self._ITEM, items=[self._ITEM])
+        _, _, _, source_switch = gu_form.translation_presence_widgets(cv=self._ITEM, remaining=[], items=[self._ITEM])
         assert source_switch.value is False
 
 

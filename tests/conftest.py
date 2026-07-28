@@ -35,19 +35,27 @@ class MockBackend:
         return set(self._forms)
 
 
+def _mock_backend(**method_returns) -> object:
+    """MagicMock backend with each keyword set as that method's .return_value."""
+    b = MagicMock()
+    for method, value in method_returns.items():
+        getattr(b, method).return_value = value
+    return b
+
+
 def mock_backend(forms: set[str]) -> object:
     """MagicMock backend returning fixed forms (for call-count assertions)."""
-    b = MagicMock()
-    b.inflect.return_value = forms
-    return b
+    return _mock_backend(inflect=forms)
 
 
 def corpus_backend(forms: set[str], lemmas: list[str]) -> object:
     """MagicMock backend returning fixed forms and lemmas."""
-    b = MagicMock()
-    b.inflect.return_value = forms
-    b.list_lemmas.return_value = list(lemmas)
-    return b
+    return _mock_backend(inflect=forms, list_lemmas=list(lemmas))
+
+
+def analyze_backend(rows: list[dict]) -> object:
+    """MagicMock backend returning fixed analyze() candidate rows."""
+    return _mock_backend(analyze=list(rows))
 
 
 def register(lang: str, name: str, backend: object) -> None:

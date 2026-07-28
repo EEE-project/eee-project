@@ -37,24 +37,21 @@ def _():
     eee.register_backend("grc", AncientGreekBackend())
     eee.register_backend("grc", UniMorphBackend(language="grc"), backend="unimorph")
 
-    # One named backend per bundled period/corpus lexicon, so this general demo
+    # One named backend per bundled period/corpus preset, so this general demo
     # notebook can show off any of them -- not just the tiny Pratt teaching set
-    # the bare default above uses. New lexicons (e.g. "byzantine") only need a
-    # line here, not a whole new example notebook.
-    for _period_name, _period_lexicons in [
-        ("ag-homer", ["homer"]),
-        ("ag-lsj", ["pratt", "ltrg", "lsj"]),
-        ("ag-lxx", ["lxx"]),
-        ("ag-morphgnt", ["morphgnt"]),
-        # byzantine is a sparse exceptions layer (specific attested
-        # divergences from an already-known classical paradigm, not a
-        # standalone stemming engine -- see greek-inflexion-eee's README)
-        # -- merge it onto a Koine/Attic base so it inherits that base's
-        # full lemma coverage and only overrides the specific cells it
-        # actually documents, falling through cleanly everywhere else.
-        ("ag-byzantine", ["lxx", "morphgnt", "pratt", "ltrg", "lsj", "byzantine"]),
+    # the bare default above uses. for_period() resolves each preset's lexicon
+    # list from a single shared source in ancient-greek-backend-eee (see its
+    # own _PERIOD_PRESETS for why e.g. "byzantine" merges onto a Koine/Attic
+    # base) -- new presets only need a name added there, not a lexicon list
+    # hand-copied into every consumer including this one.
+    for _period_name, _period in [
+        ("ag-homer", "epic"),
+        ("ag-lsj", "attic"),
+        ("ag-lxx", "hellenistic_koine"),
+        ("ag-morphgnt", "roman_koine"),
+        ("ag-byzantine", "byzantine"),
     ]:
-        eee.register_backend("grc", AncientGreekBackend(lexicons=_period_lexicons), backend=_period_name)
+        eee.register_backend("grc", AncientGreekBackend.for_period(_period), backend=_period_name)
 
     return eee, mo
 

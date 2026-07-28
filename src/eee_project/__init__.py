@@ -10,7 +10,7 @@ from eee_project._exceptions import (
     PosNotSupportedError,
     UnsupportedLanguageError,
 )
-from eee_project._results import InflectResult, LemmaEntry
+from eee_project._results import InflectResult, LemmaEntry, AnalysisEntry
 from eee_project._hooks import HookContext, PreHook, PostHook
 from eee_project._slot_template import SlotTemplate, SupportsSlotTemplates
 from eee_project._tag_registry import register_tag_type
@@ -21,13 +21,13 @@ from eee_project.notebook_utils import (
     load_ga_config, ConfigStore,
     build_grc_paradigm_table, build_modern_paradigm_table, build_grc_lexicon_tabs,
     make_paradigm_form, interactive_text, setup_ancient_greek, add_labels,
-    filter_grc_quiz_words, grc_coverage_words, norm_grc_surface, resolve_clicked_word,
+    filter_grc_quiz_words, grc_coverage_words, grc_lexicon_sources, norm_grc_surface, resolve_clicked_word,
     parse_stanza_text, parse_stanza_translations,
     LEXICON_TAG_POS, LEXICON_TAG_POS_ALIASES, TRANSLATION_PRESENCE_CONTENT_POS,
     _INC as increment_counter,
 )
 
-__version__ = "0.8.0"
+__version__ = "0.9.0"
 
 _UNSET = object()  # sentinel distinguishing "not provided" from explicit None
 
@@ -57,6 +57,9 @@ __all__ = [
     "FeatureNotSupportedError",
     "InflectResult",
     "LemmaEntry",
+    "AnalysisEntry",
+    "analyze",
+    "analyze_traced",
     "HookContext",
     "PreHook",
     "PostHook",
@@ -90,6 +93,7 @@ __all__ = [
     "add_labels",
     "filter_grc_quiz_words",
     "grc_coverage_words",
+    "grc_lexicon_sources",
     "norm_grc_surface",
     "resolve_clicked_word",
     "parse_stanza_text",
@@ -250,6 +254,46 @@ def inflect_traced(
     return InflectResult(forms=result, source=source, tried=[backend_key], by_backend={backend_key: set(result)})
 
 
+def _chain_walk_traced(lang: str, backend: str | None, method_name: str, arg, entry_ctor):
+    """Query method_name(arg) on each backend in the chain (or an explicit backend=).
+
+    Shared by list_lemmas_traced() and analyze_traced() -- same three-branch
+    shape (explicit backend= / no chain registered / chain loop), differing
+    only in which backend method to call, what argument it takes, and how to
+    wrap each raw result item. entry_ctor(item, source_key) builds one entry.
+    Backends without method_name are silently skipped. Duplicates across
+    backends are NOT collapsed.
+    """
+    if backend is not None:
+        b = _registry.get_backend(lang, backend=backend)
+        fn = getattr(b, method_name, None)
+        if fn is None:
+            return []
+        key = f"{lang}:{backend}"
+        return [entry_ctor(item, key) for item in fn(arg)]
+
+    chain = _registry.get_chain(lang)
+    if not chain:
+        b = _registry.get_backend(lang)
+        fn = getattr(b, method_name, None)
+        if fn is None:
+            return []
+        return [entry_ctor(item, lang) for item in fn(arg)]
+
+    result = []
+    for name in chain:
+        try:
+            b = _registry.get_backend(lang, backend=name)
+        except (UnsupportedLanguageError, BackendLoadError):
+            continue
+        fn = getattr(b, method_name, None)
+        if fn is None:
+            continue
+        key = f"{lang}:{name}"
+        result.extend(entry_ctor(item, key) for item in fn(arg))
+    return result
+
+
 def list_lemmas_traced(
     pos: str,
     language: str,
@@ -262,35 +306,8 @@ def list_lemmas_traced(
     collapsed. Backends without list_lemmas() are silently skipped.
     """
     lang = _registry.resolve_language(language, backend)
-
-    if backend is not None:
-        b = _registry.get_backend(lang, backend=backend)
-        fn = getattr(b, "list_lemmas", None)
-        if fn is None:
-            return []
-        key = f"{lang}:{backend}"
-        return [LemmaEntry(lemma=lm, source=key) for lm in fn(pos)]
-
-    chain = _registry.get_chain(lang)
-    if not chain:
-        b = _registry.get_backend(lang)
-        fn = getattr(b, "list_lemmas", None)
-        if fn is None:
-            return []
-        return [LemmaEntry(lemma=lm, source=lang) for lm in fn(pos)]
-
-    result: list[LemmaEntry] = []
-    for name in chain:
-        try:
-            b = _registry.get_backend(lang, backend=name)
-        except (UnsupportedLanguageError, BackendLoadError):
-            continue
-        fn = getattr(b, "list_lemmas", None)
-        if fn is None:
-            continue
-        key = f"{lang}:{name}"
-        result.extend(LemmaEntry(lemma=lm, source=key) for lm in fn(pos))
-    return result
+    return _chain_walk_traced(lang, backend, "list_lemmas", pos,
+                               lambda lm, key: LemmaEntry(lemma=lm, source=key))
 
 
 def list_lemmas(pos: str, language: str | None = None, backend: str | None = None) -> list[str]:
@@ -310,6 +327,45 @@ def list_lemmas(pos: str, language: str | None = None, backend: str | None = Non
     if fn is None:
         return []
     return fn(pos)
+
+
+def analyze_traced(
+    form: str,
+    language: str,
+    backend: str | None = None,
+) -> list[AnalysisEntry]:
+    """Return candidate reverse-lookup analyses for form with per-entry source attribution.
+
+    Queries each backend in the registered chain (or explicit backend=). Returns
+    one AnalysisEntry per (candidate, backend) pair — duplicates across backends
+    are NOT collapsed. Backends without analyze() are silently skipped.
+    """
+    lang = _registry.resolve_language(language, backend)
+    return _chain_walk_traced(lang, backend, "analyze", form,
+                               lambda r, key: AnalysisEntry(**r, source=key))
+
+
+def analyze(form: str, language: str | None = None, backend: str | None = None) -> list[dict]:
+    """Return candidate reverse-lookup analyses for form as plain dicts, deduplicated.
+
+    When backend=None and a chain is registered for language, queries all chain
+    backends and returns a deduplicated union (by lemma+pos+tag). Returns [] for
+    backends without analyze().
+    """
+    lang = _registry.resolve_language(language, backend)
+
+    if backend is None and _registry.get_chain(lang):
+        dedup: dict[tuple, dict] = {}
+        for e in analyze_traced(form, lang):
+            dedup.setdefault((e.lemma, e.pos, e.tag),
+                             {"lemma": e.lemma, "pos": e.pos, "tag": e.tag, "features": e.features})
+        return list(dedup.values())
+
+    b = _registry.get_backend(lang, backend=backend)
+    fn = getattr(b, "analyze", None)
+    if fn is None:
+        return []
+    return fn(form)
 
 
 def get_slot_templates(

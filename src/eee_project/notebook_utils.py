@@ -234,8 +234,10 @@ def _find_local(directory, filename) -> "Any | None":
 
     The shared "does this exact candidate exist locally" check behind both
     :meth:`ConfigStore.from_file` (which tries two candidate directories)
-    and :meth:`GreekUtils.load_vocab_tsv` (which tries one) before either
-    falls back to a remote fetch.
+    and :meth:`GreekUtils._resolve_tsv_path` (which tries one, on behalf of
+    both :meth:`GreekUtils.load_vocab_tsv` and
+    :meth:`GreekUtils.load_inflected_vocab_tsv`) before either falls back
+    to a remote fetch.
     """
     from pathlib import Path as _Path
 
@@ -844,12 +846,13 @@ _DIA_CSS = _bar_css(".eee-dia-bar") + """\
   font-family:'GFS Didot','New Athena Unicode','Noto Serif',serif}
 """
 
-# The input lives INSIDE the widget so beforeinput fires without crossing
-# the marimo-text shadow DOM boundary.
-# EEE_PLACEHOLDER and EEE_LABEL are replaced at runtime by _make_dia_esm().
-# Only `value` is synced so mo.ui.anywidget().value returns a plain string.
-_DIA_ESM_TMPL = """\
-const MARKS = [
+# Shared by both diacritics-bar ESM widgets (_DIA_ESM_TMPL, _PARA_ESM) --
+# was duplicated verbatim in each until 2026-07-26. clearMarks/clearAllMarks/
+# getMarksFor take `activeMarks` as an explicit parameter rather than closing
+# over it, since each widget's render() owns its own per-instance Map and
+# these functions now live at module level, shared across every instance.
+_DIACRITIC_CORE_JS = """\
+const ALL_MARKS = [
   {ch: 'ά', dia: '\\u0301', label: 'acute',  cat: 'accent'},
   {ch: 'ὰ', dia: '\\u0300', label: 'grave',  cat: 'accent'},
   {ch: 'ᾶ', dia: '\\u0342', label: 'tilde',  cat: 'accent'},
@@ -871,21 +874,92 @@ const EXCL = {
 // (Both have CCC 230, so Unicode does not reorder them automatically.)
 const CAT_ORDER = {breath: 0, accent: 1, diaer: 2, subscr: 3};
 
+const VOWELS = new Set('αεηιουωΑΕΗΙΟΥΩ');
+const DIA_VOWELS = {
+  '\\u0342': new Set('αηιυωΑΗΙΥΩ'),
+  '\\u0345': new Set('αηωΑΗΩ'),
+  '\\u0308': new Set('ιυΙΥ'),
+};
+
+function getMarksFor(activeMarks, base) {
+  const m = [...activeMarks.entries()]
+    .sort(([a], [b]) => (CAT_ORDER[a] ?? 9) - (CAT_ORDER[b] ?? 9))
+    .filter(([, {dia}]) => { const s = DIA_VOWELS[dia]; return !s || s.has(base); })
+    .map(([, {dia}]) => dia).join('');
+  return m || null;
+}
+
+function clearMarks(activeMarks, ...cats) {
+  for (const cat of cats) {
+    const m = activeMarks.get(cat);
+    if (m) { m.btn.classList.remove('dia-active'); activeMarks.delete(cat); }
+  }
+}
+
+function clearAllMarks(activeMarks) {
+  for (const {btn} of activeMarks.values()) btn.classList.remove('dia-active');
+  activeMarks.clear();
+}
+
+function makeMarkButton(ch, label) {
+  const btn = document.createElement('button');
+  btn.innerHTML = `<span class="dia-ch">${ch}</span><span class="dia-sub">${label}</span>`;
+  btn.addEventListener('mousedown', e => e.preventDefault());
+  return btn;
+}
+
+function makeClearButton() {
+  const btn = document.createElement('button');
+  btn.className = 'dia-clr';
+  btn.innerHTML = '<span class="dia-ch">✕</span><span class="dia-sub">clear</span>';
+  btn.addEventListener('mousedown', e => e.preventDefault());
+  return btn;
+}
+
+// Toggles `cat`'s mark: clears it if `dia` is already the active mark for
+// that category, otherwise clears whatever EXCL[cat] conflicts with it and
+// activates this one. Pure activeMarks/DOM-class mutation -- doesn't touch
+// focus, since which element to refocus differs by widget (a single fixed
+// input vs. whichever field currently has focus).
+function toggleMark(activeMarks, cat, dia, btn) {
+  const cur = activeMarks.get(cat);
+  if (cur && cur.dia === dia) {
+    clearMarks(activeMarks, cat);
+  } else {
+    clearMarks(activeMarks, ...(EXCL[cat] || [cat]));
+    activeMarks.set(cat, {dia, btn});
+    btn.classList.add('dia-active');
+  }
+}
+
+// Strips the diacritic marks from the character immediately before `pos` in
+// `inp.value` (NFD-decompose, drop combining marks, NFC-recompose) and
+// updates inp.value + its selection to match. Returns the new cursor
+// position, or null if pos was 0 (nothing before the cursor to strip --
+// caller decides what "nothing to do" means for it, e.g. still refocusing).
+// Deliberately does not persist the change (model.set/save_changes) or
+// refocus -- callers persist differently (immediate vs. debounced).
+function stripLastDiacritic(inp, pos) {
+  if (pos === 0) return null;
+  const chars = Array.from(inp.value.slice(0, pos));
+  const last = chars.pop();
+  const stripped = last.normalize('NFD').replace(/[̀-ͯ]/g, '').normalize('NFC');
+  const pre = chars.join('');
+  inp.value = pre + stripped + inp.value.slice(pos);
+  const newPos = pre.length + stripped.length;
+  inp.setSelectionRange(newPos, newPos);
+  return newPos;
+}
+"""
+
+# The input lives INSIDE the widget so beforeinput fires without crossing
+# the marimo-text shadow DOM boundary.
+# EEE_PLACEHOLDER and EEE_LABEL are replaced at runtime by _make_dia_esm().
+# Only `value` is synced so mo.ui.anywidget().value returns a plain string.
+_DIA_ESM_TMPL = _DIACRITIC_CORE_JS + """\
 function render({ model, el }) {
   const activeMarks = new Map(); // cat → {dia, btn}
   let biSnapshot = null;         // {value, pos} saved in beforeinput for Android fix
-
-  function clear(...cats) {
-    for (const cat of cats) {
-      const m = activeMarks.get(cat);
-      if (m) { m.btn.classList.remove('dia-active'); activeMarks.delete(cat); }
-    }
-  }
-
-  function clearAll() {
-    for (const {btn} of activeMarks.values()) btn.classList.remove('dia-active');
-    activeMarks.clear();
-  }
 
   const bar = document.createElement('div');
   bar.className = 'eee-dia-bar';
@@ -903,68 +977,35 @@ function render({ model, el }) {
   inp.className = 'eee-dia-inp';
   inp.placeholder = EEE_PLACEHOLDER;
 
-  for (const {ch, dia, label, cat} of MARKS) {
-    const btn = document.createElement('button');
-    btn.innerHTML = `<span class="dia-ch">${ch}</span><span class="dia-sub">${label}</span>`;
-    btn.addEventListener('mousedown', e => e.preventDefault());
+  for (const {ch, dia, label, cat} of ALL_MARKS) {
+    const btn = makeMarkButton(ch, label);
     btn.addEventListener('click', () => {
-      const cur = activeMarks.get(cat);
-      if (cur && cur.dia === dia) {
-        clear(cat);
-      } else {
-        clear(...(EXCL[cat] || [cat]));
-        activeMarks.set(cat, {dia, btn});
-        btn.classList.add('dia-active');
-      }
+      toggleMark(activeMarks, cat, dia, btn);
       inp.focus();
     });
     bar.appendChild(btn);
   }
 
-  const clr = document.createElement('button');
-  clr.className = 'dia-clr';
-  clr.innerHTML = '<span class="dia-ch">✕</span><span class="dia-sub">clear</span>';
-  clr.addEventListener('mousedown', e => e.preventDefault());
+  const clr = makeClearButton();
   clr.addEventListener('click', () => {
-    clearAll();
+    clearAllMarks(activeMarks);
     const pos = inp.selectionStart ?? inp.value.length;
-    if (pos === 0) { inp.focus(); return; }
-    const chars = Array.from(inp.value.slice(0, pos));
-    const last = chars.pop();
-    const stripped = last.normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').normalize('NFC');
-    const bstr = chars.join('');
-    inp.value = bstr + stripped + inp.value.slice(pos);
-    model.set('value', inp.value);
-    model.save_changes();
-    inp.setSelectionRange(bstr.length + stripped.length, bstr.length + stripped.length);
+    const newPos = stripLastDiacritic(inp, pos);
+    if (newPos !== null) {
+      model.set('value', inp.value);
+      model.save_changes();
+      inp.setSelectionRange(newPos, newPos);
+    }
     inp.focus();
   });
   bar.appendChild(clr);
-
-  const VOWELS      = new Set('αεηιουωΑΕΗΙΟΥΩ');
-  const LONG_VOWELS = new Set('αηιυωΑΗΙΥΩ');
-  const IOTSUB_V    = new Set('αηωΑΗΩ');
-  const DIAER_V     = new Set('ιυΙΥ');
-  const DIA_VOWELS  = {
-    '\\u0342': LONG_VOWELS,
-    '\\u0345': IOTSUB_V,
-    '\\u0308': DIAER_V,
-  };
-
-  function getMarksFor(base) {
-    const m = [...activeMarks.entries()]
-      .sort(([a], [b]) => (CAT_ORDER[a] ?? 9) - (CAT_ORDER[b] ?? 9))
-      .filter(([, {dia}]) => { const s = DIA_VOWELS[dia]; return !s || s.has(base); })
-      .map(([, {dia}]) => dia).join('');
-    return m || null;
-  }
 
   inp.addEventListener('beforeinput', e => {
     biSnapshot = null;
     if (!activeMarks.size || (e.inputType !== 'insertText' && e.inputType !== 'insertCompositionText') || !e.data) return;
     const base = e.data.normalize('NFD')[0];
-    if (!VOWELS.has(base)) { clearAll(); return; }
-    const marks = getMarksFor(base);
+    if (!VOWELS.has(base)) { clearAllMarks(activeMarks); return; }
+    const marks = getMarksFor(activeMarks, base);
     if (!marks) return;
     e.preventDefault();
     const start = inp.selectionStart ?? inp.value.length;
@@ -1056,7 +1097,7 @@ class _DiacriticsElement:
     def enter_pressed(self) -> int:
         """Increments each time Enter is pressed in the input — treat as a second
         "check requested" signal alongside a submit button's own click counter
-        (same convention as ``make_paradigm_form``'s ``.widget.submit_count``)."""
+        (same convention as ``make_paradigm_form``'s ``.widget.submit_request["request_id"]``)."""
         return self._ui.widget.enter_pressed
 
     def _mime_(self) -> Any:
@@ -1092,24 +1133,11 @@ _PARA_CSS = _bar_css(".eee-para-bar", "margin:6px 0 8px") + """\
 .eee-para-inp:focus{outline:none;border-color:#003d82;box-shadow:0 0 0 2px rgba(0,61,130,0.15)}
 """
 
-_PARA_ESM = r"""
-const ALL_MARKS=[
-  {ch:'ά',dia:'́',label:'acute', cat:'accent'},
-  {ch:'ὰ',dia:'̀',label:'grave', cat:'accent'},
-  {ch:'ᾶ',dia:'͂',label:'tilde', cat:'accent'},
-  {ch:'ἁ',dia:'̔',label:'rough', cat:'breath'},
-  {ch:'ἀ',dia:'̓',label:'smooth',cat:'breath'},
-  {ch:'ᾳ',dia:'ͅ',label:'iotsub',cat:'subscr'},
-  {ch:'ϊ',dia:'̈',label:'diaer', cat:'diaer'},
-];
+_PARA_ESM = _DIACRITIC_CORE_JS + r"""
 // Modern Greek monotonic orthography (post-1982) only uses the acute accent
 // and diaeresis -- grave/circumflex accent and breathing/iota-subscript are
 // polytonic-only and would confuse a Modern Greek exercise, not just clutter it.
 const MONOTONIC_MARKS=ALL_MARKS.filter(m=>m.label==='acute'||m.cat==='diaer');
-const EXCL={accent:['accent'],breath:['breath','diaer'],subscr:['subscr','diaer'],diaer:['diaer','breath','subscr']};
-const CAT_ORDER={breath:0,accent:1,diaer:2,subscr:3};
-const VOWELS=new Set('αεηιουωΑΕΗΙΟΥΩ');
-const DIA_VOWELS={'͂':new Set('αηιυωΑΗΙΥΩ'),'ͅ':new Set('αηωΑΗΩ'),'̈':new Set('ιυΙΥ')};
 
 function render({model,el}){
   // anywidget calls this fresh for every new widget instance, and
@@ -1123,12 +1151,12 @@ function render({model,el}){
   const activeMarks=new Map();
   let focusedInp=null;
   let biSnap=null;
-  // submit_count doubles as the request id (each fireSubmit sends the next
-  // value and every reply echoes back the one it answered), so no separate
-  // "last sent" counter is needed -- model.get('submit_count') after a
-  // model.set() already reads the just-sent value, synchronously, before
-  // save_changes() does the real network round trip.
-  const pendingOrigin=new Map();  // submit_count -> origin field index, while its reply is in flight
+  // submit_request.request_id doubles as the request id (each fireSubmit
+  // sends the next value and every reply echoes back the one it answered),
+  // so no separate "last sent" counter is needed -- model.get('submit_request')
+  // after a model.set() already reads the just-sent value, synchronously,
+  // before save_changes() does the real network round trip.
+  const pendingOrigin=new Map();  // request_id -> origin field index, while its reply is in flight
 
   // A field can (rarely) have more than one request in flight -- fireSubmit
   // itself refuses to re-lock an already-locked field, but the mobile "Go"
@@ -1140,18 +1168,6 @@ function render({model,el}){
   function releaseLock(idx){
     for(const v of pendingOrigin.values())if(v===idx)return;
     inputs[idx].readOnly=false;
-  }
-
-  function clearMarks(...cats){
-    for(const cat of cats){const m=activeMarks.get(cat);if(m){m.btn.classList.remove('dia-active');activeMarks.delete(cat);}}
-  }
-  function clearAllMarks(){for(const{btn}of activeMarks.values())btn.classList.remove('dia-active');activeMarks.clear();}
-
-  function getMarksFor(base){
-    return[...activeMarks.entries()]
-      .sort(([a],[b])=>(CAT_ORDER[a]??9)-(CAT_ORDER[b]??9))
-      .filter(([,{dia}])=>{const s=DIA_VOWELS[dia];return!s||s.has(base);})
-      .map(([,{dia}])=>dia).join('')||null;
   }
 
   let _debTimer;
@@ -1167,35 +1183,22 @@ function render({model,el}){
   bar.className='eee-para-bar';
 
   for(const{ch,dia,label,cat}of MARKS){
-    const btn=document.createElement('button');
-    btn.innerHTML=`<span class="dia-ch">${ch}</span><span class="dia-sub">${label}</span>`;
-    btn.addEventListener('mousedown',e=>e.preventDefault());
+    const btn=makeMarkButton(ch,label);
     btn.addEventListener('click',()=>{
-      const cur=activeMarks.get(cat);
-      if(cur&&cur.dia===dia){clearMarks(cat);}
-      else{clearMarks(...(EXCL[cat]||[cat]));activeMarks.set(cat,{dia,btn});btn.classList.add('dia-active');}
+      toggleMark(activeMarks,cat,dia,btn);
       if(focusedInp)focusedInp.focus();
     });
     bar.appendChild(btn);
   }
 
-  const clrBtn=document.createElement('button');
-  clrBtn.className='dia-clr';
-  clrBtn.innerHTML='<span class="dia-ch">✕</span><span class="dia-sub">clear</span>';
-  clrBtn.addEventListener('mousedown',e=>e.preventDefault());
+  const clrBtn=makeClearButton();
   clrBtn.addEventListener('click',()=>{
-    clearAllMarks();
+    clearAllMarks(activeMarks);
     if(!focusedInp||focusedInp.readOnly)return;
     const inp=focusedInp;
     const pos=inp.selectionStart??inp.value.length;
-    if(pos===0){inp.focus();return;}
-    const chars=Array.from(inp.value.slice(0,pos));
-    const last=chars.pop();
-    const stripped=last.normalize('NFD').replace(/[̀-ͯ]/g,'').normalize('NFC');
-    const pre=chars.join('');
-    inp.value=pre+stripped+inp.value.slice(pos);
-    updateValues();
-    inp.setSelectionRange(pre.length+stripped.length,pre.length+stripped.length);
+    const newPos=stripLastDiacritic(inp,pos);
+    if(newPos!==null){updateValues();inp.setSelectionRange(newPos,newPos);}
     inp.focus();
   });
   bar.appendChild(clrBtn);
@@ -1206,10 +1209,10 @@ function render({model,el}){
   const initVals=model.get('values')||[];
 
   // shared by keydown-Enter and mobile "Go" (form submit) below — idx is
-  // -1 (enter_field_index's own documented "unset" default) when nothing
-  // was focused; fireSubmit skips locking/pendingOrigin entirely for it
-  // below, so change:focus_request's reply naturally finds no origin to
-  // act on instead of needing its own -1 check.
+  // -1 (submit_request.field_index's own documented "unset" default) when
+  // nothing was focused; fireSubmit skips locking/pendingOrigin entirely
+  // for it below, so change:focus_request's reply naturally finds no
+  // origin to act on instead of needing its own -1 check.
   function fireSubmit(idx){
     // Already locked (a reply for this field is still in flight) -- a
     // repeat Enter/"Go" while waiting can't mean anything new since the
@@ -1218,7 +1221,7 @@ function render({model,el}){
     if(idx>=0&&idx<inputs.length&&inputs[idx].readOnly)return;
     clearTimeout(_debTimer);
     flushValues();
-    const reqId=(model.get('submit_count')||0)+1;
+    const reqId=(model.get('submit_request').request_id||0)+1;
     if(idx>=0&&idx<inputs.length){
       // Lock the field the instant Enter fires. Python's validation is a
       // real async round trip (a full reactive-cell rerun); without this,
@@ -1234,8 +1237,18 @@ function render({model,el}){
         if(pendingOrigin.delete(reqId))releaseLock(idx);
       },3000);
     }
-    model.set('enter_field_index',idx);
-    model.set('submit_count',reqId);
+    // request_id and field_index only ever mean something together (a
+    // count with no origin field, or vice versa, is meaningless here), so
+    // one Dict trait replaces what used to be two separate Int traits --
+    // both fields land in the same model.set() call, with no window where
+    // a listener could see one updated but not the other. Deliberately NOT
+    // merged further with focus_request into a single bidirectional trait:
+    // model.set() fires this same client's own change: handlers
+    // synchronously (confirmed empirically), so a trait written by both
+    // sides would need explicit self-echo detection that submit_request
+    // (JS-only writer) and focus_request (Python-only writer) each avoid
+    // by construction.
+    model.set('submit_request',{request_id:reqId,field_index:idx});
     model.save_changes();
   }
 
@@ -1273,8 +1286,8 @@ function render({model,el}){
       if(inp.readOnly)return;
       if(!activeMarks.size||(e.inputType!=='insertText'&&e.inputType!=='insertCompositionText')||!e.data)return;
       const base=e.data.normalize('NFD')[0];
-      if(!VOWELS.has(base)){clearAllMarks();return;}
-      const marks=getMarksFor(base);
+      if(!VOWELS.has(base)){clearAllMarks(activeMarks);return;}
+      const marks=getMarksFor(activeMarks,base);
       if(!marks)return;
       e.preventDefault();
       const s=inp.selectionStart??inp.value.length,end=inp.selectionEnd??s;
@@ -1318,7 +1331,7 @@ function render({model,el}){
     releaseLock(originIdx);
     // A newer Enter has been sent since this reply was computed -- it's
     // for a request that's no longer the latest, so don't act on it.
-    if(request_id!==(model.get('submit_count')||0))return;
+    if(request_id!==(model.get('submit_request').request_id||0))return;
     // The user has manually moved away (click/tab) from the origin field
     // since submitting -- respect that instead of yanking focus back.
     if(focusedInp!==inputs[originIdx])return;
@@ -1337,9 +1350,8 @@ if _ANYWIDGET_OK:
         _esm = _PARA_ESM
         labels = _traitlets.List(_traitlets.Unicode()).tag(sync=True)
         values = _traitlets.List(_traitlets.Unicode()).tag(sync=True)
-        submit_count = _traitlets.Int(0).tag(sync=True)
+        submit_request = _traitlets.Dict().tag(sync=True)
         focus_request = _traitlets.Dict().tag(sync=True)
-        enter_field_index = _traitlets.Int(-1).tag(sync=True)
         polytonic = _traitlets.Bool(True).tag(sync=True)
 
 
@@ -1364,16 +1376,17 @@ def make_paradigm_form(mo, labels, values=None, polytonic=True):
 
     Pressing Enter in any field (desktop keydown, or a mobile virtual
     keyboard's "Go"/submit action — both wired) flushes the current values
-    immediately (no debounce wait), records the triggering field's index in
-    ``.widget.enter_field_index`` (``-1`` if none was focused), and increments
-    ``.widget.submit_count`` — treat that counter as an additional "check"
-    trigger alongside a submit button, the same way the button's own click
-    counter is watched. The triggering field is locked read-only client-side
-    until a reply comes back (see below), so it can't take an "advance was
-    correct — jump here" reply based on a value the user already changed again.
+    immediately (no debounce wait) and sets
+    ``.widget.submit_request = {"request_id": seq, "field_index": idx}``
+    (``field_index`` is ``-1`` if none was focused) — treat a new
+    ``request_id`` as an additional "check" trigger alongside a submit
+    button, the same way the button's own click counter is watched. The
+    triggering field is locked read-only client-side until a reply comes
+    back (see below), so it can't take an "advance was correct — jump
+    here" reply based on a value the user already changed again.
 
     Set ``.widget.focus_request = {"request_id": seq, "advance_to": index}``
-    (pair ``request_id`` with the current ``submit_count`` — both to
+    (pair ``request_id`` with ``submit_request["request_id"]`` — both to
     guarantee change-detection and because the JS side matches it against
     the request it's still waiting on; a reply for any other ``request_id``
     is superseded) to move focus to a field programmatically — e.g. to the
@@ -3337,24 +3350,26 @@ Translation: **{translation}**
 
         _w = form.widget
         _live = list(_w.values)
+        _sub_req = _w.submit_request or {}
+        _req_id = _sub_req.get("request_id", 0)
         _click = (check_btn.value or 0) > get_sub_cnt()
-        _enter = (_w.submit_count or 0) > get_entercnt()
+        _enter = _req_id > get_entercnt()
         if _click or _enter:
             set_sub_cnt(check_btn.value or 0)
-            set_entercnt(_w.submit_count or 0)
+            set_entercnt(_req_id)
             snap = make_cap(_live)
             if snap is not None:
                 set_cap(snap)
             if _enter and not _click:
-                i = _w.enter_field_index
+                i = _sub_req.get("field_index", -1)
                 advance_to = None
                 if 0 <= i < len(_live) and slot_ok(i, _live[i]) and i + 1 < len(_live):
                     advance_to = i + 1
                 # Always reply, even on a wrong answer or the last field --
                 # the JS side locks the origin field the instant Enter
-                # fires and only releases it once this exact submit_count
+                # fires and only releases it once this exact request_id
                 # comes back, so a dropped reply would leave it stuck.
-                _w.focus_request = {"request_id": _w.submit_count, "advance_to": advance_to}
+                _w.focus_request = {"request_id": _req_id, "advance_to": advance_to}
 
         cap = get_cap()
         ok = False
@@ -3634,17 +3649,21 @@ Translation: **{translation}**
     def word_drill_done(cv: "dict | None", remaining: "list | None") -> bool:
         """True once a drill/quiz is exhausted: no current word, queue empty.
 
-        Pass the already-called state values, not getters::
-
-            done=gu.word_drill_done(cv(), remaining())
+        Used internally by :meth:`word_drill_widgets`, :meth:`word_quiz_widgets`,
+        :meth:`stanza_match_widgets`, and :meth:`translation_presence_widgets`
+        (each already takes ``cv``/``remaining`` and derives ``done`` itself) —
+        callers don't need to call this directly for that purpose. Pass the
+        already-called state values, not getters, if calling it directly for
+        some other reason.
         """
         return cv is None and remaining is not None and len(remaining) == 0
 
     def word_drill_widgets(
         self,
         *,
+        cv: "dict | None",
+        remaining: "list | None",
         restore_entry: "dict | None" = None,
-        done: bool = False,
         history_len: int = 0,
         placeholder: "str | None" = None,
         label: "str | None" = None,
@@ -3657,8 +3676,10 @@ Translation: **{translation}**
         the display cell when Enter is pressed. ``lang`` (``ru``/``en``/``el``)
         sets the Next/Prev button text and the defaults for ``placeholder``
         and ``label`` (the Check button's text) — pass explicit strings only
-        to override those defaults. Use the same ``lang`` as the companion
-        :meth:`word_drill_form` call.
+        to override those defaults. ``cv``/``remaining`` are the already-called
+        state values (see :meth:`word_drill_done`) — used only to derive
+        whether the drill is finished, for the Next/Prev button labels. Use
+        the same ``lang`` as the companion :meth:`word_drill_form` call.
         """
         mo = self._mo
         if placeholder is None:
@@ -3669,7 +3690,8 @@ Translation: **{translation}**
         write_input = self.diacritics_text(placeholder=placeholder, value=_ans)
         dia = write_input._ui
         check_btn = mo.ui.button(label=label, on_click=_INC)
-        next_btn, prev_btn = self._make_nav_buttons(done=done, history_len=history_len, lang=lang)
+        _done = self.word_drill_done(cv, remaining)
+        next_btn, prev_btn = self._make_nav_buttons(done=_done, history_len=history_len, lang=lang)
         return write_input, dia, check_btn, prev_btn, next_btn
 
     def word_drill_display(
@@ -3986,9 +4008,9 @@ Translation: **{translation}**
         self,
         *,
         cv: "dict | None",
+        remaining: "list | None",
         vocab: list,
         restore_entry: "dict | None" = None,
-        done: bool = False,
         history_len: int = 0,
         lang: str = "ru",
     ) -> tuple:
@@ -3998,14 +4020,18 @@ Translation: **{translation}**
         Unpack in a single cell so marimo tracks ``answer_radio`` and re-runs
         the form cell when the user selects an option. ``lang`` sets the
         radio's own label text (``ru``/``en``/``el``) — pass the same value
-        given to the companion :meth:`word_quiz_form` call.
+        given to the companion :meth:`word_quiz_form` call. ``remaining`` is
+        the already-called state value (see :meth:`word_drill_done`) — used
+        only alongside ``cv`` to derive whether the quiz is finished, for the
+        Next/Prev button labels.
         """
         if cv is None:
             answer_radio = self._mo.ui.radio(options=[""])
         else:
             _restore = restore_entry.get("answer") if restore_entry else None
             answer_radio, _ = self.word_quiz_question(cv, vocab, lang, _random, initial_value=_restore)
-        next_btn, prev_btn = self._make_nav_buttons(done=done, history_len=history_len, lang=lang)
+        _done = self.word_drill_done(cv, remaining)
+        next_btn, prev_btn = self._make_nav_buttons(done=_done, history_len=history_len, lang=lang)
         return answer_radio, next_btn, prev_btn
 
     def word_quiz_form(
@@ -4311,15 +4337,19 @@ Translation: **{translation}**
         )
         return radio, stanza
 
-    def stanza_match_widgets(self, *, cv: "dict | None", stanzas: "list[dict]",
+    def stanza_match_widgets(self, *, cv: "dict | None", remaining: "list | None",
+                              stanzas: "list[dict]",
                               direction: str = "grc_to_tr", n_options: int = 3,
-                              restore_entry: "dict | None" = None, done: bool = False,
+                              restore_entry: "dict | None" = None,
                               history_len: int = 0, lang: str = "ru") -> tuple:
         """Create widgets for a stanza↔translation matching exercise.
 
         Returns ``(choice_radio, next_btn, prev_btn)``. Unpack in a single
         cell so marimo tracks ``choice_radio`` and re-runs the companion
-        :meth:`stanza_match_form` cell on selection.
+        :meth:`stanza_match_form` cell on selection. ``remaining`` is the
+        already-called state value (see :meth:`word_drill_done`) — used only
+        alongside ``cv`` to derive whether the exercise is finished, for the
+        Next/Prev button labels.
         """
         if cv is None:
             choice_radio = self._mo.ui.radio(options=[""])
@@ -4328,7 +4358,8 @@ Translation: **{translation}**
             choice_radio, _ = self.stanza_match_question(
                 cv, stanzas, direction, lang, _random, n_options=n_options, initial_value=_restore,
             )
-        next_btn, prev_btn = self._make_nav_buttons(done=done, history_len=history_len, lang=lang)
+        _done = self.word_drill_done(cv, remaining)
+        next_btn, prev_btn = self._make_nav_buttons(done=_done, history_len=history_len, lang=lang)
         return choice_radio, next_btn, prev_btn
 
     def stanza_match_form(
@@ -4659,8 +4690,9 @@ Translation: **{translation}**
         )
         return radio, item
 
-    def translation_presence_widgets(self, *, cv: "dict | None", items: "list[dict]",
-                                      restore_entry: "dict | None" = None, done: bool = False,
+    def translation_presence_widgets(self, *, cv: "dict | None", remaining: "list | None",
+                                      items: "list[dict]",
+                                      restore_entry: "dict | None" = None,
                                       history_len: int = 0, lang: str = "ru") -> tuple:
         """Create widgets for the да/нет translation-presence exercise.
 
@@ -4670,14 +4702,18 @@ Translation: **{translation}**
         changing. ``source_switch`` is a fresh ``mo.ui.switch(value=False)``
         every round — always starts showing the translation, never the
         original, per this exercise's own design (the student is being asked
-        about the *translation*; the source is an optional check).
+        about the *translation*; the source is an optional check). ``remaining``
+        is the already-called state value (see :meth:`word_drill_done`) — used
+        only alongside ``cv`` to derive whether the exercise is finished, for
+        the Next/Prev button labels.
         """
         if cv is None:
             choice_radio = self._mo.ui.radio(options=[""])
         else:
             _restore = restore_entry.get("answer") if restore_entry else None
             choice_radio, _ = self.translation_presence_question(cv, lang, initial_value=_restore)
-        next_btn, prev_btn = self._make_nav_buttons(done=done, history_len=history_len, lang=lang)
+        _done = self.word_drill_done(cv, remaining)
+        next_btn, prev_btn = self._make_nav_buttons(done=_done, history_len=history_len, lang=lang)
         source_switch = self._mo.ui.switch(value=False)
         return choice_radio, next_btn, prev_btn, source_switch
 
@@ -4793,6 +4829,25 @@ Translation: **{translation}**
                 socket.setdefaulttimeout(prev)
         return local
 
+    def _resolve_tsv_path(self, filename: str, *, nb_dir: Any, remote_base: "str | None") -> Any:
+        """Return a local path for *filename*, fetching from *remote_base* if given.
+
+        Shared by :meth:`load_vocab_tsv` and :meth:`load_inflected_vocab_tsv`
+        — both need the identical local-then-remote resolution, differing
+        only in how they parse the resolved file.
+        """
+        if remote_base is None:
+            local = _find_local(nb_dir, filename)
+            if local is None:
+                raise FileNotFoundError(f"{filename} not found locally and no remote_base provided")
+        else:
+            # ensure_file does its own local-then-remote check in one pass —
+            # pre-checking here first would stat the same path twice.
+            local = self.ensure_file(filename, nb_dir=nb_dir, remote_base=remote_base)
+            if local is None:
+                raise FileNotFoundError(f"{filename}: required TSV could not be fetched from remote")
+        return local
+
     def load_vocab_tsv(self, *filenames: str, nb_dir: Any, remote_base: "str | None" = None) -> "list[dict]":
         """Load one or more Word/Translation TSVs and return vocab word dicts.
 
@@ -4810,16 +4865,7 @@ Translation: **{translation}**
 
         dfs = []
         for filename in filenames:
-            if remote_base is None:
-                local = _find_local(nb_dir, filename)
-                if local is None:
-                    raise FileNotFoundError(f"{filename} not found locally and no remote_base provided")
-            else:
-                # ensure_file does its own local-then-remote check in one pass —
-                # pre-checking here first would stat the same path twice.
-                local = self.ensure_file(filename, nb_dir=nb_dir, remote_base=remote_base)
-                if local is None:
-                    raise FileNotFoundError(f"{filename}: required TSV could not be fetched from remote")
+            local = self._resolve_tsv_path(filename, nb_dir=nb_dir, remote_base=remote_base)
             dfs.append(_pd.read_csv(local, sep="\t"))
 
         _df = _pd.concat(dfs, ignore_index=True) if len(dfs) > 1 else dfs[0]
@@ -4830,6 +4876,25 @@ Translation: **{translation}**
                 continue
             meaning = str(r.get("Translation", "")).strip()
             result.append({"form": word, "meaning": meaning})
+        return result
+
+    def load_inflected_vocab_tsv(self, *filenames: str, nb_dir: Any, remote_base: "str | None" = None) -> "list[dict]":
+        """Load one or more inflected-text vocab TSVs and return word dicts.
+
+        Unlike :meth:`load_vocab_tsv`'s flat ``Word``/``Translation`` columns
+        (which need remapping to ``form``/``meaning``), inflected-text vocab
+        already provides ``form``, ``lemma``, ``pos``, ``context``, ``meaning``
+        directly as its own TSV columns — a word's surface ``form`` can
+        genuinely differ from its dictionary ``lemma`` here, so nothing is
+        collapsed or synthesized; each row is returned as-is.
+
+        Missing files are downloaded from *remote_base* when provided.
+        """
+        result = []
+        for filename in filenames:
+            local = self._resolve_tsv_path(filename, nb_dir=nb_dir, remote_base=remote_base)
+            with open(local, encoding="utf-8") as f:
+                result.extend(csv.DictReader(f, delimiter="\t"))
         return result
 
     def word_write_question(self, word: "dict | None", lang: str) -> Any:
@@ -4865,7 +4930,7 @@ Translation: **{translation}**
 _GRC_CL   = _FMT_CASE["ru"]
 _GRC_NL   = ("Ед.", "Мн.")
 _GRC_DL   = "Дв."  # dual column label -- pronoun-only; nouns/adjectives have no dual axis
-_GRC_TCOL = {"PAI": "Наст.", "IAI": "Имп.", "AAI": "Аор.", "AMI": "Аор. М.", "API": "Аор. П.", "XAI": "Перф."}
+_GRC_TCOL = {"PAI": "Наст.", "IAI": "Имп.", "AAI": "Аор.", "AMI": "Аор. М.", "API": "Аор. П.", "XAI": "Перф.", "YAI": "Плюскв."}
 _GRC_PROW = {"1S": "1 ед.", "2S": "2 ед.", "3S": "3 ед.", "1D": "1 дв.", "2D": "2 дв.", "3D": "3 дв.", "1P": "1 мн.", "2P": "2 мн.", "3P": "3 мн."}
 _GRC_INF_LBL = "Инф."
 _GRC_IMP_LBL = {"2S": "Пов. 2ед.", "2D": "Пов. 2дв.", "2P": "Пов. 2мн."}
@@ -5034,7 +5099,7 @@ def build_grc_paradigm_table(
                                     if slot else set())
                 return _vcache[tag]
 
-            tenses = [(t, _GRC_TCOL.get(t, t)) for t in ["PAI", "IAI", "AAI", "AMI", "API", "XAI"]
+            tenses = [(t, _GRC_TCOL.get(t, t)) for t in ["PAI", "IAI", "AAI", "AMI", "API", "XAI", "YAI"]
                       if any(_vf(f"{t}.{ps}") for ps in _PS)]
             if not tenses:
                 return None
@@ -5551,3 +5616,44 @@ def grc_coverage_words(words_raw: list, mode: "str | None", *, build_paradigm_ta
     return {norm_grc_surface(w["form"]) for w in words_raw
             if _grc_word_passes_filter(w, mode, build_paradigm_table=build_paradigm_table,
                                         lexicons=lexicons)}
+
+
+def grc_lexicon_sources(w: dict, *, lexicons: "dict[str, Any]") -> list:
+    """Return the sorted names of ``lexicons`` whose full paradigm for
+    ``w["lemma"]``/``w["pos"]`` contains ``w["form"]``.
+
+    Comparison is case-folded and accent/breathing-insensitive (movable-nu
+    parenthesization normalized too) — real running text varies a lemma's
+    citation-form spelling this way constantly (sentence-initial capitals,
+    grave-for-acute accent shifts in connected speech, enclitic-driven accent
+    shifts elsewhere), none of which are a different word.
+
+    Deliberately does NOT reuse :func:`_grc_word_passes_filter`/
+    :func:`build_grc_paradigm_table`: those check only the paradigm cells the
+    compact study-table renders, which never include participles — fine for
+    that table's own purpose, but would silently drop the lexicon-confirmed
+    badge from any word whose only attestation is a participle form (common
+    in Homer). This checks the complete ``backend.paradigm()`` result instead.
+
+    Only meaningful for POS values in ``LEXICON_TAG_POS``; returns ``[]`` for
+    any other POS.
+
+    Was duplicated identically across all 7 Odyssey lesson notebooks (each
+    with its own ``_lexicon_tag`` plus a hand-maintained ``_LEXICONS`` list —
+    the same ``(name, backend)`` pairs ``lexicons`` already holds, and an
+    exact-string match blind to the surface variation described above)
+    before being extracted here.
+    """
+    if w.get("pos") not in LEXICON_TAG_POS:
+        return []
+    pos = LEXICON_TAG_POS_ALIASES.get(w["pos"], w["pos"])
+    tform = _norm_grc(w.get("form", "").replace("(ν)", "ν"))
+    sources = []
+    for name, backend in lexicons.items():
+        try:
+            para = backend.paradigm(w["lemma"], pos)
+            if any(_norm_grc(f.replace("(ν)", "ν")) == tform for forms in para.values() for f in forms):
+                sources.append(name)
+        except Exception:
+            pass
+    return sorted(sources)

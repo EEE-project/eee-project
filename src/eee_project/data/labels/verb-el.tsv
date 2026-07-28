@@ -147,6 +147,30 @@ Fut		Perf	Pass	Ind	2	Sing	Μέλλ. συνοπτ. παθ. β' εν.
 Fut		Perf	Pass	Ind	2	Plur	Μέλλ. συνοπτ. παθ. β' πλ.
 Fut		Perf	Pass	Ind	3	Sing	Μέλλ. συνοπτ. παθ. γ' εν.
 Fut		Perf	Pass	Ind	3	Plur	Μέλλ. συνοπτ. παθ. γ' πλ.
+Pres		Perf	Act	Ind	1	Sing	Παρακ. ενεργ. α' εν.
+Pres		Perf	Act	Ind	1	Plur	Παρακ. ενεργ. α' πλ.
+Pres		Perf	Act	Ind	2	Sing	Παρακ. ενεργ. β' εν.
+Pres		Perf	Act	Ind	2	Plur	Παρακ. ενεργ. β' πλ.
+Pres		Perf	Act	Ind	3	Sing	Παρακ. ενεργ. γ' εν.
+Pres		Perf	Act	Ind	3	Plur	Παρακ. ενεργ. γ' πλ.
+Pres		Perf	Pass	Ind	1	Sing	Παρακ. παθ. α' εν.
+Pres		Perf	Pass	Ind	1	Plur	Παρακ. παθ. α' πλ.
+Pres		Perf	Pass	Ind	2	Sing	Παρακ. παθ. β' εν.
+Pres		Perf	Pass	Ind	2	Plur	Παρακ. παθ. β' πλ.
+Pres		Perf	Pass	Ind	3	Sing	Παρακ. παθ. γ' εν.
+Pres		Perf	Pass	Ind	3	Plur	Παρακ. παθ. γ' πλ.
+Pqp			Act	Ind	1	Sing	Υπερσ. ενεργ. α' εν.
+Pqp			Act	Ind	1	Plur	Υπερσ. ενεργ. α' πλ.
+Pqp			Act	Ind	2	Sing	Υπερσ. ενεργ. β' εν.
+Pqp			Act	Ind	2	Plur	Υπερσ. ενεργ. β' πλ.
+Pqp			Act	Ind	3	Sing	Υπερσ. ενεργ. γ' εν.
+Pqp			Act	Ind	3	Plur	Υπερσ. ενεργ. γ' πλ.
+Pqp			Pass	Ind	1	Sing	Υπερσ. παθ. α' εν.
+Pqp			Pass	Ind	1	Plur	Υπερσ. παθ. α' πλ.
+Pqp			Pass	Ind	2	Sing	Υπερσ. παθ. β' εν.
+Pqp			Pass	Ind	2	Plur	Υπερσ. παθ. β' πλ.
+Pqp			Pass	Ind	3	Sing	Υπερσ. παθ. γ' εν.
+Pqp			Pass	Ind	3	Plur	Υπερσ. παθ. γ' πλ.
 		Perf	Act	Sub	1	Sing	Υποτ. ενεργ. α' εν.
 		Perf	Act	Sub	1	Plur	Υποτ. ενεργ. α' πλ.
 		Perf	Act	Sub	2	Sing	Υποτ. ενεργ. β' εν.
