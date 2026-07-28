@@ -253,6 +253,12 @@ def _raw_base_from_url(url: str) -> str:
 class ConfigStore:
     """Navigation and GA config storage with pluggable backends.
 
+    The on-disk/remote filename this class looks for is the single
+    ``_FILENAME`` class attribute below, not repeated as a literal string
+    at each call site — renaming the convention (e.g. the 2026-07-27
+    ``lessons.tsv`` → ``index.tsv`` rename) only needs to change that one
+    line here.
+
     Use :meth:`from_url`, :meth:`from_file`, :meth:`from_file_or_url`, or
     :meth:`from_dict` to create an instance, then call :meth:`lessons`,
     :meth:`index_url`, and :meth:`ga_config` wherever a notebook needs
@@ -268,22 +274,24 @@ class ConfigStore:
 
         _ROOT = "https://codeberg.org/EEE-project/created_with_eee/raw/branch/main"
         _cfg = ConfigStore.from_url(
-            f"{_ROOT}/palaestra/lessons.tsv",
+            f"{_ROOT}/palaestra/index.tsv",
             ga=f"{_ROOT}/ga.json",
         )
         eee_topbar(mo, back_url=_cfg.index_url(), ...)
 
     Example — local dev (files next to the notebook)::
 
-        _cfg = ConfigStore.from_file(__file__)  # reads lessons.tsv + ga.json
+        _cfg = ConfigStore.from_file(__file__)  # reads index.tsv + ga.json
 
     Example — index/card-list notebooks (local-first, molab-safe)::
 
         _ROOT = "https://codeberg.org/EEE-project/created_with_eee/raw/branch/main"
         _cfg = ConfigStore.from_file_or_url(
-            __file__, f"{_ROOT}/palaestra/lessons.tsv", ga=f"{_ROOT}/ga.json",
+            __file__, f"{_ROOT}/palaestra/index.tsv", ga=f"{_ROOT}/ga.json",
         )
     """
+
+    _FILENAME = "index.tsv"
 
     def __init__(self, lessons: "list[dict]", ga: "dict | None" = None, *,
                  _raw_base: "str | None" = None):
@@ -308,7 +316,7 @@ class ConfigStore:
 
     @classmethod
     def from_file(cls, path=None) -> "ConfigStore":
-        """Load from ``lessons.tsv`` + ``ga.json`` next to ``path``.
+        """Load from ``index.tsv`` + ``ga.json`` next to ``path``.
 
         Pass ``__file__`` from a notebook cell. Walks up one level if the
         files are not found in the same directory (lesson-in-subdir layout).
@@ -319,7 +327,7 @@ class ConfigStore:
         base = (_Path(path).parent if path and _Path(path).is_file() else
                 _Path(path) if path else _Path.cwd())
 
-        tsv = _find_local(base, "lessons.tsv") or _find_local(base.parent, "lessons.tsv")
+        tsv = _find_local(base, cls._FILENAME) or _find_local(base.parent, cls._FILENAME)
         lessons = cls._parse_tsv(tsv.read_text(encoding="utf-8")) if tsv else []
         return cls(lessons, load_ga_config(path) or {})
 
@@ -363,10 +371,10 @@ class ConfigStore:
     def from_file_or_url(
         cls, path, url: str, ga: "dict | str | None" = None, timeout: int = 5
     ) -> "ConfigStore":
-        """Load ``lessons.tsv`` from next to ``path`` if present; else fetch ``url``.
+        """Load ``index.tsv`` from next to ``path`` if present; else fetch ``url``.
 
         Local-dev-friendly: a real local checkout (or a course being edited
-        before its first push) reads its own ``lessons.tsv`` straight off
+        before its first push) reads its own ``index.tsv`` straight off
         disk, walking up one level like :meth:`from_file` — no network call,
         no molab-only 404. Once the file genuinely isn't there (e.g. running
         from a fresh molab upload), falls back to :meth:`from_url`.
@@ -400,7 +408,7 @@ class ConfigStore:
 
     @property
     def raw_base(self) -> "str | None":
-        """Raw Codeberg base URL (parent of the lessons.tsv directory), or None."""
+        """Raw Codeberg base URL (parent of the index.tsv directory), or None."""
         return self._raw_base
 
     def nb_remote(self, nb_file_or_name: str) -> str:
@@ -497,8 +505,8 @@ def eee_topbar(mo, back_url: str, lang: str, titles: "dict | str", *, style: str
 def parent_back_url(parent_url: str, *, timeout: int = 5) -> "str | None":
     """Resolve ``eee_topbar``'s ``back_url`` for a course/grouping-index page.
 
-    Fetches the *parent* index's own ``lessons.tsv`` over the network and
-    returns its ``index_url``. Every row in a grouping-level ``lessons.tsv``
+    Fetches the *parent* index's own ``index.tsv`` over the network and
+    returns its ``index_url``. Every row in a grouping-level ``index.tsv``
     should carry the same value: the parent page's own URL, repeated per row
     exactly like lesson-level ``index_url`` already is one level down.
 
@@ -517,14 +525,14 @@ def parent_back_url(parent_url: str, *, timeout: int = 5) -> "str | None":
     re-render, even if the caller doesn't isolate it into its own cell.
 
     Args:
-        parent_url: Remote URL of the parent's ``lessons.tsv``.
+        parent_url: Remote URL of the parent's ``index.tsv``.
         timeout:    Network timeout in seconds.
 
     Example cell (course index one level below a grouping index)::
 
         from eee_project.notebook_utils import parent_back_url
         back_url = parent_back_url(
-            f"{_ROOT}/modern_greek/b1greeklanguageandculture/lessons.tsv",
+            f"{_ROOT}/modern_greek/b1greeklanguageandculture/index.tsv",
         )
         eee_topbar(mo, back_url=back_url, lang=lang, titles=TITLES, style="index")
     """
@@ -641,7 +649,7 @@ def eee_card_list(mo, cfg: "ConfigStore", lang: str, *, lang_fallback: str = "el
     """
     rows = cfg.lessons()
     if not rows:
-        _tsv_url = f"{cfg.raw_base}/lessons.tsv"
+        _tsv_url = f"{cfg.raw_base}/{ConfigStore._FILENAME}"
         _load_error = {
             "ru": f"Не удалось загрузить файл: {_tsv_url}\n\nПроверьте, что он доступен по этой ссылке.",
             "el": f"Δεν ήταν δυνατή η φόρτωση του αρχείου: {_tsv_url}\n\nΕλέγξτε αν είναι προσβάσιμο σε αυτόν τον σύνδεσμο.",
@@ -1883,15 +1891,32 @@ _UI_LABELS = _load_ui_labels()
 
 
 _MG_TENSE_FEATS = {
-    'present':           {'Tense': 'Pres', 'Mood': 'Ind'},
-    'imperfect':         {'Tense': 'Past', 'Aspect': 'Imp',  'Mood': 'Ind'},
-    'aorist':            {'Tense': 'Past', 'Aspect': 'Perf', 'Mood': 'Ind'},
-    'future':            {'Tense': 'Fut',  'Aspect': 'Perf', 'Mood': 'Ind'},
-    'future_continuous': {'Tense': 'Fut',  'Aspect': 'Imp',  'Mood': 'Ind'},
+    'present':               {'Tense': 'Pres', 'Mood': 'Ind'},
+    'past_continuous':       {'Tense': 'Past', 'Aspect': 'Imp',  'Mood': 'Ind'},  # Παρατατικός -- "past continuous" is ellinika_b's own name for this tense, not "imperfect"
+    'aorist':                {'Tense': 'Past', 'Aspect': 'Perf', 'Mood': 'Ind'},
+    'future':                {'Tense': 'Fut',  'Aspect': 'Perf', 'Mood': 'Ind'},
+    'future_continuous':     {'Tense': 'Fut',  'Aspect': 'Imp',  'Mood': 'Ind'},
+    'subjunctive_simple':    {'Mood': 'Sub', 'Aspect': 'Perf'},  # να + aorist-subjunctive stem
+    # {Mood: Sub, Aspect: Imp} isn't supported by the engine (raises, "not in
+    # the v1 spec") -- continuous subjunctive reuses present-tense forms with
+    # a να prefix instead, the same pattern future_continuous already uses
+    # (θα + present-tense forms) rather than a distinct conjugation.
+    'subjunctive_continuous': {'Tense': 'Pres', 'Mood': 'Ind'},
+    # Modern Greek has no synthetic conditional conjugation -- these reuse
+    # the same forms as subjunctive_simple/present respectively, introduced
+    # by αν instead of να (confirmed against the old engine's own notes:
+    # "conditional_simple ... uses aorist forms", "conditional_continuous
+    # ... uses present forms").
+    'conditional_simple':     {'Mood': 'Sub', 'Aspect': 'Perf'},
+    'conditional_continuous': {'Tense': 'Pres', 'Mood': 'Ind'},
 }
 _MG_PATH_MAP = {
-    'present':           'present',
-    'imperfect':         'paratatikos',
+    'present':                'present',
+    'past_continuous':         'paratatikos',
+    'subjunctive_simple':      'conjunctive',
+    'subjunctive_continuous':  'present',
+    'conditional_simple':      'conjunctive',
+    'conditional_continuous':  'present',
     'aorist':            'aorist',
     'future':            'conjunctive',
     'future_continuous': 'present',
@@ -1920,7 +1945,9 @@ MODERN_GREEK = GreekConfig(
     tense_feats=_MG_TENSE_FEATS,
     tense_labels=_load_tense_labels('modern_greek'),
     path_map=_MG_PATH_MAP,
-    verb_prefix={'future': 'θα', 'future_continuous': 'θα'},
+    verb_prefix={'future': 'θα', 'future_continuous': 'θα',
+                 'subjunctive_simple': 'να', 'subjunctive_continuous': 'να',
+                 'conditional_simple': 'αν', 'conditional_continuous': 'αν'},
     verb_slots=_VERB_SLOTS,
     verb_labels=['εγώ', 'εσύ', 'αυτός,-ή,-ό', 'εμείς', 'εσείς', 'αυτοί,-ές,-ά'],
     adj_cases=['nom', 'acc', 'gen'],

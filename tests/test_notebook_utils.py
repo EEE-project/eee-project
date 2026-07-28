@@ -663,7 +663,9 @@ class TestTenseDropdownOptions:
 
     def test_dropdown_options_preserves_tense_labels_order(self, gu_mg):
         assert list(gu_mg.tense_dropdown_options('en').values()) == [
-            'present', 'imperfect', 'aorist', 'future', 'future_continuous',
+            'present', 'aorist', 'future', 'future_continuous',
+            'past_continuous', 'subjunctive_simple', 'subjunctive_continuous',
+            'conditional_simple', 'conditional_continuous',
         ]
 
     def test_dropdown_options_unknown_lang_falls_back_to_english(self, gu_mg):
@@ -674,6 +676,67 @@ class TestTenseDropdownOptions:
         opts = gu_ag.tense_dropdown_options('ru')
         assert 'Перфект (Παρακείμενος)' in opts
         assert not any('future_continuous' == v for v in opts.values())
+
+
+class TestNewModernGreekTenses:
+    """Regression tests for the 5 tenses restored 2026-07-28 (past_continuous,
+    subjunctive_simple/continuous, conditional_simple/continuous) -- these
+    existed in the old modern_greek_eee package but were dropped when
+    ellinika_b's tense dropdown switched to eee_project's (then 5-tense-only)
+    tense_labels. A 6th, genuinely separate 'imperfect' key was restored
+    alongside them, then deliberately dropped again the same day once live
+    testing showed it and past_continuous are the exact same Παρατατικός
+    conjugation under two different English names -- ellinika_b's own
+    material calls this tense "past continuous", so that's the one kept.
+    Real ModernGreekBackend, not a stub -- these assert actual generated
+    Greek forms, not just wiring."""
+
+    @pytest.fixture
+    def gu_real(self):
+        from modern_greek_backend_eee import ModernGreekBackend
+        return GreekUtils(ModernGreekBackend(), _StubMo(), _pd)
+
+    def test_past_continuous_generates_paratatikos_forms(self, gu_real):
+        # Παρατατικός -- confirmed by tracing the old engine's own generation
+        # path, which pointed 'imperfect' and 'past_continuous' at the exact
+        # same stem/ending rules (no separate 'imperfect' key exists here).
+        assert gu_real._verb_forms("διαβάζω", "past_continuous", "sec", "sg") == {"διάβαζες"}
+
+    def test_imperfect_is_not_a_modern_greek_tense_key(self, gu_real):
+        # Deliberately absent -- past_continuous is the only name for this
+        # tense in the Modern Greek config (Ancient Greek's own 'imperfect'
+        # is unrelated and still present in ANCIENT_GREEK.tense_labels).
+        assert "imperfect" not in MODERN_GREEK.tense_labels
+        assert "imperfect" not in MODERN_GREEK.tense_feats
+
+    def test_subjunctive_simple_uses_aorist_subjunctive_stem(self, gu_real):
+        assert gu_real._verb_forms("διαβάζω", "subjunctive_simple", "sec", "sg") == {"διαβάσεις"}
+        assert MODERN_GREEK.verb_prefix["subjunctive_simple"] == "να"
+
+    def test_subjunctive_continuous_reuses_present_forms(self, gu_real):
+        # {Mood: Sub, Aspect: Imp} isn't supported by the engine -- continuous
+        # subjunctive reuses present-tense forms with a να prefix, the same
+        # pattern future_continuous already uses (θα + present-tense forms).
+        assert (gu_real._verb_forms("διαβάζω", "subjunctive_continuous", "sec", "sg")
+                == gu_real._verb_forms("διαβάζω", "present", "sec", "sg"))
+        assert MODERN_GREEK.verb_prefix["subjunctive_continuous"] == "να"
+
+    def test_conditional_simple_matches_old_engines_own_example(self, gu_real):
+        # Old system's own note: "Uses aorist forms for one-time events
+        # (e.g., 'Αν διαβάσεις')" -- reproduced exactly here.
+        assert gu_real._verb_forms("διαβάζω", "conditional_simple", "sec", "sg") == {"διαβάσεις"}
+        assert MODERN_GREEK.verb_prefix["conditional_simple"] == "αν"
+
+    def test_conditional_continuous_matches_old_engines_own_example(self, gu_real):
+        # Old system's own note: "Uses present forms for habitual/regular
+        # events (e.g., 'Αν διαβάζεις')" -- reproduced exactly here.
+        assert gu_real._verb_forms("διαβάζω", "conditional_continuous", "sec", "sg") == {"διαβάζεις"}
+        assert MODERN_GREEK.verb_prefix["conditional_continuous"] == "αν"
+
+    def test_el_label_for_past_continuous_names_the_real_tense(self, gu_real):
+        # Old system's own Greek label was "Συνεχής Παρακείμενος" (Perfect) --
+        # wrong grammatical term for a Παρατατικός/imperfect-shaped form.
+        assert gu_real.TENSE_LABELS["past_continuous"]["greek"] == "Συνεχής Παρατατικός"
 
 
 class TestUiLabel:
@@ -833,16 +896,16 @@ class TestParentBackUrl:
 
     def test_fetches_remote_and_returns_index_url(self):
         with patch("urllib.request.urlopen", return_value=_make_resp(self._PARENT_TSV.encode("utf-8"))):
-            result = parent_back_url("https://example.com/parent-fetch-test/lessons.tsv")
+            result = parent_back_url("https://example.com/parent-fetch-test/index.tsv")
         assert result == "https://molab.marimo.io/notebooks/nb_PARENT/app"
 
     def test_network_failure_returns_none(self):
         with patch("urllib.request.urlopen", side_effect=Exception("network error")):
-            result = parent_back_url("https://example.com/parent-failure-test/lessons.tsv")
+            result = parent_back_url("https://example.com/parent-failure-test/index.tsv")
         assert result is None
 
     def test_repeat_call_is_cached_no_second_fetch(self):
-        _url = "https://example.com/parent-cache-test/lessons.tsv"
+        _url = "https://example.com/parent-cache-test/index.tsv"
         with patch("urllib.request.urlopen", return_value=_make_resp(self._PARENT_TSV.encode("utf-8"))) as _mock:
             parent_back_url(_url)
             parent_back_url(_url)
@@ -917,7 +980,7 @@ class TestEeeCardList:
     def test_empty_lessons_returns_load_error(self):
         result = eee_card_list(_StubHtmlMo(), self._cfg([]), lang="en")
         assert "Couldn't load file" in result
-        assert "https://example.com/course/lessons.tsv" in result
+        assert "https://example.com/course/index.tsv" in result
 
     def test_empty_lessons_load_error_russian(self):
         result = eee_card_list(_StubHtmlMo(), self._cfg([]), lang="ru")
@@ -1332,7 +1395,7 @@ class TestConfigStore:
             "nb_AAA\tΑ\tΔίδαγμα α'\tЗанятие 1\tАлфавит\tБуквы\thttps://example.com/\n"
         )
         with patch("urllib.request.urlopen", return_value=_make_resp(_tsv.encode("utf-8"))):
-            cfg = ConfigStore.from_url("https://example.com/lessons.tsv")
+            cfg = ConfigStore.from_url("https://example.com/index.tsv")
         assert len(cfg.lessons()) == 1
         assert cfg.lessons()[0]["nb_id"] == "nb_AAA"
         assert cfg.index_url() == "https://example.com/"
@@ -1341,7 +1404,7 @@ class TestConfigStore:
     def test_from_url_with_ga_dict(self):
         _tsv = "nb_id\ticon\tgreek\tlabel\ttitle\tdesc\tindex_url\n"
         with patch("urllib.request.urlopen", return_value=_make_resp(_tsv.encode("utf-8"))):
-            cfg = ConfigStore.from_url("https://example.com/lessons.tsv", ga=_SAMPLE_GA)
+            cfg = ConfigStore.from_url("https://example.com/index.tsv", ga=_SAMPLE_GA)
         assert cfg.ga_config() == _SAMPLE_GA
 
     def test_from_url_with_ga_url(self):
@@ -1353,13 +1416,13 @@ class TestConfigStore:
             _make_resp(_ga_json),
         ]):
             cfg = ConfigStore.from_url(
-                "https://example.com/lessons.tsv",
+                "https://example.com/index.tsv",
                 ga="https://example.com/ga.json",
             )
         assert cfg.ga_config() == _SAMPLE_GA
 
     def test_from_file_reads_tsv(self, tmp_path):
-        tsv = tmp_path / "lessons.tsv"
+        tsv = tmp_path / "index.tsv"
         tsv.write_text(
             "nb_id\ticon\tgreek\tlabel\ttitle\tdesc\tindex_url\n"
             "nb_AAA\tΑ\tΔίδαγμα α'\tЗанятие 1\tАлфавит\tБуквы\thttps://example.com/\n",
@@ -1371,7 +1434,7 @@ class TestConfigStore:
         assert cfg.lessons()[0]["index_url"] == "https://example.com/"
 
     def test_from_file_reads_ga(self, tmp_path):
-        (tmp_path / "lessons.tsv").write_text(
+        (tmp_path / "index.tsv").write_text(
             "nb_id\ticon\tgreek\tlabel\ttitle\tdesc\tindex_url\n", encoding="utf-8"
         )
         (tmp_path / "ga.json").write_text('{"measurement_id": "G-XYZ"}', encoding="utf-8")
@@ -1386,7 +1449,7 @@ class TestConfigStore:
     def test_from_file_parent_lookup(self, tmp_path):
         subdir = tmp_path / "2026_06_09"
         subdir.mkdir()
-        tsv = tmp_path / "lessons.tsv"
+        tsv = tmp_path / "index.tsv"
         tsv.write_text(
             "nb_id\ticon\tgreek\tlabel\ttitle\tdesc\tindex_url\n"
             "nb_AAA\tΑ\t\t\t\t\thttps://example.com/\n",
@@ -3620,7 +3683,7 @@ class TestDiacriticsEsmPasteFix:
 class TestConfigStoreAdditional:
     def test_from_url_exception_empties_lessons(self):
         with patch("urllib.request.urlopen", side_effect=Exception("timeout")):
-            cfg = ConfigStore.from_url("https://example.com/lessons.tsv")
+            cfg = ConfigStore.from_url("https://example.com/index.tsv")
         assert cfg.lessons() == []
         assert cfg.ga_config() is None
         assert cfg.raw_base == "https://example.com"
@@ -3637,13 +3700,13 @@ class TestConfigStoreAdditional:
     def test_nb_remote_plain_name(self):
         _tsv = "nb_id\ticon\tgreek\tlabel\ttitle\tdesc\tindex_url\n"
         with patch("urllib.request.urlopen", return_value=_make_resp(_tsv.encode())):
-            cfg = ConfigStore.from_url("https://raw.example.com/repo/main/lessons.tsv")
+            cfg = ConfigStore.from_url("https://raw.example.com/repo/main/index.tsv")
         assert cfg.nb_remote("2026_06_09") == "https://raw.example.com/repo/main/2026_06_09"
 
     def test_nb_remote_file_path(self, tmp_path):
         _tsv = "nb_id\ticon\tgreek\tlabel\ttitle\tdesc\tindex_url\n"
         with patch("urllib.request.urlopen", return_value=_make_resp(_tsv.encode())):
-            cfg = ConfigStore.from_url("https://raw.example.com/repo/main/lessons.tsv")
+            cfg = ConfigStore.from_url("https://raw.example.com/repo/main/index.tsv")
         nb = str(tmp_path / "2026_06_09" / "notebook.py")
         assert cfg.nb_remote(nb) == "https://raw.example.com/repo/main/2026_06_09"
 
@@ -3653,20 +3716,20 @@ class TestConfigStoreAdditional:
             "nb_AAA\tΑ\tΔίδαγμα α'\tЗанятие 1\tΜάθημα 1\tАлфавит\tБуквы\n"
         )
         with patch("urllib.request.urlopen", return_value=_make_resp(_tsv.encode("utf-8"))):
-            cfg = ConfigStore.from_url("https://example.com/lessons.tsv")
+            cfg = ConfigStore.from_url("https://example.com/index.tsv")
         row = cfg.lessons()[0]
         assert row["label_ru"] == "Занятие 1"
         assert row["label_el"] == "Μάθημα 1"
         assert row["title_ru"] == "Алфавит"
 
     def test_from_file_or_url_prefers_local(self, tmp_path):
-        (tmp_path / "lessons.tsv").write_text(
+        (tmp_path / "index.tsv").write_text(
             "nb_id\ticon\tgreek\tlabel\ttitle\tdesc\tindex_url\n"
             "nb_LOCAL\tΑ\t\t\t\t\thttps://example.com/\n",
             encoding="utf-8",
         )
         with patch("urllib.request.urlopen", side_effect=AssertionError("should not hit network")):
-            cfg = ConfigStore.from_file_or_url(tmp_path, "https://example.com/lessons.tsv")
+            cfg = ConfigStore.from_file_or_url(tmp_path, "https://example.com/index.tsv")
         assert len(cfg.lessons()) == 1
         assert cfg.lessons()[0]["nb_id"] == "nb_LOCAL"
 
@@ -3676,27 +3739,27 @@ class TestConfigStoreAdditional:
             "nb_REMOTE\tΑ\t\t\t\t\thttps://example.com/\n"
         )
         with patch("urllib.request.urlopen", return_value=_make_resp(_tsv.encode("utf-8"))):
-            cfg = ConfigStore.from_file_or_url(tmp_path, "https://example.com/lessons.tsv")
+            cfg = ConfigStore.from_file_or_url(tmp_path, "https://example.com/index.tsv")
         assert len(cfg.lessons()) == 1
         assert cfg.lessons()[0]["nb_id"] == "nb_REMOTE"
 
     def test_from_file_or_url_raw_base_from_url_even_when_local(self, tmp_path):
-        (tmp_path / "lessons.tsv").write_text(
+        (tmp_path / "index.tsv").write_text(
             "nb_id\ticon\tgreek\tlabel\ttitle\tdesc\tindex_url\n", encoding="utf-8"
         )
         with patch("urllib.request.urlopen", side_effect=AssertionError("should not hit network")):
-            cfg = ConfigStore.from_file_or_url(tmp_path, "https://raw.example.com/repo/main/lessons.tsv")
+            cfg = ConfigStore.from_file_or_url(tmp_path, "https://raw.example.com/repo/main/index.tsv")
         assert cfg.raw_base == "https://raw.example.com/repo/main"
         assert cfg.nb_remote("2026_06_09") == "https://raw.example.com/repo/main/2026_06_09"
 
     def test_from_file_or_url_preserves_extra_columns_locally(self, tmp_path):
-        (tmp_path / "lessons.tsv").write_text(
+        (tmp_path / "index.tsv").write_text(
             "nb_id\ticon\tgreek\tlabel_ru\tlabel_el\ttitle_ru\tdesc_ru\n"
             "nb_AAA\tΑ\tΔίδαγμα α'\tЗанятие 1\tΜάθημα 1\tАлфавит\tБуквы\n",
             encoding="utf-8",
         )
         with patch("urllib.request.urlopen", side_effect=AssertionError("should not hit network")):
-            cfg = ConfigStore.from_file_or_url(tmp_path, "https://example.com/lessons.tsv")
+            cfg = ConfigStore.from_file_or_url(tmp_path, "https://example.com/index.tsv")
         row = cfg.lessons()[0]
         assert row["label_ru"] == "Занятие 1"
         assert row["title_ru"] == "Алфавит"
@@ -3704,7 +3767,7 @@ class TestConfigStoreAdditional:
     def test_from_file_or_url_parent_lookup(self, tmp_path):
         subdir = tmp_path / "2026_06_09"
         subdir.mkdir()
-        (tmp_path / "lessons.tsv").write_text(
+        (tmp_path / "index.tsv").write_text(
             "nb_id\ticon\tgreek\tlabel\ttitle\tdesc\tindex_url\n"
             "nb_AAA\tΑ\t\t\t\t\thttps://example.com/\n",
             encoding="utf-8",
@@ -3712,7 +3775,7 @@ class TestConfigStoreAdditional:
         nb_file = subdir / "notebook.py"
         nb_file.write_text("")
         with patch("urllib.request.urlopen", side_effect=AssertionError("should not hit network")):
-            cfg = ConfigStore.from_file_or_url(nb_file, "https://example.com/lessons.tsv")
+            cfg = ConfigStore.from_file_or_url(nb_file, "https://example.com/index.tsv")
         assert cfg.index_url() == "https://example.com/"
 
 

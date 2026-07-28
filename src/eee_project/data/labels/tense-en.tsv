@@ -1,9 +1,13 @@
 Config	Tense	label
 modern_greek	present	Present
-modern_greek	imperfect	Imperfect
 modern_greek	aorist	Aorist
 modern_greek	future	Simple Future
 modern_greek	future_continuous	Continuous Future
+modern_greek	past_continuous	Past Continuous / Imperfect
+modern_greek	subjunctive_simple	Simple Subjunctive
+modern_greek	subjunctive_continuous	Continuous Subjunctive
+modern_greek	conditional_simple	Simple Conditional
+modern_greek	conditional_continuous	Continuous Conditional
 ancient_greek	present	Present
 ancient_greek	imperfect	Imperfect
 ancient_greek	aorist	Aorist

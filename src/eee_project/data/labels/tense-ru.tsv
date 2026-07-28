@@ -1,9 +1,13 @@
 Config	Tense	label
 modern_greek	present	Настоящее
-modern_greek	imperfect	Имперфект
 modern_greek	aorist	Аорист
 modern_greek	future	Простое будущее
 modern_greek	future_continuous	Будущее продолженное
+modern_greek	past_continuous	Прошедшее продолженное / Имперфект
+modern_greek	subjunctive_simple	Простое сослагательное
+modern_greek	subjunctive_continuous	Продолженное сослагательное
+modern_greek	conditional_simple	Простое условное
+modern_greek	conditional_continuous	Продолженное условное
 ancient_greek	present	Настоящее
 ancient_greek	imperfect	Имперфект
 ancient_greek	aorist	Аорист

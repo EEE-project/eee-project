@@ -135,6 +135,8 @@ limitations, see its own README: [modern-greek-backend-eee](https://codeberg.org
 
 ## Changelog
 
+**v0.10.0** — `ConfigStore` now looks for `index.tsv` instead of `lessons.tsv` (renamed alongside all 10 files in `created_with_eee` and every notebook's own `ConfigStore.from_file_or_url`/`parent_back_url` call; the filename is now a single `ConfigStore._FILENAME` class attribute instead of a literal string repeated at each call site). Restored 5 Modern Greek tenses (`past_continuous`, `subjunctive_simple`/`continuous`, `conditional_simple`/`continuous`) that were missing from `tense_labels`.
+
 **v0.9.0** — `analyze(form)`/`analyze_traced(form)`: reverse lookup from a surface form to candidate `{lemma, pos, tag, features}` analyses, mirroring `list_lemmas`/`list_lemmas_traced`'s chain-walk + dedup shape (a differently-shaped `analyze()` existed pre-v0.4.0 and was removed as unimplemented dead protocol surface; this is a fresh, chain-aware design, not a revival of the old one), plus a shared chain-walk helper extracted for both. `build_grc_paradigm_table`'s verb branch now renders a pluperfect column (`"YAI"`, labelled "Плюскв."), matching the `XAI`/"Перф." fix shipped alongside the Byzantine lexicon; new verb `perfect`/`pluperfect` TSV labels. `word_drill_widgets`/`word_quiz_widgets`/`stanza_match_widgets`/`translation_presence_widgets` now derive `done` internally via `word_drill_done` instead of requiring callers to precompute and pass it. `AncientGreekBackend.for_period()` used in the example notebook; `GreekUtils.load_inflected_vocab_tsv()` alongside `load_vocab_tsv()`; `grc_lexicon_sources()` full-coverage lexicon-confirmation check. Widget internals: shared JS constants extracted from the diacritics/paradigm ESM templates, `submit_count`+`enter_field_index` merged into `submit_request`, mark-button JS helpers (`makeMarkButton`/`makeClearButton`/`toggleMark`/`stripLastDiacritic`) extracted.
 
 **v0.8.0** — `GreekUtils.ui_label`/`tense_dropdown_options` multi-language (EN/RU/EL) labels; `magnify_image(prefer_local=)`; `parse_stanza_text`/`parse_stanza_translations` (shared poem-file parser, replacing 7 duplicated Odyssey copies); translation-presence caption no longer hardcodes "Ancient Greek".
@@ -151,4 +153,4 @@ limitations, see its own README: [modern-greek-backend-eee](https://codeberg.org
 
 ## Status
 
-v0.9.0
+v0.10.0

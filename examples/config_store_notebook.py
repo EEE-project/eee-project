@@ -47,12 +47,12 @@ def _(mo):
 
     ## `from_url` — molab pattern
 
-    Fetch `lessons.tsv` per-course and `ga.json` from the repo root:
+    Fetch `index.tsv` per-course and `ga.json` from the repo root:
 
     ```python
     _ROOT = "https://codeberg.org/EEE-project/created_with_eee/raw/branch/main"
     _cfg = ConfigStore.from_url(
-        f"{_ROOT}/palaestra/ancient_greek.2026.summer/lessons.tsv",
+        f"{_ROOT}/palaestra/ancient_greek.2026.summer/index.tsv",
         ga=f"{_ROOT}/ga.json",
     )
     ```
@@ -104,10 +104,10 @@ def _(mo):
 
     ```python
     _cfg = ConfigStore.from_file(__file__)
-    # reads lessons.tsv + ga.json from the same directory (or one level up)
+    # reads index.tsv + ga.json from the same directory (or one level up)
     ```
 
-    `lessons.tsv` (tab-separated, same columns as above):
+    `index.tsv` (tab-separated, same columns as above):
 
     ```
     url             icon  greek        label       title      desc            index_url
@@ -129,7 +129,7 @@ def _():
 
     _ROOT = "https://codeberg.org/EEE-project/created_with_eee/raw/branch/main"
     cfg = ConfigStore.from_url(
-        f"{_ROOT}/palaestra/ancient_greek.2026.summer/lessons.tsv",
+        f"{_ROOT}/palaestra/ancient_greek.2026.summer/index.tsv",
         ga=f"{_ROOT}/ga.json",
     )
 

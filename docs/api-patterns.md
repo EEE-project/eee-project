@@ -280,7 +280,7 @@ eee_topbar(mo, back_url="https://.../b1greeklanguageandculture/",
 
 For a course-index page one level below a *grouping* index (e.g. Kapodistrias
 under the B1 grouping page), use `parent_back_url()` instead of hand-rolling
-the parent lookup — it fetches the parent's own `lessons.tsv` (remote-only;
+the parent lookup — it fetches the parent's own `index.tsv` (remote-only;
 molab never bundles a parent directory, so there's no local-first check) and
 returns its `index_url`. Pass the same parent name as `parent_titles=` so the
 link is labeled correctly:
@@ -288,7 +288,7 @@ link is labeled correctly:
 ```python
 from eee_project.notebook_utils import parent_back_url
 
-back_url = parent_back_url(f"{_ROOT}/modern_greek/b1greeklanguageandculture/lessons.tsv")
+back_url = parent_back_url(f"{_ROOT}/modern_greek/b1greeklanguageandculture/index.tsv")
 eee_topbar(mo, back_url=back_url, lang=lang_sel.value, titles="Kapodistrias",
            parent_titles="B1: Greek Language and Culture", style="index")
 ```
@@ -323,7 +323,7 @@ is suppressed but the GA script is still injected.
 ### Config storage (`ConfigStore`)
 
 `ConfigStore` is a unified abstraction for lesson navigation config and GA
-settings. It replaces ad-hoc `pd.read_csv("lessons.tsv")` / `load_ga_config()`
+settings. It replaces ad-hoc `pd.read_csv("index.tsv")` / `load_ga_config()`
 calls with a single object whose source is swapped at construction time — the
 rest of the notebook sees the same accessors regardless.
 
@@ -331,7 +331,7 @@ TSV columns: `url, icon, greek, label, title, desc, index_url`. `url` and
 `index_url` are both complete URLs — the TSV owns hosting details, notebook
 code never constructs a molab (or any other host's) URL itself.
 
-**Use `from_url`** for molab notebooks (fetch `lessons.tsv` from Codeberg at
+**Use `from_url`** for molab notebooks (fetch `index.tsv` from Codeberg at
 startup, GA config inline):
 
 ```python
@@ -339,12 +339,12 @@ from eee_project import ConfigStore
 
 _ROOT = "https://codeberg.org/EEE-project/created_with_eee/raw/branch/main"
 _cfg = ConfigStore.from_url(
-    f"{_ROOT}/palaestra/lessons.tsv",   # per-course TSV
+    f"{_ROOT}/palaestra/index.tsv",   # per-course TSV
     ga=f"{_ROOT}/ga.json",              # shared GA config at repo root
 )
 ```
 
-`ga=` accepts a URL string (fetched as JSON) or a plain dict. `lessons.tsv`
+`ga=` accepts a URL string (fetched as JSON) or a plain dict. `index.tsv`
 lives per-course in `created_with_eee`; `ga.json` sits at the repo root and
 is shared across all courses. HTTP errors propagate to the caller (bad URL →
 startup exception, visible in the kernel log).
@@ -352,10 +352,10 @@ startup exception, visible in the kernel log).
 **Use `from_file`** for local development (files next to the notebook):
 
 ```python
-_cfg = ConfigStore.from_file(__file__)   # reads lessons.tsv + ga.json
+_cfg = ConfigStore.from_file(__file__)   # reads index.tsv + ga.json
 ```
 
-`from_file` looks for `lessons.tsv` and `ga.json` in the same directory as
+`from_file` looks for `index.tsv` and `ga.json` in the same directory as
 the notebook, then one level up if not found. Missing files are silently
 ignored.
 
@@ -1109,7 +1109,7 @@ Want Google Analytics in the notebook?
   → load_ga_config(__file__) + ga_config= on eee_topbar; add ga.json to .gitignore
 Need to manage lesson nav config + GA together (molab or local)?
   → ConfigStore.from_url(codeberg_raw_url, ga={...})  (molab — fetch TSV at startup)
-  → ConfigStore.from_file(__file__)                    (local dev — lessons.tsv + ga.json)
+  → ConfigStore.from_file(__file__)                    (local dev — index.tsv + ga.json)
 Paradigm table for an Ancient Greek word-form quiz?
   → build_grc_paradigm_table(ag, um) + build_grc_lexicon_tabs(ag, um, lexicons={...})
   → pass build_lexicon_tabs as build_paradigm_table= to word_quiz_feedback or word_quiz_form
