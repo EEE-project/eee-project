@@ -134,6 +134,8 @@ limitations, see its own README: [modern-greek-backend-eee](https://codeberg.org
 
 ## Changelog
 
+**v0.8.0** — `GreekUtils.ui_label`/`tense_dropdown_options` multi-language (EN/RU/EL) labels; `magnify_image(prefer_local=)`; `parse_stanza_text`/`parse_stanza_translations` (shared poem-file parser, replacing 7 duplicated Odyssey copies); translation-presence caption no longer hardcodes "Ancient Greek".
+
 **v0.7.0** — `GreekConfig.polytonic` field for Modern Greek's monotonic diacritics; `noun_paradigm_drill_form` gains `article`/`indefinite` toggles; new `make_paradigm_drill_state` helper; fixed an Enter-key focus-lock race in `make_paradigm_form`; new Modern Greek paradigm-drill exercise in `examples/`.
 
 **v0.6.0** — paradigm-drill exercises, diachronic paradigm tables through Modern Greek, clickable interactive text, stanza-match/translation-presence quizzes, Byzantine lexicon rung, pronoun POS support, `magnify_image()` click-to-zoom images, refactored `eee_topbar`; mobile "Go" button support for `make_paradigm_form`; fixes to `parent_back_url()`/`eee_topbar()` link targets on molab; Google Analytics actually firing (real `anywidget`, not an inert inline `<script>`); notebook markdown tables rendering left-aligned; a dead CSS selector removed.
@@ -146,4 +148,4 @@ limitations, see its own README: [modern-greek-backend-eee](https://codeberg.org
 
 ## Status
 
-v0.7.0
+v0.8.0

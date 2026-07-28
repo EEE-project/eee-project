@@ -1,0 +1,11 @@
+Config	Tense	label
+modern_greek	present	Настоящее
+modern_greek	imperfect	Имперфект
+modern_greek	aorist	Аорист
+modern_greek	future	Простое будущее
+modern_greek	future_continuous	Будущее продолженное
+ancient_greek	present	Настоящее
+ancient_greek	imperfect	Имперфект
+ancient_greek	aorist	Аорист
+ancient_greek	perfect	Перфект
+ancient_greek	future	Будущее

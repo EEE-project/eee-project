@@ -765,15 +765,40 @@ tantum) plus two independent toggles:
   include one indefinite-article slot per singular case (indefinite
   articles don't inflect for plural), appended after the definite ones and
   always requiring the article regardless of `article`. Build the label
-  list as `gu.noun_slot_labels(active_cases) + [f"Ind. {l}" for l in
-  gu.noun_slot_labels(gu.noun_indef_cells(active_cases))]`. No-ops safely
-  when `config.indef_articles` is unset (Ancient Greek) — fine to pass
-  unconditionally from a notebook that doesn't branch on config itself.
+  list as `gu.noun_slot_labels(active_cases, lang=lang) + [f"{ind_prefix} {l}"
+  for l in gu.noun_slot_labels(gu.noun_indef_cells(active_cases), lang=lang)]`
+  (`ind_prefix` from your own UI strings, or hardcode `"Ind."` if the
+  notebook is English-only). No-ops safely when `config.indef_articles` is
+  unset (Ancient Greek) — fine to pass unconditionally from a notebook that
+  doesn't branch on config itself.
 
 For adjectives, swap in `adjective_paradigm_drill_form` and pass
 `mode: str = "simple"` (nominative only, 6 slots — matches
 `adjective_slot_labels("simple")`; anything else drills every case in
 `config.adj_cases`).
+
+`noun_slot_labels`/`adjective_slot_labels` both take `lang: str = "en"` —
+routes through `get_slot_templates(..., terms_lang=lang)`, backed by
+`data/labels/{noun,adj}-{lang}.tsv`. Pass the notebook's own
+`language_selector.value`; never hand-roll per-language label text in the
+notebook itself.
+
+For a verb-tense **selector** (which of present/imperfect/aorist/future/...
+to test — distinct from `verb_slot_labels()`'s pronoun slot labels above),
+build the dropdown options from `gu.tense_dropdown_options(lang=lang)` →
+`{"Continuous Future (Συνεχής Μέλλοντας)": "future_continuous", ...}`,
+backed by `data/labels/tense-{lang}.tsv`. Same rule: don't hardcode
+per-language tense names in the notebook.
+
+For the paradigm-drill widget's own **chrome** (test headings, Check-button
+label, empty-state text, "TSV not found" messages — anything that isn't
+grammar content) call `gu.ui_label(key, lang)`, backed by
+`data/labels/ui-{lang}.tsv`. Unlike the label methods above this isn't
+Config-scoped — the widget chrome is the same across courses. A notebook
+that already has ~30 `t_ui("key", lang)` call sites scattered through its
+cells doesn't need to touch every one: assign `t_ui = gu.ui_label` once
+(after constructing `gu`) instead of defining a local `UI_STRINGS` dict +
+`t_ui()` closure, and every existing call site keeps working unchanged.
 
 Pressing Enter in any field locks it read-only until the reply for that
 Enter comes back (correct → advance focus to the next field; wrong or last

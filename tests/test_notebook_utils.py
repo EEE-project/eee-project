@@ -14,6 +14,8 @@ from eee_project.notebook_utils import (
     greek_compare,
     strip_diacritics,
     poly_to_mono,
+    parse_stanza_text,
+    parse_stanza_translations,
     load_ga_config,
     MODERN_GREEK,
     ANCIENT_GREEK,
@@ -398,6 +400,100 @@ class TestGreekCompare:
         assert greek_compare("λεγε", "λέγε", case_sensitive=True, diacritics=True) is False
 
 
+# ───────────────────────────────────────── parse_stanza_text ──
+
+class TestParseStanzaText:
+    def test_default_prefix_single_stanza(self):
+        md = "### Ithaki 1-3\n\nΣαν βγεις\nνα εύχεσαι\n"
+        assert parse_stanza_text(md) == {"Ithaki 1-3": ["Σαν βγεις", "να εύχεσαι"]}
+
+    def test_custom_ref_prefix(self):
+        md = "### Odyss. IX.39-42\n\nἸλιόθεν\nἸσμάρῳ\n"
+        assert parse_stanza_text(md, ref_prefix="### Odyss. ") == {
+            "IX.39-42": ["Ἰλιόθεν", "Ἰσμάρῳ"]
+        }
+
+    def test_multiple_stanzas_in_order(self):
+        md = "### A\nline1\nline2\n### B\nline3\n"
+        result = parse_stanza_text(md)
+        assert list(result.keys()) == ["A", "B"]
+        assert result["A"] == ["line1", "line2"]
+        assert result["B"] == ["line3"]
+
+    def test_comment_lines_skipped(self):
+        md = "<!-- edition note -->\n### A\n<!-- inline comment -->\nreal line\n"
+        assert parse_stanza_text(md) == {"A": ["real line"]}
+
+    def test_blank_lines_skipped(self):
+        md = "### A\nline1\n\n\nline2\n"
+        assert parse_stanza_text(md) == {"A": ["line1", "line2"]}
+
+    def test_lines_before_first_heading_ignored(self):
+        md = "orphan line\n### A\nreal line\n"
+        assert parse_stanza_text(md) == {"A": ["real line"]}
+
+    def test_empty_input(self):
+        assert parse_stanza_text("") == {}
+
+
+# ─────────────────────────────────── parse_stanza_translations ──
+
+class TestParseStanzaTranslations:
+    def test_single_translator_single_stanza(self):
+        md = "## Жуковский\n### A\nline1\nline2\n"
+        out, desc = parse_stanza_translations(md)
+        assert out == {"Жуковский": {"A": "line1\nline2"}}
+        assert desc == {}
+
+    def test_description_comment_captured(self):
+        md = "## Жуковский\n<!-- **Жуковский, 1849** · рус. -->\n### A\nline1\n"
+        out, desc = parse_stanza_translations(md)
+        assert desc == {"Жуковский": "**Жуковский, 1849** · рус."}
+        assert out == {"Жуковский": {"A": "line1"}}
+
+    def test_translator_without_description_omitted_from_desc(self):
+        # подстрочник's own convention: no <!-- **...** --> comment at all
+        md = "## подстрочник\n### A\nline1\n"
+        out, desc = parse_stanza_translations(md)
+        assert "подстрочник" not in desc
+        assert out == {"подстрочник": {"A": "line1"}}
+
+    def test_multiple_translators_and_stanzas(self):
+        md = (
+            "## Жуковский\n### A\nj-a\n### B\nj-b\n"
+            "---\n"
+            "## Вересаев\n### A\nv-a\n### B\nv-b\n"
+        )
+        out, desc = parse_stanza_translations(md)
+        assert out == {
+            "Жуковский": {"A": "j-a", "B": "j-b"},
+            "Вересаев": {"A": "v-a", "B": "v-b"},
+        }
+
+    def test_dash_separator_not_treated_as_content(self):
+        md = "## T\n### A\nline1\n---\n"
+        out, _ = parse_stanza_translations(md)
+        assert out == {"T": {"A": "line1"}}
+
+    def test_custom_ref_prefix(self):
+        md = "## T\n### Odyss. IX.39-42\nline1\n"
+        out, _ = parse_stanza_translations(md, ref_prefix="### Odyss. ")
+        assert out == {"T": {"IX.39-42": "line1"}}
+
+    def test_empty_input(self):
+        assert parse_stanza_translations("") == ({}, {})
+
+    def test_round_trips_with_parse_stanza_text_line_count(self):
+        # the contract parse_stanza_text/parse_stanza_translations callers rely
+        # on: one translation line per source line, same order, so they can be
+        # zipped positionally.
+        greek_md = "### A\nline1\nline2\nline3\n"
+        trans_md = "## T\n### A\nt1\nt2\nt3\n"
+        greek = parse_stanza_text(greek_md)
+        trans, _ = parse_stanza_translations(trans_md)
+        assert len(greek["A"]) == len(trans["T"]["A"].split("\n"))
+
+
 # ──────────────────────────────────────────────── GreekConfig ──
 
 class TestModernGreekConfig:
@@ -526,6 +622,110 @@ class TestGreekUtilsConfig:
         assert gu_ag._ci("λύουσι",  {"λύουσι(ν)"}) is True
         assert gu_ag._ci("λύουσιν", {"λύουσι(ν)"}) is True
         assert gu_ag._ci("λύουσιξ", {"λύουσι(ν)"}) is False
+
+
+class TestTenseDropdownOptions:
+    """tense_labels' translated names come from data/labels/tense-{lang}.tsv --
+    never hardcoded in notebook_utils.py, same routing layer as noun/adj/verb
+    slot labels. tense_dropdown_options() is the consumer notebooks should call
+    instead of hand-rolling per-language tense-selector option dicts."""
+
+    def test_label_dict_loaded_from_tsv_all_langs(self):
+        labels = MODERN_GREEK.tense_labels['future_continuous']['label']
+        assert labels == {
+            'en': 'Continuous Future',
+            'ru': 'Будущее продолженное',
+            'el': 'Συνεχής Μέλλοντας',
+        }
+
+    def test_dropdown_options_en(self, gu_mg):
+        opts = gu_mg.tense_dropdown_options('en')
+        assert opts['Continuous Future (Συνεχής Μέλλοντας)'] == 'future_continuous'
+        assert opts['Simple Future (Απλός Μέλλοντας)'] == 'future'
+
+    def test_dropdown_options_ru(self, gu_mg):
+        # regression: chapter 9's own hand-rolled Russian label for this tense
+        # was "Длительное будущее" (wrong word order/term) before being fixed
+        # to "Будущее продолженное" -- this is the source of truth now.
+        opts = gu_mg.tense_dropdown_options('ru')
+        assert opts['Будущее продолженное (Συνεχής Μέλλοντας)'] == 'future_continuous'
+        assert opts['Простое будущее (Απλός Μέλλοντας)'] == 'future'
+
+    def test_dropdown_options_el_no_redundant_parenthetical(self, gu_mg):
+        # the Greek label IS the parenthetical reference -- "Ενεστώτας
+        # (Ενεστώτας)" would be a redundant echo of itself, not a real gloss.
+        opts = gu_mg.tense_dropdown_options('el')
+        assert 'Ενεστώτας' in opts
+        assert 'Ενεστώτας (Ενεστώτας)' not in opts
+
+    def test_dropdown_options_preserves_tense_labels_order(self, gu_mg):
+        assert list(gu_mg.tense_dropdown_options('en').values()) == [
+            'present', 'imperfect', 'aorist', 'future', 'future_continuous',
+        ]
+
+    def test_dropdown_options_unknown_lang_falls_back_to_english(self, gu_mg):
+        opts = gu_mg.tense_dropdown_options('fr')
+        assert 'Continuous Future (Συνεχής Μέλλοντας)' in opts
+
+    def test_ancient_greek_has_no_future_continuous_but_has_perfect(self, gu_ag):
+        opts = gu_ag.tense_dropdown_options('ru')
+        assert 'Перфект (Παρακείμενος)' in opts
+        assert not any('future_continuous' == v for v in opts.values())
+
+
+class TestUiLabel:
+    """Paradigm-drill widget-chrome strings come from data/labels/ui-{lang}.tsv --
+    never a per-notebook UI_STRINGS dict + local t_ui() closure. Not Config-scoped
+    (unlike tense_labels): one GreekUtils instance with no backend at all still
+    resolves every key, since this text belongs to the shared widget, not any
+    one course's grammar."""
+
+    def test_known_key_en(self):
+        gu = GreekUtils(mo_module=_StubMo())
+        assert gu.ui_label('check_label', 'en') == 'Check'
+
+    def test_known_key_ru(self):
+        gu = GreekUtils(mo_module=_StubMo())
+        assert gu.ui_label('check_label', 'ru') == 'Проверить'
+
+    def test_known_key_el(self):
+        gu = GreekUtils(mo_module=_StubMo())
+        assert gu.ui_label('check_label', 'el') == 'Έλεγχος'
+
+    def test_lang_none_falls_back_to_english(self):
+        gu = GreekUtils(mo_module=_StubMo())
+        assert gu.ui_label('check_label', None) == gu.ui_label('check_label', 'en')
+
+    def test_unknown_lang_falls_back_to_english(self):
+        gu = GreekUtils(mo_module=_StubMo())
+        assert gu.ui_label('check_label', 'fr') == gu.ui_label('check_label', 'en')
+
+    def test_unknown_key_returns_key_itself(self):
+        # matches the retired per-notebook t_ui()'s own ultimate fallback --
+        # never raise, never return an empty string for a typo'd key.
+        gu = GreekUtils(mo_module=_StubMo())
+        assert gu.ui_label('not_a_real_key', 'en') == 'not_a_real_key'
+
+    def test_all_34_keys_present_in_all_3_languages(self):
+        # regression: guards against a TSV row silently dropped for one
+        # language during a future edit -- every key must resolve in en/ru/el.
+        gu = GreekUtils(mo_module=_StubMo())
+        keys = [
+            'test1_heading', 'test2_heading', 'test3_heading',
+            'select_nouns', 'select_verbs', 'select_adjs', 'translation_label',
+            'simple_noun_heading', 'article_noun_heading', 'verb_heading', 'adj_heading',
+            'noun_empty', 'verb_empty', 'verb_no_tense', 'adj_empty',
+            'tense_label', 'mode_label', 'indefinite_label', 'check_label',
+            'def_prefix', 'indef_prefix',
+            'nouns_not_found', 'verbs_not_found', 'adjs_not_found',
+            'test1_done', 'test2_done', 'test3_done',
+            'poem_section_heading', 'vocabulary_heading',
+            'test_label', 'presence_test_topic', 'noun_test_topic', 'verb_test_topic', 'adj_test_topic',
+        ]
+        for key in keys:
+            for lang in ('en', 'ru', 'el'):
+                label = gu.ui_label(key, lang)
+                assert label != key, f"{key!r} missing a real {lang} label (echoed the key back)"
 
 
 # ──────────────────────────────────────── eee_topbar / eee_footer ──
@@ -1021,10 +1221,16 @@ class TestEeeFooter:
 class TestMagnifyImage:
     _RAW_BASE = "https://codeberg.org/EEE-project/created_with_eee/raw/branch/main/odyssey/2026_06_15"
 
-    def test_missing_path_returns_empty_html(self, tmp_path):
+    def test_missing_path_falls_back_to_remote_url(self, tmp_path):
+        # No local file -- both the click-through and the thumbnail fall back
+        # to the remote URL rather than rendering nothing, regardless of
+        # prefer_local (there's no local file to prefer).
         result = magnify_image(_StubHtmlMo(), tmp_path / "missing.jpg", raw_base=self._RAW_BASE, width=280)
         assert isinstance(result, _StubHtmlMo.Html)
-        assert result.s == ""
+        assert result.s.count(f"{self._RAW_BASE}/missing.jpg") == 2
+        assert "data:image" not in result.s
+        result_pl = magnify_image(_StubHtmlMo(), tmp_path / "missing.jpg", raw_base=self._RAW_BASE, prefer_local=True)
+        assert result_pl.s.count(f"{self._RAW_BASE}/missing.jpg") == 2
 
     def test_existing_path_wraps_in_magnify_link(self, tmp_path):
         img = tmp_path / "pic.jpg"
@@ -1032,17 +1238,35 @@ class TestMagnifyImage:
         result = magnify_image(_StubHtmlMo(), img, raw_base=self._RAW_BASE, width=280)
         assert isinstance(result, _StubHtmlMo.Html)
         assert 'target="_blank"' in result.s
-        assert f"{self._RAW_BASE}/pic.jpg" in result.s
+        assert f'<a href="{self._RAW_BASE}/pic.jpg"' in result.s
         assert "max-width:280px" in result.s
         assert "cursor:pointer" in result.s
 
-    def test_url_is_remote_not_a_data_uri(self, tmp_path):
+    def test_default_ignores_local_file_thumbnail_stays_remote(self, tmp_path):
+        # prefer_local defaults to False -- matches every existing call site
+        # (7 already-shipped Odyssey lessons): the thumbnail must stay on the
+        # remote URL even when a local copy exists, so those lessons keep
+        # HTTP-cacheable thumbnails instead of silently switching to inline
+        # base64 blobs on every render.
         img = tmp_path / "pic.png"
         img.write_bytes(b"\x89PNGfake-bytes")
         result = magnify_image(_StubHtmlMo(), img, raw_base=self._RAW_BASE, width=None)
         assert "data:image" not in result.s
-        assert "base64" not in result.s
         assert result.s.count(f"{self._RAW_BASE}/pic.png") == 2
+
+    def test_prefer_local_reads_local_bytes_click_through_stays_remote(self, tmp_path):
+        import base64
+        img = tmp_path / "pic.png"
+        _bytes = b"\x89PNGfake-bytes"
+        img.write_bytes(_bytes)
+        result = magnify_image(_StubHtmlMo(), img, raw_base=self._RAW_BASE, width=None, prefer_local=True)
+        # click-through link: remote URL, exactly once (never a data-URI --
+        # that's the specific thing that breaks inside a sandboxed iframe)
+        assert f'<a href="{self._RAW_BASE}/pic.png" target="_blank"' in result.s
+        assert result.s.count(f"{self._RAW_BASE}/pic.png") == 1
+        # thumbnail: local bytes, base64-encoded, not the remote URL
+        _expected_src = f"data:image/png;base64,{base64.b64encode(_bytes).decode('ascii')}"
+        assert f'<img src="{_expected_src}"' in result.s
 
     def test_raw_base_trailing_slash_does_not_double_up(self, tmp_path):
         img = tmp_path / "pic.jpg"
@@ -3204,11 +3428,75 @@ class TestNounDrillMeta:
 class TestNounSlotLabels:
     def test_formats_number_and_case(self):
         gu = GreekUtils(mo_module=_StubMo())
-        assert gu.noun_slot_labels([("sg", "nom"), ("pl", "gen")]) == ["Sg. Nom.:", "Pl. Gen.:"]
+        assert gu.noun_slot_labels([("sg", "nom"), ("pl", "gen")]) == ["Nom. Sg.:", "Gen. Pl.:"]
 
     def test_unknown_keys_pass_through(self):
         gu = GreekUtils(mo_module=_StubMo())
-        assert gu.noun_slot_labels([("du", "abl")]) == ["Du. abl:"]
+        assert gu.noun_slot_labels([("du", "abl")]) == ["abl Du.:"]
+
+    def _gu(self):
+        from modern_greek_backend_eee import ModernGreekBackend
+        be = ModernGreekBackend()
+        return GreekUtils(be, mo_module=_StubMo(), eee_module=be, config=MODERN_GREEK)
+
+    def test_lang_en_matches_default_fallback_order(self):
+        # real get_slot_templates path (not the no-eee_module fallback), lang="en"
+        gu = self._gu()
+        assert gu.noun_slot_labels([("sg", "nom"), ("pl", "gen")]) == ["Nom. Sg.:", "Gen. Pl.:"]
+
+    def test_lang_ru(self):
+        gu = self._gu()
+        assert gu.noun_slot_labels([("sg", "nom"), ("pl", "gen")], lang="ru") == ["Именит. ед.:", "Родит. мн.:"]
+
+    def test_lang_el(self):
+        gu = self._gu()
+        assert gu.noun_slot_labels([("sg", "nom"), ("pl", "gen")], lang="el") == ["Ονομ. εν.:", "Γεν. πλ.:"]
+
+
+class TestAdjectiveSlotLabelsLang:
+    """lang= localization specifically -- see TestAdjectiveSlotLabels below
+    for structural coverage (count/order) against a stub backend."""
+
+    def _gu(self):
+        from modern_greek_backend_eee import ModernGreekBackend
+        be = ModernGreekBackend()
+        return GreekUtils(be, mo_module=_StubMo(), eee_module=be, config=MODERN_GREEK)
+
+    def test_simple_mode_lang_en(self):
+        gu = self._gu()
+        labels = gu.adjective_slot_labels("simple")
+        assert labels[0] == "Nom. Sg. m.:"
+        assert labels[3] == "Nom. Pl. m.:"
+
+    def test_simple_mode_lang_ru(self):
+        gu = self._gu()
+        labels = gu.adjective_slot_labels("simple", lang="ru")
+        assert labels[0] == "Именит. ед. м.:"
+
+    def test_simple_mode_lang_el(self):
+        gu = self._gu()
+        labels = gu.adjective_slot_labels("simple", lang="el")
+        assert labels[0] == "Ονομ. εν. αρ.:"
+
+    def test_no_eee_module_falls_back_unchanged(self):
+        gu = GreekUtils(mo_module=_StubMo())
+        assert gu.adjective_slot_labels("simple")[0] == "Masc Sg:"
+
+    def test_backend_without_real_labels_falls_back_not_raw_tag(self):
+        # REGRESSION: ancient_greek_backend_eee's get_slot_templates() never
+        # resolves terms_lang (label == tag by its own docstring/contract) --
+        # confirmed live once in examples/greek_exercise_notebook.py, where
+        # this produced ".NSM:" etc. instead of a real label. noun_slot_labels
+        # never hit this (its 2-key Case+Number lookup never matches this
+        # backend's always-3-key Case+Number+Gender features, so it always
+        # fell through to the dict fallback by accident) -- only the
+        # adjective path's 3-key lookup actually matched and leaked the tag.
+        from ancient_greek_backend_eee import AncientGreekBackend
+        be = AncientGreekBackend()
+        gu = GreekUtils(be, mo_module=_StubMo(), eee_module=be, config=ANCIENT_GREEK)
+        labels = gu.adjective_slot_labels("simple")
+        assert labels[0] == "Masc Sg:"
+        assert not any(lbl.startswith(".") for lbl in labels)
 
 
 class TestNounIndefCells:

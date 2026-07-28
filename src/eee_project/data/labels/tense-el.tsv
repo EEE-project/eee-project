@@ -1,0 +1,11 @@
+Config	Tense	label
+modern_greek	present	Ενεστώτας
+modern_greek	imperfect	Παρατατικός
+modern_greek	aorist	Αόριστος
+modern_greek	future	Απλός Μέλλοντας
+modern_greek	future_continuous	Συνεχής Μέλλοντας
+ancient_greek	present	Ἐνεστώς
+ancient_greek	imperfect	Παρατατικός
+ancient_greek	aorist	Ἀόριστος
+ancient_greek	perfect	Παρακείμενος
+ancient_greek	future	Μέλλων

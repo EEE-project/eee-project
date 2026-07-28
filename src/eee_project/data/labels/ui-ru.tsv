@@ -1,0 +1,35 @@
+Key	label
+test1_heading	## Тест 1: Существительные
+test2_heading	## Тест 2: Глаголы
+test3_heading	## Тест 3: Прилагательные
+select_nouns	### Выберите существительные для практики
+select_verbs	### Выберите глаголы для практики
+select_adjs	### Выберите прилагательные для практики
+translation_label	Перевод:
+simple_noun_heading	**Простой тест по существительным**
+article_noun_heading	**Тест по существительным с артиклями**
+verb_heading	**Тест по глаголам**
+adj_heading	**Тест по прилагательным**
+noun_empty	_Выберите существительные из таблицы выше, чтобы начать._
+verb_empty	_Выберите глаголы из таблицы выше, чтобы начать._
+verb_no_tense	_Выберите время выше._
+adj_empty	_Выберите прилагательные из таблицы выше, чтобы начать._
+tense_label	Выбрать время:
+mode_label	Режим теста:
+indefinite_label	Также с неопределённым артиклем
+check_label	Проверить
+def_prefix	Опр.
+indef_prefix	Неопр.
+nouns_not_found	_nouns.tsv не найден — загрузите файл._
+verbs_not_found	_verbs.tsv не найден — загрузите файл._
+adjs_not_found	_adjectives.tsv не найден — загрузите файл._
+test1_done	Все существительные пройдены за эту сессию!
+test2_done	Все глаголы пройдены за эту сессию!
+test3_done	Все прилагательные пройдены за эту сессию!
+poem_section_heading	## Текст поэмы с параллельными переводами
+vocabulary_heading	## ПОЛЕЗНЫЕ СЛОВА
+test_label	Тест
+presence_test_topic	Слово в переводе
+noun_test_topic	Существительные
+verb_test_topic	Глаголы
+adj_test_topic	Прилагательные

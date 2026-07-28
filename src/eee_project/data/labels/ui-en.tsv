@@ -1,0 +1,35 @@
+Key	label
+test1_heading	## Test 1: Nouns
+test2_heading	## Test 2: Verbs
+test3_heading	## Test 3: Adjectives
+select_nouns	### Select nouns to practice
+select_verbs	### Select verbs to practice
+select_adjs	### Select adjectives to practice
+translation_label	Translation:
+simple_noun_heading	**Simple noun test**
+article_noun_heading	**Noun test with articles**
+verb_heading	**Verb test**
+adj_heading	**Adjective test**
+noun_empty	_Select nouns from the table above to begin._
+verb_empty	_Select verbs from the table above to begin._
+verb_no_tense	_Select a tense above._
+adj_empty	_Select adjectives from the table above to begin._
+tense_label	Select tense:
+mode_label	Test mode:
+indefinite_label	Also test indefinite article
+check_label	Check
+def_prefix	Def.
+indef_prefix	Ind.
+nouns_not_found	_nouns.tsv not found — upload a file to begin._
+verbs_not_found	_verbs.tsv not found — upload a file to begin._
+adjs_not_found	_adjectives.tsv not found — upload a file to begin._
+test1_done	All nouns done for this session!
+test2_done	All verbs done for this session!
+test3_done	All adjectives done for this session!
+poem_section_heading	## Poem Text with Parallel Translations
+vocabulary_heading	## USEFUL VOCABULARY
+test_label	Test
+presence_test_topic	Word in Translation
+noun_test_topic	Nouns
+verb_test_topic	Verbs
+adj_test_topic	Adjectives

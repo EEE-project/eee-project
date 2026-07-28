@@ -47,7 +47,9 @@ Usage::
 
 from __future__ import annotations
 
+import csv
 import functools
+import importlib.resources
 import io
 import random as _random
 import re as _re
@@ -181,9 +183,9 @@ _PRESENCE_EMPTY = {
 _PRESENCE_SOURCE_LBL = {"ru": "оригинал", "en": "original", "el": "πρωτότυπο"}
 
 _PRESENCE_SWITCH_LBL = {
-    "ru": "Показать оригинал (др.-греч.) вместо перевода",
-    "en": "Show the original (Ancient Greek) instead of the translation",
-    "el": "Εμφάνιση πρωτοτύπου (αρχ. ελλ.) αντί της μετάφρασης",
+    "ru": "Показать оригинал вместо перевода",
+    "en": "Show the original instead of the translation",
+    "el": "Εμφάνιση πρωτοτύπου αντί της μετάφρασης",
 }
 
 
@@ -691,26 +693,37 @@ def eee_footer(mo, lang: str):
 </div>""")
 
 
-def magnify_image(mo, path, *, raw_base: str, width: "int | None" = None) -> Any:
+def magnify_image(mo, path, *, raw_base: str, width: "int | None" = None,
+                   prefer_local: bool = False) -> Any:
     """Render an image that opens full-size in a new tab on click.
 
-    Points both the thumbnail ``<img>`` and the click-through ``<a>`` at a
-    remote raw-content URL (``raw_base`` + the file's name), not a base64
-    data-URI. Data-URIs do NOT reliably open on click when the page is
+    The click-through ``<a href>`` always points at a remote raw-content URL
+    (``raw_base`` + the file's name), never a base64 data-URI — confirmed in
+    practice that a data-URI does NOT reliably open on click when the page is
     embedded in a sandboxed iframe (molab and the TG mini-app wrappers both
-    embed notebooks this way) — confirmed broken in practice. Do not revert
-    to data-URIs here even though they avoid the "404 until pushed" problem
-    a raw URL has; that tradeoff was already made deliberately.
+    embed notebooks this way). That constraint is about the click *target*,
+    not image *display*: by default the inline thumbnail ``<img src>`` also
+    uses that same remote URL (so it benefits from normal HTTP caching), but
+    pass ``prefer_local=True`` to instead read the local file directly (as a
+    data-URI) when present, falling back to the remote URL only if it isn't.
+    That's for a lesson whose images haven't been pushed yet: the thumbnail
+    renders immediately in local dev/preview rather than 404ing until the
+    first push. Leave the default off for already-published lessons — it
+    only trades away caching for a problem they don't have. Do not point the
+    ``<a href>`` at a data-URI either way — that reintroduces the
+    click-through bug this function exists to avoid.
 
     Args:
-        mo:       The marimo module.
-        path:     ``pathlib.Path`` to the local copy of the image, used only
-                   to confirm the asset exists before linking it.
-        raw_base: Base raw-content URL for the file's directory, e.g.
-                   ``"https://codeberg.org/ORG/REPO/raw/branch/main/dir"``.
-                   Required (no default) so every call site names its own
-                   repo/branch/path explicitly.
-        width:    Optional max-width in pixels for the inline thumbnail.
+        mo:           The marimo module.
+        path:         ``pathlib.Path`` to the local copy of the image.
+        raw_base:     Base raw-content URL for the file's directory, e.g.
+                       ``"https://codeberg.org/ORG/REPO/raw/branch/main/dir"``.
+                       Required (no default) so every call site names its own
+                       repo/branch/path explicitly.
+        width:        Optional max-width in pixels for the inline thumbnail.
+        prefer_local: When ``True``, read the thumbnail from the local file
+                       (data-URI) if it exists, instead of the remote URL.
+                       Default ``False`` matches every existing call site.
 
     Example cell::
 
@@ -722,13 +735,19 @@ def magnify_image(mo, path, *, raw_base: str, width: "int | None" = None) -> Any
             width=280,
         )
     """
-    if not path.exists():
-        return mo.Html("")
     url = f"{raw_base.rstrip('/')}/{path.name}"
+    if prefer_local and path.exists():
+        import base64
+        import mimetypes
+        _mime = mimetypes.guess_type(path.name)[0] or "image/jpeg"
+        _b64 = base64.b64encode(path.read_bytes()).decode("ascii")
+        img_src = f"data:{_mime};base64,{_b64}"
+    else:
+        img_src = url
     style = f"max-width:{width}px;" if width else "max-width:100%;"
     return mo.Html(
         f'<a href="{url}" target="_blank" rel="noopener">'
-        f'<img src="{url}" style="{style}width:100%;border-radius:4px;'
+        f'<img src="{img_src}" style="{style}width:100%;border-radius:4px;'
         f'object-fit:cover;cursor:pointer"/>'
         f'</a>'
     )
@@ -1640,6 +1659,72 @@ def poly_to_mono(text: str) -> str:
     return _unicodedata.normalize("NFC", "".join(out))
 
 
+def parse_stanza_text(md: str, *, ref_prefix: str = "### ") -> dict:
+    """Parse a ``greek.md``-style poem source file into ``{stanza_ref: [lines]}``.
+
+    A ``<ref_prefix><ref>`` heading (e.g. ``"### Odyss. IX.39-42"`` with
+    ``ref_prefix="### Odyss. "``, or ``"### Ithaki 1-3"`` with the default
+    ``"### "``) opens a new stanza; every non-blank line under it, up to the
+    next such heading, is one poem line, in order. Lines starting ``<!--``
+    (an HTML comment, e.g. a source citation) are skipped everywhere, not
+    just before the first heading.
+
+    Was duplicated near-identically across every Odyssey lesson notebook
+    (each with its own module-local ``_parse_greek``) before being extracted
+    here — ``ref_prefix`` is the one thing that varied between callers.
+    """
+    out, ref, buf = {}, None, []
+    def _flush():
+        if ref:
+            out[ref] = buf
+    for L in md.splitlines():
+        if L.startswith(ref_prefix):
+            _flush()
+            ref, buf = L[len(ref_prefix):].strip(), []
+        elif ref and L.strip() and not L.startswith("<!--"):
+            buf.append(L.strip())
+    _flush()
+    return out
+
+
+def parse_stanza_translations(md: str, *, ref_prefix: str = "### ") -> "tuple[dict, dict]":
+    """Parse a ``translations.md``-style file into ``({translator: {stanza_ref: text}}, {translator: description})``.
+
+    ``## <name>`` opens a translator's section (e.g. ``"## подстрочник"``,
+    ``"## Жуковский"``). An optional ``<!-- **...** -->`` comment line right
+    after a ``## <name>`` heading (before any ``<ref_prefix><ref>`` heading)
+    becomes that translator's ``description`` entry — omit it for a
+    translator like подстрочник that gets its description handled specially
+    by the caller instead. ``<ref_prefix><ref>`` (matching :func:`parse_stanza_text`'s
+    own ``ref_prefix``) opens a stanza within the current translator's
+    section; every following line up to the next heading or a bare ``---``
+    separator is joined with ``\\n`` into that stanza's translation text —
+    the block must have exactly as many lines as :func:`parse_stanza_text`'s
+    matching stanza, in the same order, since callers zip them positionally.
+
+    Was duplicated near-identically across every Odyssey lesson notebook
+    (each with its own module-local ``_parse_trans``) before being extracted
+    here — ``ref_prefix`` is the one thing that varied between callers.
+    """
+    out, desc, tr, ref, buf = {}, {}, None, None, []
+    def _flush():
+        if tr and ref and buf:
+            out.setdefault(tr, {})[ref] = "\n".join(buf)
+    for L in md.splitlines():
+        if L.startswith("## "):
+            _flush()
+            tr, ref, buf = L[3:].strip(), None, []
+        elif tr and ref is None and L.startswith("<!-- **") and L.endswith("-->"):
+            desc[tr] = L[4:-3].strip()
+        elif L.startswith(ref_prefix):
+            _flush()
+            ref, buf = L[len(ref_prefix):].strip(), []
+        elif ref and L.strip() and L.strip() != "---":
+            buf.append(L)
+    _flush()
+    return out, desc
+
+
 def greek_compare(
     a: str,
     b: str,
@@ -1690,7 +1775,7 @@ class GreekConfig:
     indef_articles: "dict | None"       # indefinite articles; None = not used
     noun_cells: "list[tuple[str,str]]"  # (num, case) slots per noun exercise
     tense_feats: dict                   # tense_key → UD feature dict
-    tense_labels: dict                  # tense_key → {"greek": ..., "dropdown": ...}
+    tense_labels: dict                  # tense_key → {"greek": ..., "label": {"en"/"ru"/"el": ...}}
     path_map: dict                      # tense_key → paradigm() key (backend fallback)
     verb_prefix: dict                   # tense_key → particle string (e.g. "θα")
     verb_slots: "list[tuple[str,str]]"  # (num, person) slots per verb exercise
@@ -1748,6 +1833,42 @@ _QUIZ_ADJ_NUM      = {'sg': 'Sg', 'pl': 'Pl'}
 
 # ────────────────────────────────────────────── tense / verb tables ──
 
+def _load_tense_labels(config_key: str) -> dict:
+    """Load tense_labels for one GreekConfig ('modern_greek'/'ancient_greek') from
+    the bundled eee_project.data.labels/tense-{lang}.tsv files -- translated tense
+    names live in the TSVs (same routing layer as noun/adj/verb slot labels), never
+    hardcoded in this module.
+    """
+    pkg = importlib.resources.files("eee_project.data.labels")
+    per_tense: dict = {}
+    for lang in ("en", "ru", "el"):
+        text = (pkg / f"tense-{lang}.tsv").read_text(encoding="utf-8")
+        for row in csv.DictReader(text.splitlines(), delimiter="\t"):
+            if row["Config"] != config_key:
+                continue
+            per_tense.setdefault(row["Tense"], {})[lang] = row["label"]
+    return {tense: {"greek": langs["el"], "label": langs} for tense, langs in per_tense.items()}
+
+
+def _load_ui_labels() -> dict:
+    """Load widget-chrome UI strings (headings, button labels, empty-state text)
+    from the bundled eee_project.data.labels/ui-{lang}.tsv files -- same routing
+    layer as tense/noun/adj/verb labels, never hardcoded in a notebook. Not
+    Config-scoped (unlike tense_labels) since this text belongs to the shared
+    paradigm-drill widget chrome, not any one course's grammar.
+    """
+    pkg = importlib.resources.files("eee_project.data.labels")
+    labels: dict = {}
+    for lang in ("en", "ru", "el"):
+        text = (pkg / f"ui-{lang}.tsv").read_text(encoding="utf-8")
+        for row in csv.DictReader(text.splitlines(), delimiter="\t"):
+            labels.setdefault(row["Key"], {})[lang] = row["label"]
+    return labels
+
+
+_UI_LABELS = _load_ui_labels()
+
+
 _MG_TENSE_FEATS = {
     'present':           {'Tense': 'Pres', 'Mood': 'Ind'},
     'imperfect':         {'Tense': 'Past', 'Aspect': 'Imp',  'Mood': 'Ind'},
@@ -1784,13 +1905,7 @@ MODERN_GREEK = GreekConfig(
         ('pl', 'nom'), ('pl', 'acc'), ('pl', 'gen'),
     ],
     tense_feats=_MG_TENSE_FEATS,
-    tense_labels={
-        'present':           {'greek': 'Ενεστώτας',         'dropdown': 'Present (Ενεστώτας)'},
-        'imperfect':         {'greek': 'Παρατατικός',       'dropdown': 'Imperfect (Παρατατικός)'},
-        'aorist':            {'greek': 'Αόριστος',          'dropdown': 'Aorist (Αόριστος)'},
-        'future':            {'greek': 'Απλός Μέλλοντας',   'dropdown': 'Simple Future (Μέλλοντας)'},
-        'future_continuous': {'greek': 'Συνεχής Μέλλοντας', 'dropdown': 'Continuous Future (Μέλλοντας)'},
-    },
+    tense_labels=_load_tense_labels('modern_greek'),
     path_map=_MG_PATH_MAP,
     verb_prefix={'future': 'θα', 'future_continuous': 'θα'},
     verb_slots=_VERB_SLOTS,
@@ -1809,13 +1924,7 @@ ANCIENT_GREEK = GreekConfig(
         ('pl', 'nom'), ('pl', 'acc'), ('pl', 'gen'), ('pl', 'dat'),
     ],
     tense_feats=_AG_TENSE_FEATS,
-    tense_labels={
-        'present':   {'greek': 'Ἐνεστώς',      'dropdown': 'Present (Ἐνεστώς)'},
-        'imperfect': {'greek': 'Παρατατικός',   'dropdown': 'Imperfect (Παρατατικός)'},
-        'aorist':    {'greek': 'Ἀόριστος',     'dropdown': 'Aorist (Ἀόριστος)'},
-        'perfect':   {'greek': 'Παρακείμενος',  'dropdown': 'Perfect (Παρακείμενος)'},
-        'future':    {'greek': 'Μέλλων',        'dropdown': 'Future (Μέλλων)'},
-    },
+    tense_labels=_load_tense_labels('ancient_greek'),
     path_map={},
     verb_prefix={},
     verb_slots=_VERB_SLOTS,
@@ -1880,6 +1989,36 @@ class GreekUtils:
     @property
     def TENSE_LABELS(self) -> dict:
         return self._cfg.tense_labels
+
+    def tense_dropdown_options(self, lang: str = "en") -> dict:
+        """Localized ``{"Continuous Future (Συνεχής Μέλλοντας)": "future_continuous", ...}``
+        options dict for a verb-tense-selector dropdown, keyed by ``tense_labels``'
+        insertion order (present/imperfect/aorist/future/... as configured).
+        Falls back to English if ``lang`` has no entry for a given tense. Drops the
+        parenthetical Greek reference when it's already the label (``lang="el"``) --
+        "Ενεστώτας (Ενεστώτας)" would just be a redundant echo of itself.
+        """
+        out = {}
+        for key, info in self._cfg.tense_labels.items():
+            label = info['label'].get(lang, info['label']['en'])
+            display = label if label == info['greek'] else f"{label} ({info['greek']})"
+            out[display] = key
+        return out
+
+    def ui_label(self, key: str, lang: str | None = None) -> str:
+        """Translated paradigm-drill widget-chrome string (heading, button
+        label, empty-state text) for ``key``, backed by
+        ``data/labels/ui-{lang}.tsv``. Falls back to English if ``lang`` has
+        no entry, then to the bare ``key`` if the key itself is unknown --
+        same fallback shape as the notebook-local ``t_ui()`` helper this
+        replaces. Not Config-scoped (unlike :meth:`tense_dropdown_options`)
+        since this text belongs to the shared widget, not one course's
+        grammar -- assign ``t_ui = gu2.ui_label`` in a notebook to keep every
+        existing ``t_ui("key", lang)`` call site unchanged.
+        """
+        lang = lang or "en"
+        entry = _UI_LABELS.get(key, {})
+        return entry.get(lang) or entry.get("en") or key
 
     # ------------------------------------------------------------------ utils
 
@@ -2214,12 +2353,43 @@ class GreekUtils:
         )
         return SimpleNamespace(is_pluralia_tantum=is_pt, active_cases=active_cases)
 
-    def noun_slot_labels(self, active_cases: list) -> list:
+    def _slot_label_index(self, pos: str, lang: str) -> dict:
+        """``{frozenset(features): label}`` for every backend-resolved slot
+        template of *pos* in *lang* — shared by :meth:`noun_slot_labels` and
+        :meth:`_adj_slot_names`. ``label == tag`` means the backend echoed
+        its internal tag string back unresolved (no real localized text
+        available for this slot, or at all -- e.g. ancient-greek-backend-eee's
+        get_slot_templates() never resolves terms_lang, by its own
+        docstring) -- treated the same as "not found" rather than surfacing
+        a raw tag like ".NSM" to a student.
+        """
+        slots = self._eee.get_slot_templates(self._cfg.language, pos, lang) if self._eee else None
+        return {
+            frozenset(s.features.items()): s.label
+            for s in (slots or []) if s.features and s.label != s.tag
+        }
+
+    def noun_slot_labels(self, active_cases: list, lang: str = "en") -> list:
         """Labels for a noun paradigm-drill's slots — one per ``(number,
         case)`` pair in ``active_cases`` (see :meth:`noun_drill_meta`),
-        e.g. "Sg. Nom.:", in the same slot order ``check_noun_slot`` indexes.
+        e.g. "Nom. Sg.:", in the same slot order ``check_noun_slot`` indexes.
+
+        ``lang`` (``"en"``/``"ru"``/``"el"``) selects the label language via
+        ``get_slot_templates(..., terms_lang=lang)`` — the bundled
+        ``eee_project.data.labels/noun-{lang}.tsv`` backs this the same way
+        it backs any other slot-template consumer (never read directly here;
+        always through the routing layer, per this project's own tagging
+        rule). Falls back to the English quiz-label dicts for any (number,
+        case) pair the template doesn't cover (e.g. no ``eee_module``).
         """
-        return [f"{_QUIZ_NUM_LABEL.get(n, n)} {_QUIZ_CASE_LABEL.get(c, c)}:" for n, c in active_cases]
+        by_feats = self._slot_label_index("noun", lang)
+        labels = []
+        for n, c in active_cases:
+            label = by_feats.get(frozenset({"Case": _CASE.get(c, c), "Number": _NUM.get(n, n)}.items()))
+            if label is None:
+                label = f"{_QUIZ_CASE_LABEL.get(c, c)} {_QUIZ_NUM_LABEL.get(n, n)}"
+            labels.append(f"{label}:")
+        return labels
 
     def noun_indef_cells(self, active_cases: list) -> list:
         """The singular-only subset of *active_cases* indefinite-article
@@ -2336,11 +2506,11 @@ class GreekUtils:
             if art_table is not None:
                 if ua is None:
                     if require_art:
-                        errs.append(f'❌ [{_n} {_c}]: article missing, must be **{" / ".join(sorted(correct_arts))}**')
+                        errs.append(f'❌ [{_c} {_n}]: article missing, must be **{" / ".join(sorted(correct_arts))}**')
                 elif not self._ci(ua, correct_arts):
-                    errs.append(f'❌ [{_n} {_c}]: article **"{ua}"**, must be **{" / ".join(sorted(correct_arts))}**')
+                    errs.append(f'❌ [{_c} {_n}]: article **"{ua}"**, must be **{" / ".join(sorted(correct_arts))}**')
             if not self._ci(uw, correct):
-                errs.append(f'❌ [{_n} {_c}]: noun **"{uw}"**, must be **{" / ".join(sorted(correct)) if correct else "?"}**')
+                errs.append(f'❌ [{_c} {_n}]: noun **"{uw}"**, must be **{" / ".join(sorted(correct)) if correct else "?"}**')
             return not errs, errs
 
         def _collect(results):
@@ -2552,16 +2722,29 @@ Translation: **{translation}**
         return [(g, n, c) for n in ('sg', 'pl')
                 for g in ('masc', 'fem', 'neut') for c in self._cfg.adj_cases]
 
-    def _adj_slot_names(self, mode: str) -> list:
+    def _adj_slot_names(self, mode: str, lang: str = "en") -> list:
         """Human-readable name per ``_adj_slot_list`` slot (no trailing
-        colon), e.g. "Masc Sg" / "Masc Sg Nom" — the single source behind
+        colon), e.g. "Nom. Sg. m." — the single source behind
         check_adjective_test's error labels and adjective_slot_labels.
+
+        ``lang`` (``"en"``/``"ru"``/``"el"``) selects the label language via
+        ``get_slot_templates(..., terms_lang=lang)`` — see
+        :meth:`noun_slot_labels` for the mechanism (same routing layer,
+        backed by ``eee_project.data.labels/adj-{lang}.tsv`` here instead).
+        Falls back to the English quiz-label dicts for any slot the
+        template doesn't cover.
         """
         cm = {c: c.title() for c in self._cfg.adj_cases}
         fk = self._adj_slot_list(mode)
-        if mode == 'simple':
-            return [f"{_QUIZ_ADJ_GENDER[g]} {_QUIZ_ADJ_NUM[n]}" for g, n, c in fk]
-        return [f"{_QUIZ_ADJ_GENDER[g]} {_QUIZ_ADJ_NUM[n]} {cm.get(c, c)}" for g, n, c in fk]
+        by_feats = self._slot_label_index("adjective", lang)
+        names = []
+        for g, n, c in fk:
+            label = by_feats.get(frozenset({"Case": _CASE.get(c, c), "Number": _NUM.get(n, n), "Gender": _GENDER.get(g, g)}.items()))
+            if label is None:
+                label = (f"{_QUIZ_ADJ_GENDER[g]} {_QUIZ_ADJ_NUM[n]}" if mode == 'simple'
+                          else f"{_QUIZ_ADJ_GENDER[g]} {_QUIZ_ADJ_NUM[n]} {cm.get(c, c)}")
+            names.append(label)
+        return names
 
     def _adj_slot_ok(self, adj_base, g, n, c, value) -> tuple:
         """Check one adjective-form slot; returns (ok, correct_forms).
@@ -2619,11 +2802,14 @@ Translation: **{translation}**
         ok, _ = self._adj_slot_ok(adj_base, g, n, c, (value or '').strip())
         return ok
 
-    def adjective_slot_labels(self, mode: str = 'simple') -> list:
+    def adjective_slot_labels(self, mode: str = 'simple', lang: str = "en") -> list:
         """Labels for the adjective paradigm-drill's slots, matching the
         same order as check_adjective_slot's slot list for the same mode.
+
+        ``lang`` (``"en"``/``"ru"``/``"el"``) selects the label language —
+        see :meth:`_adj_slot_names`.
         """
-        return [f"{name}:" for name in self._adj_slot_names(mode)]
+        return [f"{name}:" for name in self._adj_slot_names(mode, lang)]
 
     # --------------------------------------------------------------- item drills
 
