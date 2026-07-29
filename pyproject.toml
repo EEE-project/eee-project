@@ -1,6 +1,10 @@
 [project]
 name = "eee-project"
-version = "0.10.0"
+version = "1.0.0"
+description = "Language-agnostic morphology umbrella for the EEE project"
+readme = "README.md"
+license = "Apache-2.0"
+authors = [{name = "Oleg Sadov", email = "oleg.sadov@gmail.com"}]
 requires-python = ">=3.12"
 dependencies = [
     "anywidget>=0.9",
@@ -9,6 +13,9 @@ dependencies = [
     "tomlkit>=0.15.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/EEE-project/eee-project"
+Repository = "https://github.com/EEE-project/eee-project"
 
 [build-system]
 requires = ["hatchling"]

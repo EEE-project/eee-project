@@ -1,44 +1,31 @@
 # eee-project
 
-Part of [Ελληνικά Εκπαιδευτικά Εργαλεία (EEE) — Greek Language Educational Tools](https://codeberg.org/EEE-project).
+Part of [Ελληνικά Εκπαιδευτικά Εργαλεία (EEE) — Greek Language Educational Tools](https://github.com/EEE-project).
 
-Language-agnostic morphology umbrella for the EEE project. Same API for Modern Greek (`el`), Ancient Greek (`grc`), and any future language. Language codes follow [ISO 639](https://en.wikipedia.org/wiki/ISO_639).
+Same API for general Modern/Ancient Greek flavours, with the possibility of
+extending language coverage. Language codes follow
+[ISO 639](https://en.wikipedia.org/wiki/ISO_639).
 
-## Greek diachronic coverage
+🔓 Open source:
+- prod — https://github.com/EEE-project/eee-project
+- prod mirror — https://gitlab.com/EEE-project/eee-project
+- dev — https://codeberg.org/EEE-project/eee-project
 
-Greek has a continuous documented history of ~3,500 years with substantial
-morphological and phonological change across periods. Current backends primarily
-target two ends of this spectrum, with limited incidental coverage of
-intermediate historical stages through `unimorph grc`. This table spans multiple
-backends and packages, so it lives here rather than in any single backend's README.
-
-| Variety | Approx. dates | Status |
-|---------|--------------|--------|
-| Mycenaean (Linear B) | ~1490–1200 BCE | Not covered |
-| Arcado-Cypriot (Cypriot Syllabary) | ~1100–300 BCE | Not covered |
-| Homeric/Archaic | 800–500 BCE | **Covered (verbs)** — `AncientGreekBackend(lexicons=["homer"])` provides ~2,335 Homeric verb stems with full paradigm generation; nouns/adjectives: Pratt lexicon only (~23/4) |
-| Classical Attic | 480–323 BCE | **Partly covered** — hand-authored `lsj` lexicon adds Classical-Attic verbs + nouns via `AncientGreekBackend(lexicons=["pratt","ltrg","lsj"])`; Pratt is the teaching base (20 verbs); `unimorph grc` adds ~2,400 nouns/adjectives but skews Koine/NT |
-| Koine / Hellenistic | 323 BCE – 400 CE | **Primary coverage of `unimorph grc`** — Wiktionary-derived dataset is heavily Koine/NT; for verbs: `AncientGreekBackend(lexicons=["lxx","morphgnt"])` adds ~3,300 stems |
-| New Testament Greek | ~50–100 CE | **Well covered** — `unimorph grc` (nouns/adj); `AncientGreekBackend(lexicons=["morphgnt"])` (~1,848 verb stems) |
-| Byzantine | 400–1453 CE | No dedicated support; some overlap with late Koine via `unimorph grc` |
-| Katharevousa | 1830–1976 CE | Partially supported — many forms work, some explicitly suppressed in `modern-greek` |
-| Standard Demotic | 1976–present | **Covered** — `modern-greek` (any lemma); UniMorph ell (fixed vocabulary) |
-
-The major alphabetic dialects (Attic, Ionic, Doric, Aeolic) share the same
-morphological paradigms; differences are primarily phonological and orthographic
-(e.g. Attic -ττ- vs Ionic -σσ-, loss of digamma in Ionic). The `ancient-greek`
-backend targets Classical Attic and is not optimised for other dialects.
+💬 Community: https://telegram.me/eee_greek
 
 ## Installation
 
 ```bash
-pip install git+https://codeberg.org/EEE-project/eee-project.git
+pip install eee-project
 
 # Install the backends you need:
-pip install git+https://codeberg.org/EEE-project/modern-greek-backend-eee.git
-pip install git+https://codeberg.org/EEE-project/unimorph-backend-eee.git
-pip install git+https://codeberg.org/EEE-project/ancient-greek-backend-eee.git
+pip install modern-greek-backend-eee
+pip install unimorph-backend-eee
+pip install ancient-greek-backend-eee
 ```
+
+Development version (latest, from Codeberg) — for any of the above, replace
+with: `pip install "<name> @ git+https://codeberg.org/EEE-project/<name>.git"`
 
 Requires Python 3.12+.
 
@@ -74,26 +61,49 @@ Feature keys follow [Universal Dependencies FEATS](https://universaldependencies
 
 ### Named backends and chains
 
-When multiple backends cover the same language, register them by name and configure a chain.
-See [`docs/chains.md`](docs/chains.md) for the full chain API, `stop="all"` union mode, and hook extension points.
+When multiple backends cover the same language, register them by name and
+configure a chain (e.g. try `modern-greek` first, fall back to `unimorph`).
+See [`docs/chains.md`](docs/chains.md) for the full chain API, `stop="all"`
+union mode, and hook extension points.
+
+## Greek diachronic coverage
+
+Greek has a continuous documented history of ~3,500 years, with substantial
+morphological and phonological change across periods and dialects.
+
+| Variety | Approx. dates | Status |
+|---------|--------------|--------|
+| Mycenaean (Linear B) | ~1490–1200 BCE | Not covered |
+| Arcado-Cypriot | ~1100–300 BCE | Not covered |
+| Homeric/Epic | 800–500 BCE | Covered |
+| Classical Attic | 480–323 BCE | Covered |
+| Koine/Hellenistic | 323 BCE–400 CE | Covered |
+| New Testament Greek | ~50–100 CE | Covered |
+| Byzantine | 400–1453 CE | Partial |
+| Katharevousa | 1830–1976 CE | Partial |
+| Standard Demotic | 1976–present | Covered |
+
+The major alphabetic dialects (Attic, Ionic, Doric, Aeolic) share the same
+morphological paradigms and differ mainly in phonology and orthography;
+Ancient Greek support here follows Classical Attic conventions.
 
 ```python
-from modern_greek_backend_eee import ModernGreekBackend
-from unimorph_backend_eee import UniMorphBackend
+from ancient_greek_backend_eee import AncientGreekBackend
 
-eee.register_backend("el", ModernGreekBackend(),    backend="modern-greek")
-eee.register_backend("el", UniMorphBackend("el"), backend="unimorph")
-eee.set_chain("el", ["modern-greek", "unimorph"])  # try modern-greek first, fall back to unimorph
+# Query the same lemma under different historical periods
+epic  = AncientGreekBackend.for_period("epic")               # Homer
+attic = AncientGreekBackend.for_period("attic")               # Classical Attic
+koine = AncientGreekBackend.for_period("hellenistic_koine", "roman_koine")  # Septuagint + NT
 
-# Explicit named backend
-eee.inflect("γυναίκα", {"Case": "Gen", "Number": "Plur"}, "noun", language="el", backend="unimorph")
-
-# Chain with attribution
-from eee_project import inflect_traced
-result = inflect_traced("γυναίκα", {"Case": "Gen", "Number": "Plur"}, "noun", language="el")
-print(result.source)   # "el:modern-greek"
-print(result.tried)    # ["el:modern-greek"]
+# Epic verse allows the unaugmented aorist alongside the standard form;
+# Attic and Koine require the augment.
+form = {"VerbForm": "Fin", "Tense": "Aor", "Voice": "Act", "Mood": "Ind", "Person": "1", "Number": "Sing"}
+epic.inflect("λύω", form, "verb")   # {'λῦσα', 'ἔλυσα'}
+attic.inflect("λύω", form, "verb")  # {'ἔλυσα'}
+koine.inflect("λύω", form, "verb")  # {'ἔλυσα'}
 ```
+
+See each backend's own README for exact lexicon-level coverage within each period.
 
 ## Examples
 
@@ -115,42 +125,19 @@ exception semantics: [docs/api-reference.md](docs/api-reference.md).
 
 ## Backends
 
-| Language | Code | `backend=` | Package |
-|----------|------|-----------|---------|
-| Modern Greek | `el` | `"modern-greek"` | [modern-greek-backend-eee](https://codeberg.org/EEE-project/modern-greek-backend-eee) |
-| Modern Greek | `el` | `"unimorph"` | [unimorph-backend-eee](https://codeberg.org/EEE-project/unimorph-backend-eee) |
-| Ancient Greek | `grc` | `"ancient-greek"` | [ancient-greek-backend-eee](https://codeberg.org/EEE-project/ancient-greek-backend-eee) |
-| Ancient Greek | `grc` | `"unimorph"` | [unimorph-backend-eee](https://codeberg.org/EEE-project/unimorph-backend-eee) |
-| Latin | `la` | `"unimorph"` | [unimorph-backend-eee](https://codeberg.org/EEE-project/unimorph-backend-eee) |
-| Russian | `ru` | `"unimorph"` | [unimorph-backend-eee](https://codeberg.org/EEE-project/unimorph-backend-eee) |
-| Spanish | `es` | `"unimorph"` | [unimorph-backend-eee](https://codeberg.org/EEE-project/unimorph-backend-eee) |
-| Turkish | `tr` | `"unimorph"` | [unimorph-backend-eee](https://codeberg.org/EEE-project/unimorph-backend-eee) |
+| Language | Code | Package |
+|----------|------|---------|
+| Modern Greek | `el` | [modern-greek-backend-eee](https://github.com/EEE-project/modern-greek-backend-eee) |
+| Ancient Greek | `grc` | [ancient-greek-backend-eee](https://github.com/EEE-project/ancient-greek-backend-eee) |
 
-The two `grc` backends have **complementary coverage**: θεός is in `ancient-greek` only; βοηθός is in `unimorph` only.
+[unimorph-backend-eee](https://github.com/EEE-project/unimorph-backend-eee) adds
+a second, TSV-lookup rung for both Greek languages, plus several other
+languages (Latin, Russian, Spanish, Turkish, and 187 more on demand) — see its
+own README for bundled coverage and how it compares to the dedicated backends
+above.
 
-For each backend's source, license, implementation notes, lemma counts, and known
-limitations, see its own README: [modern-greek-backend-eee](https://codeberg.org/EEE-project/modern-greek-backend-eee#readme),
-[ancient-greek-backend-eee](https://codeberg.org/EEE-project/ancient-greek-backend-eee#readme),
-[unimorph-backend-eee](https://codeberg.org/EEE-project/unimorph-backend-eee#readme).
-
-## Changelog
-
-**v0.10.0** — `ConfigStore` now looks for `index.tsv` instead of `lessons.tsv` (renamed alongside all 10 files in `created_with_eee` and every notebook's own `ConfigStore.from_file_or_url`/`parent_back_url` call; the filename is now a single `ConfigStore._FILENAME` class attribute instead of a literal string repeated at each call site). Restored 5 Modern Greek tenses (`past_continuous`, `subjunctive_simple`/`continuous`, `conditional_simple`/`continuous`) that were missing from `tense_labels`.
-
-**v0.9.0** — `analyze(form)`/`analyze_traced(form)`: reverse lookup from a surface form to candidate `{lemma, pos, tag, features}` analyses, mirroring `list_lemmas`/`list_lemmas_traced`'s chain-walk + dedup shape (a differently-shaped `analyze()` existed pre-v0.4.0 and was removed as unimplemented dead protocol surface; this is a fresh, chain-aware design, not a revival of the old one), plus a shared chain-walk helper extracted for both. `build_grc_paradigm_table`'s verb branch now renders a pluperfect column (`"YAI"`, labelled "Плюскв."), matching the `XAI`/"Перф." fix shipped alongside the Byzantine lexicon; new verb `perfect`/`pluperfect` TSV labels. `word_drill_widgets`/`word_quiz_widgets`/`stanza_match_widgets`/`translation_presence_widgets` now derive `done` internally via `word_drill_done` instead of requiring callers to precompute and pass it. `AncientGreekBackend.for_period()` used in the example notebook; `GreekUtils.load_inflected_vocab_tsv()` alongside `load_vocab_tsv()`; `grc_lexicon_sources()` full-coverage lexicon-confirmation check. Widget internals: shared JS constants extracted from the diacritics/paradigm ESM templates, `submit_count`+`enter_field_index` merged into `submit_request`, mark-button JS helpers (`makeMarkButton`/`makeClearButton`/`toggleMark`/`stripLastDiacritic`) extracted.
-
-**v0.8.0** — `GreekUtils.ui_label`/`tense_dropdown_options` multi-language (EN/RU/EL) labels; `magnify_image(prefer_local=)`; `parse_stanza_text`/`parse_stanza_translations` (shared poem-file parser, replacing 7 duplicated Odyssey copies); translation-presence caption no longer hardcodes "Ancient Greek".
-
-**v0.7.0** — `GreekConfig.polytonic` field for Modern Greek's monotonic diacritics; `noun_paradigm_drill_form` gains `article`/`indefinite` toggles; new `make_paradigm_drill_state` helper; fixed an Enter-key focus-lock race in `make_paradigm_form`; new Modern Greek paradigm-drill exercise in `examples/`.
-
-**v0.6.0** — paradigm-drill exercises, diachronic paradigm tables through Modern Greek, clickable interactive text, stanza-match/translation-presence quizzes, Byzantine lexicon rung, pronoun POS support, `magnify_image()` click-to-zoom images, refactored `eee_topbar`; mobile "Go" button support for `make_paradigm_form`; fixes to `parent_back_url()`/`eee_topbar()` link targets on molab; Google Analytics actually firing (real `anywidget`, not an inert inline `<script>`); notebook markdown tables rendering left-aligned; a dead CSS selector removed.
-
-**v0.5.0** — `GreekUtils` and `notebook_utils`; slot template system; Latin, Russian, Spanish, Turkish added; new example notebooks.
-
-**v0.4.0** — UniMorph TSV backend extracted to `unimorph-backend-eee`; backend chain machinery (`set_chain`, `inflect_traced`, pre/post hooks); `analyze()` removed.
-
-**v0.3.0** — Combined el/grc Marimo notebook; `eee.supported_languages()`.
-
-## Status
-
-v0.10.0
+Each backend's own README is the canonical source for its lexicon flavors,
+period/dialect coverage, lemma counts, and known limitations —
+[modern-greek-backend-eee](https://github.com/EEE-project/modern-greek-backend-eee#readme),
+[ancient-greek-backend-eee](https://github.com/EEE-project/ancient-greek-backend-eee#readme),
+[unimorph-backend-eee](https://github.com/EEE-project/unimorph-backend-eee#readme).
