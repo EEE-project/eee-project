@@ -5189,6 +5189,39 @@ class TestBuildGrcLexiconTabsWithData:
         assert result is not None
         assert "radio" in result or "style" in result
 
+    def test_first_tab_defaults_to_visible_not_hidden(self):
+        """Regression: re-rendering to a new word with FEWER tabs than the
+        previous one's live DOM can strip every radio's checked state (the
+        browser's own DOM patching preserves live checked/unchecked state
+        by tree position across same-shaped renders; a checked radio at a
+        position the new render doesn't have has nowhere to land).
+        Confirmed live via Playwright against a real browser: selecting a
+        later tab for one word, then clicking a word with fewer tabs, left
+        zero radios checked and zero panels visible. The first tab's
+        panel/caption/summary-label must default to visible (not
+        hidden-until-:checked) so losing the checked state entirely still
+        shows something sane instead of a blank switcher."""
+        ag = _GrcNounBackend()
+        fn = build_grc_lexicon_tabs(ag, _EmptyGrcBackend(),
+                                     lexicons={"homer": ag, "lxx": ag})
+        w = {"lemma": "θεος", "pos": "noun", "form": "θεος",
+             "lexicon_tag": '"homer","lxx"'}
+        def fake_inflect(word, slot, pos, *, language, backend):
+            return {"θεος"} if slot.tag == ".NSM" else set()
+        with patch("eee_project.inflect_slot", side_effect=fake_inflect):
+            result = fn(w)
+        assert result is not None
+
+        uid = abs(hash(w["lemma"] + w["form"])) % 99999
+        initial_hide_block = result.split("{display:none}")[0]
+        # "homer" (dict-insertion first) must NOT be in the unconditional
+        # hide-all rule -- it defaults to visible.
+        assert f"#lp-{uid}-homer" not in initial_hide_block
+        # "lxx" (the other tab) still defaults to hidden, as before.
+        assert f"#lp-{uid}-lxx" in initial_hide_block
+        # A rule must hide "homer" specifically when "lxx" is genuinely checked.
+        assert f"#lr-{uid}-lxx:checked~#lp-{uid}-homer{{display:none}}" in result
+
     def test_multi_lexicon_one_table_falls_back(self):
         ag = _GrcNounBackend()
         empty = _EmptyGrcBackend()

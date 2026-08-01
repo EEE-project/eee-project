@@ -23,6 +23,7 @@ indef_prefix	Ind.
 nouns_not_found	_nouns.tsv not found — upload a file to begin._
 verbs_not_found	_verbs.tsv not found — upload a file to begin._
 adjs_not_found	_adjectives.tsv not found — upload a file to begin._
+translation_presence_not_found	_translation_presence.tsv not found and could not be fetched from the server._
 test1_done	All nouns done for this session!
 test2_done	All verbs done for this session!
 test3_done	All adjectives done for this session!

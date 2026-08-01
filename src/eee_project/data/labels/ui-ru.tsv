@@ -23,6 +23,7 @@ indef_prefix	Неопр.
 nouns_not_found	_nouns.tsv не найден — загрузите файл._
 verbs_not_found	_verbs.tsv не найден — загрузите файл._
 adjs_not_found	_adjectives.tsv не найден — загрузите файл._
+translation_presence_not_found	_translation_presence.tsv не найден и не удалось загрузить с сервера._
 test1_done	Все существительные пройдены за эту сессию!
 test2_done	Все глаголы пройдены за эту сессию!
 test3_done	Все прилагательные пройдены за эту сессию!

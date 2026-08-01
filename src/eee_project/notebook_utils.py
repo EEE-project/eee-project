@@ -5471,15 +5471,38 @@ def build_grc_lexicon_tabs(
 
         names = [n for n, _ in tables]
         uid = abs(hash(w.get("lemma", "") + w.get("form", ""))) % 99999
+        first, others = names[0], names[1:]
 
-        # panels, captions, and the summary's current-period label default to hidden;
-        # the :checked radio reveals its own (all via the stylesheet, so :checked can override).
-        hide = ",".join(f"#lp-{uid}-{n},#ld-{uid}-{n},.dc-{uid}-{n}" for n in names)
+        # names[0]'s panel/caption/summary-label default to VISIBLE (not hidden) --
+        # every other name's elements default to hidden and only reveal via
+        # :checked, as before. This is deliberate, not an oversight: on a fresh
+        # render the HTML also marks radio[0] checked (below), which would make a
+        # plain "everything hidden, :checked reveals" scheme sufficient on its
+        # own -- but re-rendering to a NEW word with FEWER tabs than the previous
+        # one can strip every radio's checked state (the browser's own DOM
+        # patching preserves live form-control state across same-position
+        # elements between renders; a checked radio at a position the new render
+        # doesn't have has nowhere to land, and every other position keeps
+        # whatever unchecked state it had). Confirmed live via Playwright: select
+        # "Modern" for a word with 6 tabs, then click a word with only 5 -- zero
+        # radios end up checked and zero panels visible. Defaulting the first
+        # tab to visible-unless-overridden self-heals that case without needing
+        # JS (mo.Html() doesn't execute inline <script> tags in this codebase).
+        hide = ",".join(f"#lp-{uid}-{n},#ld-{uid}-{n},.dc-{uid}-{n}" for n in others)
         show = "".join(
             f"#lr-{uid}-{n}:checked~#lp-{uid}-{n}{{display:block}}"
             f"#lr-{uid}-{n}:checked~#ld-{uid}-{n}{{display:block}}"
             f"#lr-{uid}-{n}:checked~.ddw-{uid} .dc-{uid}-{n}{{display:inline}}"
             for n in names
+        )
+        # Hide the default (first) tab's elements whenever some OTHER radio is
+        # actually checked -- native single radio-group semantics guarantee at
+        # most one is ever checked, so this fires only for a genuine user pick.
+        hide_default = "".join(
+            f"#lr-{uid}-{n}:checked~#lp-{uid}-{first}{{display:none}}"
+            f"#lr-{uid}-{n}:checked~#ld-{uid}-{first}{{display:none}}"
+            f"#lr-{uid}-{n}:checked~.ddw-{uid} .dc-{uid}-{first}{{display:none}}"
+            for n in others
         )
         opt_on = "".join(
             f'#lr-{uid}-{n}:checked~.ddw-{uid} label[for="lr-{uid}-{n}"]'
@@ -5489,7 +5512,7 @@ def build_grc_lexicon_tabs(
         # native <details> handles open/close on click — no focus, no JS; drop the default marker
         nomark = (f".ddw-{uid}>summary{{list-style:none}}"
                   f".ddw-{uid}>summary::-webkit-details-marker{{display:none}}")
-        style = f"<style>{hide}{{display:none}}{show}{opt_on}{nomark}</style>"
+        style = f"<style>{hide}{{display:none}}{show}{hide_default}{opt_on}{nomark}</style>"
 
         # hidden radios drive panel + summary state; <label for> switches them (known to work)
         radios = "".join(

@@ -23,6 +23,7 @@ indef_prefix	Αόρ.
 nouns_not_found	_Το αρχείο nouns.tsv δεν βρέθηκε — φόρτωσε αρχείο._
 verbs_not_found	_Το αρχείο verbs.tsv δεν βρέθηκε — φόρτωσε αρχείο._
 adjs_not_found	_Το αρχείο adjectives.tsv δεν βρέθηκε — φόρτωσε αρχείο._
+translation_presence_not_found	_Το αρχείο translation_presence.tsv δεν βρέθηκε και δεν ήταν δυνατή η λήψη του από τον διακομιστή._
 test1_done	Όλα τα ουσιαστικά ολοκληρώθηκαν για αυτή τη συνεδρία!
 test2_done	Όλα τα ρήματα ολοκληρώθηκαν για αυτή τη συνεδρία!
 test3_done	Όλα τα επίθετα ολοκληρώθηκαν για αυτή τη συνεδρία!
