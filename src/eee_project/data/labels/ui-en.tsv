@@ -34,3 +34,13 @@ presence_test_topic	Word in Translation
 noun_test_topic	Nouns
 verb_test_topic	Verbs
 adj_test_topic	Adjectives
+drill_title	Word Forms — Modern Greek
+drill_description	Practice noun, verb, and adjective forms. Use the built-in sample words, or upload your own **TAB-delimited TSV** with `Word` and `Translation` columns to drill your own vocabulary instead.
+pos_label	Part of speech
+load_tsv_label	Load TSV (Word + Translation columns) — optional
+require_article_label	Require article (noun)
+full_paradigm_label	Full paradigm (all cases, not just nominative)
+verb_done	Done — every verb drilled!
+noun_done	Done — every noun drilled!
+adj_done	Done — every adjective drilled!
+word_label	Word

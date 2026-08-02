@@ -1,4 +1,4 @@
-.PHONY: help el grc unimorph backends chain hooks comparison notebook-el notebook-grc notebook notebook-unimorph notebook-exercise notebook-config
+.PHONY: help el grc unimorph backends chain hooks comparison notebook-el notebook-grc notebook notebook-unimorph notebook-exercise notebook-config notebook-drill
 
 help:
 	@echo "make el                run modern_greek.py"
@@ -14,6 +14,7 @@ help:
 	@echo "make notebook-unimorph open unimorph_notebook.py"
 	@echo "make notebook-exercise open greek_exercise_notebook.py (GreekUtils exercises + vocab quiz)"
 	@echo "make notebook-config   open config_store_notebook.py (ConfigStore — from_url / from_file / from_dict)"
+	@echo "make notebook-drill    open modern_greek_drill_notebook.py (paradigm drill — verb/noun/adj, TSV upload)"
 
 el:
 	cd .. && uv run python examples/modern_greek.py
@@ -53,3 +54,6 @@ notebook-exercise:
 
 notebook-config:
 	cd .. && uv run marimo edit examples/config_store_notebook.py --no-token
+
+notebook-drill:
+	cd .. && uv run marimo edit examples/modern_greek_drill_notebook.py --no-token

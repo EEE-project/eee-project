@@ -17,6 +17,7 @@ All examples are in `examples/`:
 | `examples/unimorph_notebook.py` | Interactive browser for all 187 UniMorph languages with slot template support |
 | `examples/greek_exercise_notebook.py` | `GreekUtils` full demo — verb drills, custom drill, `greek_compare`, vocab quiz (MG + AG) |
 | `examples/config_store_notebook.py` | `ConfigStore` demo — `from_url`, `from_file`, `from_dict` with `eee_topbar` |
+| `examples/modern_greek_drill_notebook.py` | Modern Greek paradigm drill — verb/noun/adjective, switchable, with personal vocab TSV upload |
 
 Run directly:
 
@@ -27,6 +28,7 @@ uv run marimo edit examples/greek_notebook.py --no-token
 uv run marimo edit examples/unimorph_notebook.py --no-token
 uv run marimo edit examples/greek_exercise_notebook.py --no-token
 uv run marimo edit examples/config_store_notebook.py --no-token
+uv run marimo edit examples/modern_greek_drill_notebook.py --no-token
 ```
 
 Or via the `Makefile` shortcuts (same scripts, just less typing):
@@ -46,4 +48,5 @@ make -C examples notebook          # open examples/greek_notebook.py
 make -C examples notebook-unimorph # open examples/unimorph_notebook.py
 make -C examples notebook-exercise # open examples/greek_exercise_notebook.py
 make -C examples notebook-config   # open examples/config_store_notebook.py
+make -C examples notebook-drill    # open examples/modern_greek_drill_notebook.py
 ```

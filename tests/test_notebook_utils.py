@@ -772,7 +772,7 @@ class TestUiLabel:
         gu = GreekUtils(mo_module=_StubMo())
         assert gu.ui_label('not_a_real_key', 'en') == 'not_a_real_key'
 
-    def test_all_34_keys_present_in_all_3_languages(self):
+    def test_all_44_keys_present_in_all_3_languages(self):
         # regression: guards against a TSV row silently dropped for one
         # language during a future edit -- every key must resolve in en/ru/el.
         gu = GreekUtils(mo_module=_StubMo())
@@ -787,6 +787,9 @@ class TestUiLabel:
             'test1_done', 'test2_done', 'test3_done',
             'poem_section_heading', 'vocabulary_heading',
             'test_label', 'presence_test_topic', 'noun_test_topic', 'verb_test_topic', 'adj_test_topic',
+            'drill_title', 'drill_description', 'pos_label', 'load_tsv_label',
+            'require_article_label', 'full_paradigm_label',
+            'verb_done', 'noun_done', 'adj_done', 'word_label',
         ]
         for key in keys:
             for lang in ('en', 'ru', 'el'):
