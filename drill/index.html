@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EEE — Paradigm Drill</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;700;800&display=swap');
+
+    :root {
+      --bg: #ffffff;
+      --surface: #f8f9fa;
+      --border: #e0e0e0;
+      --accent: #003d82;
+      --accent2: #5f27cd;
+      --text: #1a1a1a;
+      --muted: #666666;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      font-family: 'Syne', sans-serif;
+      color: var(--text);
+    }
+
+    #loader {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      transition: opacity 0.4s ease, visibility 0.4s ease;
+    }
+
+    #loader.hidden { opacity: 0; visibility: hidden; }
+
+    .logo-wrap { position: relative; width: 72px; height: 72px; }
+
+    .logo-ring {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      border-top-color: var(--accent);
+      border-right-color: var(--accent2);
+      animation: spin 1.2s linear infinite;
+    }
+
+    .logo-ring:nth-child(2) {
+      inset: 8px;
+      border-top-color: var(--accent2);
+      border-right-color: var(--accent);
+      animation-direction: reverse;
+      animation-duration: 1.8s;
+    }
+
+    .logo-dot {
+      position: absolute;
+      inset: 18px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 50%;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(0.85); opacity: 0.7; }
+    }
+
+    .loader-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .loader-title {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    #topbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 50;
+      height: 48px;
+      background: #f5f5f5;
+      border-bottom: 2px solid var(--accent);
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 10px;
+    }
+
+    .tb-back {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      background: rgba(0,61,130,0.08);
+      border: 1px solid rgba(0,61,130,0.2);
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 16px;
+      transition: background 0.15s, border-color 0.15s;
+      flex-shrink: 0;
+    }
+
+    .tb-back:active {
+      background: rgba(0,61,130,0.15);
+      border-color: rgba(0,61,130,0.35);
+    }
+
+    .tb-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    .tb-title {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      flex: 1;
+      color: var(--text);
+      text-decoration: none;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .tb-badge {
+      font-weight: 700;
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      color: var(--accent);
+      background: rgba(0,61,130,0.08);
+      border: 1px solid rgba(0,61,130,0.3);
+      border-radius: 4px;
+      padding: 4px 8px;
+      letter-spacing: 0.1em;
+      text-decoration: none;
+      flex-shrink: 0;
+    }
+
+    #notebook-frame {
+      position: fixed;
+      top: 48px; left: 0; right: 0; bottom: 40px;
+      border: none;
+      width: 100%;
+      height: calc(100% - 88px);
+      background: #fff;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+    }
+
+    #notebook-frame.visible { opacity: 1; }
+
+    #error-state {
+      display: none;
+      position: fixed;
+      inset: 48px 0 40px 0;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    #error-state.show { display: flex; }
+
+    .err-icon { font-size: 48px; opacity: 0.5; }
+    .err-title { font-size: 18px; font-weight: 700; }
+    .err-msg { font-size: 13px; color: var(--muted); max-width: 280px; line-height: 1.6; }
+
+    .err-btn {
+      margin-top: 8px;
+      padding: 10px 24px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #ffffff;
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 13px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      letter-spacing: 0.03em;
+      transition: transform 0.15s, opacity 0.15s;
+    }
+
+    .err-btn:active { transform: scale(0.96); opacity: 0.85; }
+
+    #footer {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      z-index: 100;
+      height: 40px;
+      background: #f5f5f5;
+      border-top: 2px solid var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 12px;
+    }
+
+    .footer-link {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--accent);
+      letter-spacing: 0.05em;
+      text-decoration: none;
+    }
+  </style>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-D9SLECHKZL"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-D9SLECHKZL');
+  </script>
+</head>
+<body>
+
+  <div id="loader">
+    <div class="logo-wrap">
+      <div class="logo-ring"></div>
+      <div class="logo-ring"></div>
+      <div class="logo-dot"></div>
+    </div>
+    <div class="loader-title">EEE</div>
+    <div class="loader-label">Paradigm Drill</div>
+  </div>
+
+  <div id="topbar">
+    <a class="tb-back" href="../" title="Back to hub">&#9664;</a>
+    <a class="tb-title" href="../">Paradigm Drill</a>
+    <a class="tb-badge" href="https://telegram.me/+VuocC5la3ZwyNDky" target="_blank" rel="noopener">EEE Community</a>
+  </div>
+
+  <iframe
+    id="notebook-frame"
+    src="notebook.html"
+    allow="fullscreen; clipboard-read; clipboard-write"
+    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads"
+    title="EEE — Paradigm Drill"
+  ></iframe>
+
+  <div id="error-state">
+    <div class="err-icon">&#9889;</div>
+    <div class="err-title">Couldn't load notebook</div>
+    <div class="err-msg">The notebook may be temporarily unavailable, or your browser blocked it.</div>
+    <button class="err-btn" onclick="retryLoad()">Try again</button>
+    <button class="err-btn" style="background: var(--surface); color: var(--text); border: 1px solid var(--border);" onclick="window.open('notebook.html', '_blank')">Open in new tab</button>
+  </div>
+
+  <div id="footer">
+    <span style="font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text); margin-right: 8px;">Source code:</span>
+    <a class="footer-link" href="https://codeberg.org/EEE-project/eee-project" target="_blank" rel="noopener">codeberg.org/EEE-project/eee-project</a>
+  </div>
+
+  <script>
+    const NOTEBOOK_URL = 'notebook.html';
+    const frame = document.getElementById('notebook-frame');
+    const loader = document.getElementById('loader');
+    const errorState = document.getElementById('error-state');
+
+    let loadTimer = setTimeout(showError, 90000);
+    let readyPoll = null;
+
+    // The WASM notebook's own DOM 'load' event fires as soon as the static
+    // HTML shell loads (~1s) -- long before Pyodide finishes booting and the
+    // notebook actually renders (~20-30s). Poll the (same-origin) iframe's
+    // own rendered text instead of trusting 'load' alone, so the loader stays
+    // up until there's real content, not a blank white page.
+    function frameHasContent() {
+      try {
+        const doc = frame.contentDocument;
+        return !!(doc && doc.body && doc.body.innerText.trim().length > 100);
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function revealFrame() {
+      clearTimeout(loadTimer);
+      clearInterval(readyPoll);
+      loader.classList.add('hidden');
+      frame.classList.add('visible');
+    }
+
+    frame.addEventListener('load', () => {
+      readyPoll = setInterval(() => {
+        if (frameHasContent()) revealFrame();
+      }, 500);
+    });
+
+    frame.addEventListener('error', () => {
+      clearTimeout(loadTimer);
+      clearInterval(readyPoll);
+      showError();
+    });
+
+    function showError() {
+      clearInterval(readyPoll);
+      loader.classList.add('hidden');
+      errorState.classList.add('show');
+    }
+
+    function retryLoad() {
+      errorState.classList.remove('show');
+      loader.classList.remove('hidden');
+      frame.classList.remove('visible');
+      clearInterval(readyPoll);
+      loadTimer = setTimeout(showError, 90000);
+      frame.src = NOTEBOOK_URL + '?t=' + Date.now();
+    }
+  </script>
+</body>
+</html>

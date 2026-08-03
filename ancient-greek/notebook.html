@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="./favicon.ico" />
+    <!-- Preload is necessary because we show these images when we disconnect from the server,
+    but at that point we cannot load these images from the server -->
+    <link rel="preload" href="./assets/gradient-yHQUC_QB.png" as="image" />
+    <link rel="preload" href="./assets/noise-60BoTA8O.png" as="image" />
+    <!-- Preload the fonts -->
+    <link rel="preload" href="./assets/Lora-VariableFont_wght-CZceb_kH.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+    <link rel="preload" href="./assets/PTSans-Regular-Bam3NpBI.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+    <link rel="preload" href="./assets/PTSans-Bold-C_DwAp7Z.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+    <link rel="preload" href="./assets/FiraMono-Regular-CEsLFVD9.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+    <link rel="preload" href="./assets/FiraMono-Medium-D5MAsWEG.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+    <link rel="preload" href="./assets/FiraMono-Bold-C6PDArdf.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="a marimo app" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <link rel="manifest" href="./manifest.json" />
+
+    <script data-marimo="true">
+      function __resizeIframe(obj) {
+        const scrollbarHeight = 20; // Max between windows, mac, and linux
+
+        function setHeight() {
+          // Guard against race condition where iframe isn't ready
+          if (!obj.contentWindow?.document?.documentElement) {
+            return;
+          }
+          const element = obj.contentWindow.document.documentElement;
+          // If there is no vertical scrollbar, we don't need to resize the iframe
+          if (element.scrollHeight === element.clientHeight) {
+            return;
+          }
+
+          // Create a new height that includes the scrollbar height if it's visible
+          const hasHorizontalScrollbar = element.scrollWidth > element.clientWidth;
+          const newHeight = element.scrollHeight + (hasHorizontalScrollbar ? scrollbarHeight : 0);
+
+          // Only update the height if it's different from the current height
+          if (obj.style.height !== `${newHeight}px`) {
+            obj.style.height = `${newHeight}px`;
+          }
+        }
+
+        // Resize the iframe to the height of the content and bottom scrollbar height
+        setHeight();
+
+        // Resize the iframe when the content changes
+        const resizeObserver = new ResizeObserver((_entries) => {
+          setHeight();
+        });
+        // Only observe if iframe content is ready
+        if (obj.contentWindow?.document?.body) {
+          resizeObserver.observe(obj.contentWindow.document.body);
+        }
+      }
+    </script>
+    <marimo-filename hidden>notebook.py</marimo-filename>
+    <!-- TODO(Trevor): Legacy, required by VS Code plugin. Remove when plugin is updated (see marimo/server/_templates/template.py) -->
+    <marimo-version data-version="{{ version }}" hidden></marimo-version>
+    <marimo-user-config data-config="{{ user_config }}" hidden></marimo-user-config>
+    <marimo-server-token data-token="{{ server_token }}" hidden></marimo-server-token>
+    <!-- /TODO -->
+    <title>ancient greek notebook</title>
+    <script type="module" crossorigin src="./assets/index-Dbvu7Fs-.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/preload-helper-BW0IMuFq.js">
+    <link rel="modulepreload" crossorigin href="./assets/chunk-LvLJmgfZ.js">
+    <link rel="modulepreload" crossorigin href="./assets/react-Bj1aDYRI.js">
+    <link rel="modulepreload" crossorigin href="./assets/compiler-runtime-B3qBwwSJ.js">
+    <link rel="modulepreload" crossorigin href="./assets/jsx-runtime-PbYoItBR.js">
+    <link rel="modulepreload" crossorigin href="./assets/useEventListener-BakX-tnw.js">
+    <link rel="modulepreload" crossorigin href="./assets/defaultLocale-OkOxlkkM.js">
+    <link rel="modulepreload" crossorigin href="./assets/precisionRound-BOmLQIKI.js">
+    <link rel="modulepreload" crossorigin href="./assets/defaultLocale-DK1MWd7f.js">
+    <link rel="modulepreload" crossorigin href="./assets/vega-loader.browser-CZV6_g2i.js">
+    <link rel="modulepreload" crossorigin href="./assets/utils-DPvpQ891.js">
+    <link rel="modulepreload" crossorigin href="./assets/clsx-BtEcuwwV.js">
+    <link rel="modulepreload" crossorigin href="./assets/cn-X2M2usMq.js">
+    <link rel="modulepreload" crossorigin href="./assets/badge-6yGCqY1Z.js">
+    <link rel="modulepreload" crossorigin href="./assets/button-BF7GSjhW.js">
+    <link rel="modulepreload" crossorigin href="./assets/react-dom-CSu739Rf.js">
+    <link rel="modulepreload" crossorigin href="./assets/fullscreen-BXI8V5i6.js">
+    <link rel="modulepreload" crossorigin href="./assets/menu-items-CQMqwayA.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-DCqDlsgq.js">
+    <link rel="modulepreload" crossorigin href="./assets/createLucideIcon-BTp1tQDO.js">
+    <link rel="modulepreload" crossorigin href="./assets/check-DQmqoJgr.js">
+    <link rel="modulepreload" crossorigin href="./assets/x-9vLEgLY6.js">
+    <link rel="modulepreload" crossorigin href="./assets/select-Cjly7tmx.js">
+    <link rel="modulepreload" crossorigin href="./assets/tooltip-CgQpRVyN.js">
+    <link rel="modulepreload" crossorigin href="./assets/use-toast-kCNiuc-_.js">
+    <link rel="modulepreload" crossorigin href="./assets/useEvent-D91BmmQi.js">
+    <link rel="modulepreload" crossorigin href="./assets/invariant-C2E8KCbD.js">
+    <link rel="modulepreload" crossorigin href="./assets/isObject-DvLSfCY5.js">
+    <link rel="modulepreload" crossorigin href="./assets/_baseFor-DKD1r8uL.js">
+    <link rel="modulepreload" crossorigin href="./assets/merge-_9WLTEyt.js">
+    <link rel="modulepreload" crossorigin href="./assets/zod-H_cgTO0M.js">
+    <link rel="modulepreload" crossorigin href="./assets/utils-CCzEbCvM.js">
+    <link rel="modulepreload" crossorigin href="./assets/Deferred-BMfCOLaw.js">
+    <link rel="modulepreload" crossorigin href="./assets/uuid-ClFZlR7U.js">
+    <link rel="modulepreload" crossorigin href="./assets/DeferredRequestRegistry-RuL7NV1n.js">
+    <link rel="modulepreload" crossorigin href="./assets/constants-B9JJ72XE.js">
+    <link rel="modulepreload" crossorigin href="./assets/session-CsT5Gg9j.js">
+    <link rel="modulepreload" crossorigin href="./assets/config-Vyzo6FSF.js">
+    <link rel="modulepreload" crossorigin href="./assets/requests-KshNNAOp.js">
+    <link rel="modulepreload" crossorigin href="./assets/useLifecycle-Baf35rp4.js">
+    <link rel="modulepreload" crossorigin href="./assets/useNonce-0SWz6w4W.js">
+    <link rel="modulepreload" crossorigin href="./assets/useTheme-COorCcXC.js">
+    <link rel="modulepreload" crossorigin href="./assets/arrays-DWxvyYxP.js">
+    <link rel="modulepreload" crossorigin href="./assets/strings-DvZlHYnD.js">
+    <link rel="modulepreload" crossorigin href="./assets/once-CXj_gH7S.js">
+    <link rel="modulepreload" crossorigin href="./assets/capabilities-CjNGDxxx.js">
+    <link rel="modulepreload" crossorigin href="./assets/createReducer-3wF4dU7I.js">
+    <link rel="modulepreload" crossorigin href="./assets/paths-DhuNSnZ_.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-Dez1I5M9.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-B0WqBUnf.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-CwfKvuyQ.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-CNKFZCiw.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-ZjSH4Z6x.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-D-2yWcX9.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-DblYTes5.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-BtrqKtvn.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-CfGDksO-.js">
+    <link rel="modulepreload" crossorigin href="./assets/stex-0ac7Aukl.js">
+    <link rel="modulepreload" crossorigin href="./assets/toDate-DCE7d2fN.js">
+    <link rel="modulepreload" crossorigin href="./assets/purify.es-DfJp_of2.js">
+    <link rel="modulepreload" crossorigin href="./assets/cjs-DXo9vDEJ.js">
+    <link rel="modulepreload" crossorigin href="./assets/isSymbol-BT6B8Bon.js">
+    <link rel="modulepreload" crossorigin href="./assets/now-CsYTPAhW.js">
+    <link rel="modulepreload" crossorigin href="./assets/debounce-OiXznToA.js">
+    <link rel="modulepreload" crossorigin href="./assets/database-zap-DIlSqcdp.js">
+    <link rel="modulepreload" crossorigin href="./assets/main-DmhaVp6Y.js">
+    <link rel="modulepreload" crossorigin href="./assets/cells-ChH37lAD.js">
+    <link rel="modulepreload" crossorigin href="./assets/kbd-UVzWBHfi.js">
+    <link rel="modulepreload" crossorigin href="./assets/useInstallPackage-C1Dd0aIZ.js">
+    <link rel="modulepreload" crossorigin href="./assets/alert-dialog-CC0gG4Av.js">
+    <link rel="modulepreload" crossorigin href="./assets/dialog-DkJmIrsG.js">
+    <link rel="modulepreload" crossorigin href="./assets/useDebounce-CpLI2dsc.js">
+    <link rel="modulepreload" crossorigin href="./assets/numbers-_ry1Nlla.js">
+    <link rel="modulepreload" crossorigin href="./assets/SSRProvider-DX2edArU.js">
+    <link rel="modulepreload" crossorigin href="./assets/context-C2Ie4tn_.js">
+    <link rel="modulepreload" crossorigin href="./assets/useNumberFormatter-CuxZh3Bq.js">
+    <link rel="modulepreload" crossorigin href="./assets/usePress-BSFUeqnS.js">
+    <link rel="modulepreload" crossorigin href="./assets/input-DB2LiTiQ.js">
+    <link rel="modulepreload" crossorigin href="./assets/ImperativeModal-B62Q6S9l.js">
+    <link rel="modulepreload" crossorigin href="./assets/cell-link-BZg1pgHT.js">
+    <link rel="modulepreload" crossorigin href="./assets/config-CjCV0n0j.js">
+    <link rel="modulepreload" crossorigin href="./assets/alert-1y_DnRWn.js">
+    <link rel="modulepreload" crossorigin href="./assets/chevron-right-C7RH0Nc7.js">
+    <link rel="modulepreload" crossorigin href="./assets/dropdown-menu-DfGLyCbP.js">
+    <link rel="modulepreload" crossorigin href="./assets/links-CCkJpphF.js">
+    <link rel="modulepreload" crossorigin href="./assets/useRunCells-Dmf7GVGt.js">
+    <link rel="modulepreload" crossorigin href="./assets/copy-D8MtpXgN.js">
+    <link rel="modulepreload" crossorigin href="./assets/copy-IBNGDypD.js">
+    <link rel="modulepreload" crossorigin href="./assets/copy-icon-EHMT-qlr.js">
+    <link rel="modulepreload" crossorigin href="./assets/RenderHTML-DZz6EFTa.js">
+    <link rel="modulepreload" crossorigin href="./assets/datasource-ii4hOmhM.js">
+    <link rel="modulepreload" crossorigin href="./assets/state-DIDUL4YY.js">
+    <link rel="modulepreload" crossorigin href="./assets/hat-glasses-DlK0E4SX.js">
+    <link rel="modulepreload" crossorigin href="./assets/package-BTIV9-Dk.js">
+    <link rel="modulepreload" crossorigin href="./assets/sparkles-COaEc8Qn.js">
+    <link rel="modulepreload" crossorigin href="./assets/MarimoErrorOutput-t_4q7nKD.js">
+    <link rel="modulepreload" crossorigin href="./assets/ErrorBoundary-Bo313Z9X.js">
+    <link rel="modulepreload" crossorigin href="./assets/eye-off-DI0EQXw0.js">
+    <link rel="modulepreload" crossorigin href="./assets/refresh-cw-C9FftltI.js">
+    <link rel="modulepreload" crossorigin href="./assets/tree-actions-DONHntzY.js">
+    <link rel="modulepreload" crossorigin href="./assets/spinner-BbI9qk88.js">
+    <link rel="modulepreload" crossorigin href="./assets/html-to-image-B9XAiAY5.js">
+    <link rel="modulepreload" crossorigin href="./assets/focus-CeA7VBO7.js">
+    <link rel="modulepreload" crossorigin href="./assets/useAsyncData-DAQcLiyE.js">
+    <link rel="modulepreload" crossorigin href="./assets/LazyAnyLanguageCodeMirror-BSGwa0jm.js">
+    <link rel="modulepreload" crossorigin href="./assets/micromark-factory-space-BUQpMdx2.js">
+    <link rel="modulepreload" crossorigin href="./assets/chunk-5FQGJX7Z-OScactr4.js">
+    <link rel="modulepreload" crossorigin href="./assets/markdown-renderer-BxBgsCTf.js">
+    <link rel="modulepreload" crossorigin href="./assets/command-DRHbYHUP.js">
+    <link rel="modulepreload" crossorigin href="./assets/field-DlNY-dDH.js">
+    <link rel="modulepreload" crossorigin href="./assets/popover-DMNO6Poc.js">
+    <link rel="modulepreload" crossorigin href="./assets/errors-Bi-kjxOy.js">
+    <link rel="modulepreload" crossorigin href="./assets/download-BVqpOaYz.js">
+    <link rel="modulepreload" crossorigin href="./assets/table-CnW850Wt.js">
+    <link rel="modulepreload" crossorigin href="./assets/useIframeCapabilities-B0dNZiKK.js">
+    <link rel="modulepreload" crossorigin href="./assets/error-banner-DEWyImqa.js">
+    <link rel="modulepreload" crossorigin href="./assets/formats-ZGU43GQU.js">
+    <link rel="modulepreload" crossorigin href="./assets/en-US-BXNio91F.js">
+    <link rel="modulepreload" crossorigin href="./assets/isValid-DKyiOp4U.js">
+    <link rel="modulepreload" crossorigin href="./assets/dates-D8uxHHPL.js">
+    <link rel="modulepreload" crossorigin href="./assets/extends-CeSFM22p.js">
+    <link rel="modulepreload" crossorigin href="./assets/emotion-is-prop-valid.esm-CK2zY6a8.js">
+    <link rel="modulepreload" crossorigin href="./assets/useDateFormatter-CAlTJ8HV.js">
+    <link rel="modulepreload" crossorigin href="./assets/react-icons.esm-DCqqMD4w.js">
+    <link rel="modulepreload" crossorigin href="./assets/RSPContexts-VzcTZjG1.js">
+    <link rel="modulepreload" crossorigin href="./assets/table-DxdydCSG.js">
+    <link rel="modulepreload" crossorigin href="./assets/ellipsis-D0iYysLh.js">
+    <link rel="modulepreload" crossorigin href="./assets/external-link-BktyywYg.js">
+    <link rel="modulepreload" crossorigin href="./assets/message-circle-RkIzfQEi.js">
+    <link rel="modulepreload" crossorigin href="./assets/plus-ZXRHY1up.js">
+    <link rel="modulepreload" crossorigin href="./assets/trash-2-CqTUwVuU.js">
+    <link rel="modulepreload" crossorigin href="./assets/react-resizable-panels.browser.esm-Ce2ksurd.js">
+    <link rel="modulepreload" crossorigin href="./assets/JsonOutput-Cqq7S3wn.js">
+    <link rel="modulepreload" crossorigin href="./assets/chart-no-axes-column-DVEV2j1H.js">
+    <link rel="modulepreload" crossorigin href="./assets/square-function-Dx0pKHko.js">
+    <link rel="modulepreload" crossorigin href="./assets/spec-CDgWI0fT.js">
+    <link rel="modulepreload" crossorigin href="./assets/column-preview-47aOuXOh.js">
+    <link rel="modulepreload" crossorigin href="./assets/icons-avFV3lBF.js">
+    <link rel="modulepreload" crossorigin href="./assets/radio-group-xSHDhdM7.js">
+    <link rel="modulepreload" crossorigin href="./assets/floating-outline-Dy8nXch3.js">
+    <link rel="modulepreload" crossorigin href="./assets/objectWithoutPropertiesLoose-BkUn3I0-.js">
+    <link rel="modulepreload" crossorigin href="./assets/esm-X3Tr2pur.js">
+    <link rel="modulepreload" crossorigin href="./assets/readonly-python-code-C12Tt_qR.js">
+    <link rel="modulepreload" crossorigin href="./assets/file-headphone-CUN2DC78.js">
+    <link rel="modulepreload" crossorigin href="./assets/file-BvoBtS_V.js">
+    <link rel="modulepreload" crossorigin href="./assets/image-BzUcK6ho.js">
+    <link rel="modulepreload" crossorigin href="./assets/file-icons-BSYRCaKq.js">
+    <link rel="modulepreload" crossorigin href="./assets/switch-DqXjpgoL.js">
+    <link rel="modulepreload" crossorigin href="./assets/events-XR_LpvHc.js">
+    <link rel="modulepreload" crossorigin href="./assets/globals-B2VpoaLA.js">
+    <link rel="modulepreload" crossorigin href="./assets/share-DQjChRJG.js">
+    <link rel="modulepreload" crossorigin href="./assets/blob-BiK5xmlC.js">
+    <link rel="modulepreload" crossorigin href="./assets/memoize-Tp7rARFe.js">
+    <link rel="modulepreload" crossorigin href="./assets/get-C-qh_et5.js">
+    <link rel="modulepreload" crossorigin href="./assets/_baseSet-CsW0tABf.js">
+    <link rel="modulepreload" crossorigin href="./assets/state-Csq9SFHN.js">
+    <link rel="modulepreload" crossorigin href="./assets/label-CFvCMYuj.js">
+    <link rel="modulepreload" crossorigin href="./assets/textarea-D_WnJbC1.js">
+    <link rel="modulepreload" crossorigin href="./assets/refresh-ccw-Bee7JLOl.js">
+    <link rel="modulepreload" crossorigin href="./assets/form-x2vXRBGq.js">
+    <link rel="modulepreload" crossorigin href="./assets/renderShortcut-DTZeni4V.js">
+    <link rel="modulepreload" crossorigin href="./assets/useBoolean-DmobZaim.js">
+    <link rel="modulepreload" crossorigin href="./assets/useDeepCompareMemoize-CWcgQCbT.js">
+    <link rel="modulepreload" crossorigin href="./assets/types-BnrgJ4Gh.js">
+    <link rel="modulepreload" crossorigin href="./assets/semaphore-X3ApuO41.js">
+    <link rel="modulepreload" crossorigin href="./assets/fileToBase64-BSOFR3RV.js">
+    <link rel="modulepreload" crossorigin href="./assets/pathUtils-BXCjaLHB.js">
+    <link rel="modulepreload" crossorigin href="./assets/prop-types-B6Y2e__V.js">
+    <link rel="modulepreload" crossorigin href="./assets/es-EItoYvXh.js">
+    <link rel="modulepreload" crossorigin href="./assets/_hasPath-hMc_3QZy.js">
+    <link rel="modulepreload" crossorigin href="./assets/hasIn-CSsM95b1.js">
+    <link rel="modulepreload" crossorigin href="./assets/flatten-Bd5tsfm_.js">
+    <link rel="modulepreload" crossorigin href="./assets/pick-D1xb4gl6.js">
+    <link rel="modulepreload" crossorigin href="./assets/code-xml-tqeFGeKJ.js">
+    <link rel="modulepreload" crossorigin href="./assets/house-DHu4JLi3.js">
+    <link rel="modulepreload" crossorigin href="./assets/square-35tXIgiR.js">
+    <link rel="modulepreload" crossorigin href="./assets/triangle-alert-D8Ft17xk.js">
+    <link rel="modulepreload" crossorigin href="./assets/bundle.esm-D544r2Sr.js">
+    <link rel="stylesheet" crossorigin href="./assets/cells-BVzo2MHf.css">
+    <link rel="stylesheet" crossorigin href="./assets/markdown-renderer-DdDKmWlR.css">
+    <link rel="stylesheet" crossorigin href="./assets/JsonOutput-BQtz7-np.css">
+    <link rel="stylesheet" crossorigin href="./assets/index-DZAttTAm.css">
+  <marimo-wasm hidden=""></marimo-wasm>
+    <script>
+        if (window.location.protocol === 'file:') {
+            alert('Warning: This file must be served by an HTTP server to function correctly.');
+        }
+    </script>
+    
+    <style>
+        #save-button {
+            display: none !important;
+        }
+        #filename-input {
+            display: none !important;
+        }
+    </style>
+    
+<script data-marimo="true">
+    Object.defineProperty(window, "__MARIMO_EXPORT_CONTEXT__", {
+        value: Object.freeze({
+            trusted: true,
+            notebookCode: "# /// script\n# requires-python = \"\u003E=3.12\"\n# dependencies = [\n#     \"marimo\u003E=0.23.13\",\n#     \"eee-project\u003E=1.1.0\",\n#     \"unimorph-backend-eee\u003E=1.0.3\",\n#     \"ancient-greek-backend-eee\u003E=2.0.0\",\n# ]\n# ///\n\"\"\"Ancient Greek morphology demo using the eee package.\n\nRun standalone (fetches packages from PyPI):\n    uv run marimo run examples/ancient_greek_notebook.py\n\nRun from within the repo (uses local packages):\n    uv run marimo edit examples/ancient_greek_notebook.py\n\"\"\"\n\nimport marimo\n\n__generated_with = \"0.23.14\"\napp = marimo.App(width=\"medium\")\n\n\n@app.cell(hide_code=True)\ndef _():\n    import marimo as mo\n    import eee_project as eee\n    from ancient_greek_backend_eee import AncientGreekBackend\n    from unimorph_backend_eee import UniMorphBackend\n\n    eee.register_backend(\"grc\", AncientGreekBackend())\n    eee.register_backend(\"grc\", UniMorphBackend(language=\"grc\"), backend=\"unimorph\")\n\n    # One named backend per bundled period/corpus preset, so this general demo\n    # notebook can show off any of them -- not just the tiny Pratt teaching set\n    # the bare default above uses. for_period() resolves each preset's lexicon\n    # list from a single shared source in ancient-greek-backend-eee (see its\n    # own _PERIOD_PRESETS for why e.g. \"byzantine\" merges onto a Koine/Attic\n    # base) -- new presets only need a name added there, not a lexicon list\n    # hand-copied into every consumer including this one.\n    for _period_name, _period in [\n        (\"ag-homer\", \"epic\"),\n        (\"ag-lsj\", \"attic\"),\n        (\"ag-lxx\", \"hellenistic_koine\"),\n        (\"ag-morphgnt\", \"roman_koine\"),\n        (\"ag-byzantine\", \"byzantine\"),\n    ]:\n        eee.register_backend(\"grc\", AncientGreekBackend.for_period(_period), backend=_period_name)\n    return eee, mo\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    # Ancient Greek Morphology\n    **[eee](https://codeberg.org/EEE-project/eee)** \u2014 language-agnostic morphology engine for the EEE project.\n\n    Select a part of speech and backend, then pick a word from the corpus table.\n    Feature keys follow [Universal Dependencies FEATS](https://universaldependencies.org/u/feat/index.html).\n    \"\"\")\n    return\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    pos_selector = mo.ui.dropdown(\n        options={\"Noun\": \"noun\", \"Verb\": \"verb\", \"Adjective\": \"adjective\"},\n        value=\"Noun\",\n        label=\"Part of speech\",\n    )\n    gender_selector = mo.ui.dropdown(\n        options={\"\u2014 (all)\": None, \"Masc\": \"Masc\", \"Fem\": \"Fem\", \"Neut\": \"Neut\"},\n        value=\"\u2014 (all)\",\n        label=\"Gender\",\n    )\n    backend_selector = mo.ui.dropdown(\n        options={\n            \"ancient-greek (pratt)\": None,\n            \"Epic Greek (homer)\": \"ag-homer\",\n            \"Classical Attic (lsj)\": \"ag-lsj\",\n            \"Hellenistic Koine (lxx)\": \"ag-lxx\",\n            \"Roman Koine (morphgnt)\": \"ag-morphgnt\",\n            \"Byzantine Greek (byzantine)\": \"ag-byzantine\",\n            \"unimorph\": \"unimorph\",\n        },\n        value=\"ancient-greek (pratt)\",\n        label=\"Backend\",\n    )\n    return backend_selector, gender_selector, pos_selector\n\n\n@app.cell(hide_code=True)\ndef _(backend_selector, eee, mo, pos_selector):\n    _unimorph_verb = backend_selector.value == \"unimorph\" and pos_selector.value == \"verb\"\n    if _unimorph_verb:\n        corpus_table = None\n        _display = mo.callout(\n            mo.md(\"UniMorph has no Ancient Greek verb data \u2014 use **ancient-greek** backend\"),\n            kind=\"warn\",\n        )\n    else:\n        try:\n            _available = eee.list_lemmas(pos_selector.value, language=\"grc\", backend=backend_selector.value)\n        except Exception:\n            _available = []\n        if _available:\n            corpus_table = mo.ui.table(\n                [{\"Word\": w} for w in _available],\n                selection=\"single\",\n                label=f\"Corpus words \u2014 {pos_selector.value} ({len(_available)})\",\n            )\n            _display = corpus_table\n        else:\n            corpus_table = None\n            _display = mo.md(\"\")\n    _display\n    return (corpus_table,)\n\n\n@app.cell(hide_code=True)\ndef _(backend_selector, gender_selector, mo, pos_selector):\n    _controls = [backend_selector, pos_selector]\n    if pos_selector.value == \"adjective\":\n        _controls.append(gender_selector)\n    mo.hstack(_controls, gap=\"1rem\", justify=\"start\")\n    return\n\n\n@app.cell(hide_code=True)\ndef _(backend_selector, corpus_table, eee, gender_selector, pos_selector):\n    _lemma = corpus_table.value[0][\"Word\"] if (corpus_table is not None and corpus_table.value) else \"\"\n    _pos = pos_selector.value\n    _gender = gender_selector.value\n\n    _VERB_FORMS = []\n    for _tense, _tense_label in [(\"Pres\", \"Pres\"), (\"Aor\", \"Aor\"), (\"Fut\", \"Fut\"), (\"Perf\", \"Perf\")]:\n        for _voice, _voice_label in [(\"Act\", \"Act\"), (\"Mid\", \"Mid\"), (\"Pass\", \"Pass\")]:\n            for _person, _number in [(\"1\", \"Sing\"), (\"2\", \"Sing\"), (\"3\", \"Sing\"),\n                                      (\"1\", \"Plur\"), (\"2\", \"Plur\"), (\"3\", \"Plur\")]:\n                _VERB_FORMS.append((\n                    f\"{_tense_label} {_voice_label} {_person}{'sg' if _number == 'Sing' else 'pl'} Ind\",\n                    {\"VerbForm\": \"Fin\", \"Tense\": _tense, \"Voice\": _voice,\n                     \"Mood\": \"Ind\", \"Person\": _person, \"Number\": _number},\n                ))\n    for _tense, _tense_label in [(\"Pres\", \"Pres\"), (\"Aor\", \"Aor\")]:\n        for _voice, _voice_label in [(\"Act\", \"Act\"), (\"Mid\", \"Mid\"), (\"Pass\", \"Pass\")]:\n            _VERB_FORMS.append((\n                f\"{_tense_label} {_voice_label} Inf\",\n                {\"VerbForm\": \"Inf\", \"Tense\": _tense, \"Voice\": _voice},\n            ))\n            _VERB_FORMS.append((\n                f\"{_tense_label} {_voice_label} Part NSM\",\n                {\"VerbForm\": \"Part\", \"Tense\": _tense, \"Voice\": _voice,\n                 \"Case\": \"Nom\", \"Number\": \"Sing\", \"Gender\": \"Masc\"},\n            ))\n\n    _NOUN_FORMS = []\n    for _number in (\"Sing\", \"Plur\"):\n        for _case in (\"Nom\", \"Gen\", \"Dat\", \"Acc\", \"Voc\"):\n            _feats = {\"Case\": _case, \"Number\": _number}\n            if _gender:\n                _feats[\"Gender\"] = _gender\n            _NOUN_FORMS.append((f\"{_case} {_number}\", _feats))\n\n    _ADJ_FORMS = []\n    _genders = [_gender] if _gender else [\"Masc\", \"Fem\", \"Neut\"]\n    for _g in _genders:\n        for _number in (\"Sing\", \"Plur\"):\n            for _case in (\"Nom\", \"Gen\", \"Dat\", \"Acc\"):\n                _ADJ_FORMS.append((\n                    f\"{_g} {_case} {_number}\",  # restore \"Pos {_g}...\" when Cmp/Sup re-enabled\n                    {\"Degree\": \"Pos\", \"Gender\": _g, \"Case\": _case, \"Number\": _number},\n                ))\n\n    _GRC_DEF = {\n        (\"Masc\",\"Sing\",\"Nom\"): \"\u1f41\",    (\"Masc\",\"Sing\",\"Gen\"): \"\u03c4\u03bf\u1fe6\",\n        (\"Masc\",\"Sing\",\"Dat\"): \"\u03c4\u1ff7\",   (\"Masc\",\"Sing\",\"Acc\"): \"\u03c4\u03cc\u03bd\",  (\"Masc\",\"Sing\",\"Voc\"): \"\",\n        (\"Masc\",\"Plur\",\"Nom\"): \"\u03bf\u1f31\",   (\"Masc\",\"Plur\",\"Gen\"): \"\u03c4\u1ff6\u03bd\",\n        (\"Masc\",\"Plur\",\"Dat\"): \"\u03c4\u03bf\u1fd6\u03c2\", (\"Masc\",\"Plur\",\"Acc\"): \"\u03c4\u03bf\u03cd\u03c2\", (\"Masc\",\"Plur\",\"Voc\"): \"\",\n        (\"Fem\", \"Sing\",\"Nom\"): \"\u1f21\",    (\"Fem\", \"Sing\",\"Gen\"): \"\u03c4\u1fc6\u03c2\",\n        (\"Fem\", \"Sing\",\"Dat\"): \"\u03c4\u1fc7\",   (\"Fem\", \"Sing\",\"Acc\"): \"\u03c4\u03ae\u03bd\",  (\"Fem\", \"Sing\",\"Voc\"): \"\",\n        (\"Fem\", \"Plur\",\"Nom\"): \"\u03b1\u1f31\",   (\"Fem\", \"Plur\",\"Gen\"): \"\u03c4\u1ff6\u03bd\",\n        (\"Fem\", \"Plur\",\"Dat\"): \"\u03c4\u03b1\u1fd6\u03c2\", (\"Fem\", \"Plur\",\"Acc\"): \"\u03c4\u03ac\u03c2\",  (\"Fem\", \"Plur\",\"Voc\"): \"\",\n        (\"Neut\",\"Sing\",\"Nom\"): \"\u03c4\u03cc\",   (\"Neut\",\"Sing\",\"Gen\"): \"\u03c4\u03bf\u1fe6\",\n        (\"Neut\",\"Sing\",\"Dat\"): \"\u03c4\u1ff7\",   (\"Neut\",\"Sing\",\"Acc\"): \"\u03c4\u03cc\",   (\"Neut\",\"Sing\",\"Voc\"): \"\",\n        (\"Neut\",\"Plur\",\"Nom\"): \"\u03c4\u03ac\",   (\"Neut\",\"Plur\",\"Gen\"): \"\u03c4\u1ff6\u03bd\",\n        (\"Neut\",\"Plur\",\"Dat\"): \"\u03c4\u03bf\u1fd6\u03c2\", (\"Neut\",\"Plur\",\"Acc\"): \"\u03c4\u03ac\",   (\"Neut\",\"Plur\",\"Voc\"): \"\",\n    }\n    _forms_map = {\"verb\": _VERB_FORMS, \"noun\": _NOUN_FORMS, \"adjective\": _ADJ_FORMS}\n    _fg_noun = _gender\n    if _pos == \"noun\" and _fg_noun is None:\n        for _g in (\"Masc\", \"Fem\", \"Neut\"):\n            try:\n                _r = eee.inflect(_lemma, {\"Number\": \"Sing\", \"Case\": \"Nom\", \"Gender\": _g}, _pos, language=\"grc\", backend=backend_selector.value)\n                if _lemma in (_r or set()):\n                    _fg_noun = _g\n                    break\n            except Exception:\n                pass\n    _use_articles = _pos == \"noun\" and _fg_noun is not None\n    rows = []\n    if _lemma:\n        for _label, _features in _forms_map.get(_pos, []):\n            try:\n                _result = eee.inflect(_lemma, _features, _pos, language=\"grc\", backend=backend_selector.value)\n                if _use_articles:\n                    _fn = _features.get(\"Number\", \"\")\n                    _fc = _features.get(\"Case\", \"\")\n                    _art = _GRC_DEF.get((_fg_noun, _fn, _fc), \"\")\n                    rows.append({\n                        \"Form\":     _label,\n                        \"Definite\": \", \".join(f\"{_art} {f}\".strip() for f in sorted(_result)) if _result else \"\u2014\",\n                    })\n                else:\n                    rows.append({\"Form\": _label, \"Inflected forms\": \", \".join(sorted(_result)) if _result else \"\u2014\"})\n            except Exception as _exc:\n                if _use_articles:\n                    rows.append({\"Form\": _label, \"Definite\": f\"error: {_exc}\"})\n                else:\n                    rows.append({\"Form\": _label, \"Inflected forms\": f\"error: {_exc}\"})\n    return (rows,)\n\n\n@app.cell(hide_code=True)\ndef _(corpus_table, mo, rows):\n    _lemma = corpus_table.value[0][\"Word\"] if (corpus_table is not None and corpus_table.value) else \"\"\n    if rows:\n        _output = mo.ui.table(rows, selection=None)\n    elif _lemma:\n        _output = mo.md(f\"No forms found for **{_lemma}**.\")\n    elif corpus_table is not None:\n        _output = mo.md(\"Select a word from the corpus table above.\")\n    else:\n        _output = mo.md(\"\")\n    _output\n    return\n\n\nif __name__ == \"__main__\":\n    app.run()\n",
+        }),
+        writable: false,
+        configurable: false,
+    });
+</script>
+<marimo-code hidden="">%23%20%2F%2F%2F%20script%0A%23%20requires-python%20%3D%20%22%3E%3D3.12%22%0A%23%20dependencies%20%3D%20%5B%0A%23%20%20%20%20%20%22marimo%3E%3D0.23.13%22%2C%0A%23%20%20%20%20%20%22eee-project%3E%3D1.1.0%22%2C%0A%23%20%20%20%20%20%22unimorph-backend-eee%3E%3D1.0.3%22%2C%0A%23%20%20%20%20%20%22ancient-greek-backend-eee%3E%3D2.0.0%22%2C%0A%23%20%5D%0A%23%20%2F%2F%2F%0A%22%22%22Ancient%20Greek%20morphology%20demo%20using%20the%20eee%20package.%0A%0ARun%20standalone%20(fetches%20packages%20from%20PyPI)%3A%0A%20%20%20%20uv%20run%20marimo%20run%20examples%2Fancient_greek_notebook.py%0A%0ARun%20from%20within%20the%20repo%20(uses%20local%20packages)%3A%0A%20%20%20%20uv%20run%20marimo%20edit%20examples%2Fancient_greek_notebook.py%0A%22%22%22%0A%0Aimport%20marimo%0A%0A__generated_with%20%3D%20%220.23.14%22%0Aapp%20%3D%20marimo.App(width%3D%22medium%22)%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_()%3A%0A%20%20%20%20import%20marimo%20as%20mo%0A%20%20%20%20import%20eee_project%20as%20eee%0A%20%20%20%20from%20ancient_greek_backend_eee%20import%20AncientGreekBackend%0A%20%20%20%20from%20unimorph_backend_eee%20import%20UniMorphBackend%0A%0A%20%20%20%20eee.register_backend(%22grc%22%2C%20AncientGreekBackend())%0A%20%20%20%20eee.register_backend(%22grc%22%2C%20UniMorphBackend(language%3D%22grc%22)%2C%20backend%3D%22unimorph%22)%0A%0A%20%20%20%20%23%20One%20named%20backend%20per%20bundled%20period%2Fcorpus%20preset%2C%20so%20this%20general%20demo%0A%20%20%20%20%23%20notebook%20can%20show%20off%20any%20of%20them%20--%20not%20just%20the%20tiny%20Pratt%20teaching%20set%0A%20%20%20%20%23%20the%20bare%20default%20above%20uses.%20for_period()%20resolves%20each%20preset's%20lexicon%0A%20%20%20%20%23%20list%20from%20a%20single%20shared%20source%20in%20ancient-greek-backend-eee%20(see%20its%0A%20%20%20%20%23%20own%20_PERIOD_PRESETS%20for%20why%20e.g.%20%22byzantine%22%20merges%20onto%20a%20Koine%2FAttic%0A%20%20%20%20%23%20base)%20--%20new%20presets%20only%20need%20a%20name%20added%20there%2C%20not%20a%20lexicon%20list%0A%20%20%20%20%23%20hand-copied%20into%20every%20consumer%20including%20this%20one.%0A%20%20%20%20for%20_period_name%2C%20_period%20in%20%5B%0A%20%20%20%20%20%20%20%20(%22ag-homer%22%2C%20%22epic%22)%2C%0A%20%20%20%20%20%20%20%20(%22ag-lsj%22%2C%20%22attic%22)%2C%0A%20%20%20%20%20%20%20%20(%22ag-lxx%22%2C%20%22hellenistic_koine%22)%2C%0A%20%20%20%20%20%20%20%20(%22ag-morphgnt%22%2C%20%22roman_koine%22)%2C%0A%20%20%20%20%20%20%20%20(%22ag-byzantine%22%2C%20%22byzantine%22)%2C%0A%20%20%20%20%5D%3A%0A%20%20%20%20%20%20%20%20eee.register_backend(%22grc%22%2C%20AncientGreekBackend.for_period(_period)%2C%20backend%3D_period_name)%0A%20%20%20%20return%20eee%2C%20mo%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%20Ancient%20Greek%20Morphology%0A%20%20%20%20**%5Beee%5D(https%3A%2F%2Fcodeberg.org%2FEEE-project%2Feee)**%20%E2%80%94%20language-agnostic%20morphology%20engine%20for%20the%20EEE%20project.%0A%0A%20%20%20%20Select%20a%20part%20of%20speech%20and%20backend%2C%20then%20pick%20a%20word%20from%20the%20corpus%20table.%0A%20%20%20%20Feature%20keys%20follow%20%5BUniversal%20Dependencies%20FEATS%5D(https%3A%2F%2Funiversaldependencies.org%2Fu%2Ffeat%2Findex.html).%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20pos_selector%20%3D%20mo.ui.dropdown(%0A%20%20%20%20%20%20%20%20options%3D%7B%22Noun%22%3A%20%22noun%22%2C%20%22Verb%22%3A%20%22verb%22%2C%20%22Adjective%22%3A%20%22adjective%22%7D%2C%0A%20%20%20%20%20%20%20%20value%3D%22Noun%22%2C%0A%20%20%20%20%20%20%20%20label%3D%22Part%20of%20speech%22%2C%0A%20%20%20%20)%0A%20%20%20%20gender_selector%20%3D%20mo.ui.dropdown(%0A%20%20%20%20%20%20%20%20options%3D%7B%22%E2%80%94%20(all)%22%3A%20None%2C%20%22Masc%22%3A%20%22Masc%22%2C%20%22Fem%22%3A%20%22Fem%22%2C%20%22Neut%22%3A%20%22Neut%22%7D%2C%0A%20%20%20%20%20%20%20%20value%3D%22%E2%80%94%20(all)%22%2C%0A%20%20%20%20%20%20%20%20label%3D%22Gender%22%2C%0A%20%20%20%20)%0A%20%20%20%20backend_selector%20%3D%20mo.ui.dropdown(%0A%20%20%20%20%20%20%20%20options%3D%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%22ancient-greek%20(pratt)%22%3A%20None%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20%22Epic%20Greek%20(homer)%22%3A%20%22ag-homer%22%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20%22Classical%20Attic%20(lsj)%22%3A%20%22ag-lsj%22%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20%22Hellenistic%20Koine%20(lxx)%22%3A%20%22ag-lxx%22%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20%22Roman%20Koine%20(morphgnt)%22%3A%20%22ag-morphgnt%22%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20%22Byzantine%20Greek%20(byzantine)%22%3A%20%22ag-byzantine%22%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20%22unimorph%22%3A%20%22unimorph%22%2C%0A%20%20%20%20%20%20%20%20%7D%2C%0A%20%20%20%20%20%20%20%20value%3D%22ancient-greek%20(pratt)%22%2C%0A%20%20%20%20%20%20%20%20label%3D%22Backend%22%2C%0A%20%20%20%20)%0A%20%20%20%20return%20backend_selector%2C%20gender_selector%2C%20pos_selector%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(backend_selector%2C%20eee%2C%20mo%2C%20pos_selector)%3A%0A%20%20%20%20_unimorph_verb%20%3D%20backend_selector.value%20%3D%3D%20%22unimorph%22%20and%20pos_selector.value%20%3D%3D%20%22verb%22%0A%20%20%20%20if%20_unimorph_verb%3A%0A%20%20%20%20%20%20%20%20corpus_table%20%3D%20None%0A%20%20%20%20%20%20%20%20_display%20%3D%20mo.callout(%0A%20%20%20%20%20%20%20%20%20%20%20%20mo.md(%22UniMorph%20has%20no%20Ancient%20Greek%20verb%20data%20%E2%80%94%20use%20**ancient-greek**%20backend%22)%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20kind%3D%22warn%22%2C%0A%20%20%20%20%20%20%20%20)%0A%20%20%20%20else%3A%0A%20%20%20%20%20%20%20%20try%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20_available%20%3D%20eee.list_lemmas(pos_selector.value%2C%20language%3D%22grc%22%2C%20backend%3Dbackend_selector.value)%0A%20%20%20%20%20%20%20%20except%20Exception%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20_available%20%3D%20%5B%5D%0A%20%20%20%20%20%20%20%20if%20_available%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20corpus_table%20%3D%20mo.ui.table(%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%5B%7B%22Word%22%3A%20w%7D%20for%20w%20in%20_available%5D%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20selection%3D%22single%22%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20label%3Df%22Corpus%20words%20%E2%80%94%20%7Bpos_selector.value%7D%20(%7Blen(_available)%7D)%22%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20)%0A%20%20%20%20%20%20%20%20%20%20%20%20_display%20%3D%20corpus_table%0A%20%20%20%20%20%20%20%20else%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20corpus_table%20%3D%20None%0A%20%20%20%20%20%20%20%20%20%20%20%20_display%20%3D%20mo.md(%22%22)%0A%20%20%20%20_display%0A%20%20%20%20return%20(corpus_table%2C)%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(backend_selector%2C%20gender_selector%2C%20mo%2C%20pos_selector)%3A%0A%20%20%20%20_controls%20%3D%20%5Bbackend_selector%2C%20pos_selector%5D%0A%20%20%20%20if%20pos_selector.value%20%3D%3D%20%22adjective%22%3A%0A%20%20%20%20%20%20%20%20_controls.append(gender_selector)%0A%20%20%20%20mo.hstack(_controls%2C%20gap%3D%221rem%22%2C%20justify%3D%22start%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(backend_selector%2C%20corpus_table%2C%20eee%2C%20gender_selector%2C%20pos_selector)%3A%0A%20%20%20%20_lemma%20%3D%20corpus_table.value%5B0%5D%5B%22Word%22%5D%20if%20(corpus_table%20is%20not%20None%20and%20corpus_table.value)%20else%20%22%22%0A%20%20%20%20_pos%20%3D%20pos_selector.value%0A%20%20%20%20_gender%20%3D%20gender_selector.value%0A%0A%20%20%20%20_VERB_FORMS%20%3D%20%5B%5D%0A%20%20%20%20for%20_tense%2C%20_tense_label%20in%20%5B(%22Pres%22%2C%20%22Pres%22)%2C%20(%22Aor%22%2C%20%22Aor%22)%2C%20(%22Fut%22%2C%20%22Fut%22)%2C%20(%22Perf%22%2C%20%22Perf%22)%5D%3A%0A%20%20%20%20%20%20%20%20for%20_voice%2C%20_voice_label%20in%20%5B(%22Act%22%2C%20%22Act%22)%2C%20(%22Mid%22%2C%20%22Mid%22)%2C%20(%22Pass%22%2C%20%22Pass%22)%5D%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20for%20_person%2C%20_number%20in%20%5B(%221%22%2C%20%22Sing%22)%2C%20(%222%22%2C%20%22Sing%22)%2C%20(%223%22%2C%20%22Sing%22)%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20(%221%22%2C%20%22Plur%22)%2C%20(%222%22%2C%20%22Plur%22)%2C%20(%223%22%2C%20%22Plur%22)%5D%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20_VERB_FORMS.append((%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20f%22%7B_tense_label%7D%20%7B_voice_label%7D%20%7B_person%7D%7B'sg'%20if%20_number%20%3D%3D%20'Sing'%20else%20'pl'%7D%20Ind%22%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%7B%22VerbForm%22%3A%20%22Fin%22%2C%20%22Tense%22%3A%20_tense%2C%20%22Voice%22%3A%20_voice%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%22Mood%22%3A%20%22Ind%22%2C%20%22Person%22%3A%20_person%2C%20%22Number%22%3A%20_number%7D%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20))%0A%20%20%20%20for%20_tense%2C%20_tense_label%20in%20%5B(%22Pres%22%2C%20%22Pres%22)%2C%20(%22Aor%22%2C%20%22Aor%22)%5D%3A%0A%20%20%20%20%20%20%20%20for%20_voice%2C%20_voice_label%20in%20%5B(%22Act%22%2C%20%22Act%22)%2C%20(%22Mid%22%2C%20%22Mid%22)%2C%20(%22Pass%22%2C%20%22Pass%22)%5D%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20_VERB_FORMS.append((%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20f%22%7B_tense_label%7D%20%7B_voice_label%7D%20Inf%22%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%7B%22VerbForm%22%3A%20%22Inf%22%2C%20%22Tense%22%3A%20_tense%2C%20%22Voice%22%3A%20_voice%7D%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20))%0A%20%20%20%20%20%20%20%20%20%20%20%20_VERB_FORMS.append((%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20f%22%7B_tense_label%7D%20%7B_voice_label%7D%20Part%20NSM%22%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%7B%22VerbForm%22%3A%20%22Part%22%2C%20%22Tense%22%3A%20_tense%2C%20%22Voice%22%3A%20_voice%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%22Case%22%3A%20%22Nom%22%2C%20%22Number%22%3A%20%22Sing%22%2C%20%22Gender%22%3A%20%22Masc%22%7D%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20))%0A%0A%20%20%20%20_NOUN_FORMS%20%3D%20%5B%5D%0A%20%20%20%20for%20_number%20in%20(%22Sing%22%2C%20%22Plur%22)%3A%0A%20%20%20%20%20%20%20%20for%20_case%20in%20(%22Nom%22%2C%20%22Gen%22%2C%20%22Dat%22%2C%20%22Acc%22%2C%20%22Voc%22)%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20_feats%20%3D%20%7B%22Case%22%3A%20_case%2C%20%22Number%22%3A%20_number%7D%0A%20%20%20%20%20%20%20%20%20%20%20%20if%20_gender%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20_feats%5B%22Gender%22%5D%20%3D%20_gender%0A%20%20%20%20%20%20%20%20%20%20%20%20_NOUN_FORMS.append((f%22%7B_case%7D%20%7B_number%7D%22%2C%20_feats))%0A%0A%20%20%20%20_ADJ_FORMS%20%3D%20%5B%5D%0A%20%20%20%20_genders%20%3D%20%5B_gender%5D%20if%20_gender%20else%20%5B%22Masc%22%2C%20%22Fem%22%2C%20%22Neut%22%5D%0A%20%20%20%20for%20_g%20in%20_genders%3A%0A%20%20%20%20%20%20%20%20for%20_number%20in%20(%22Sing%22%2C%20%22Plur%22)%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20for%20_case%20in%20(%22Nom%22%2C%20%22Gen%22%2C%20%22Dat%22%2C%20%22Acc%22)%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20_ADJ_FORMS.append((%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20f%22%7B_g%7D%20%7B_case%7D%20%7B_number%7D%22%2C%20%20%23%20restore%20%22Pos%20%7B_g%7D...%22%20when%20Cmp%2FSup%20re-enabled%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%7B%22Degree%22%3A%20%22Pos%22%2C%20%22Gender%22%3A%20_g%2C%20%22Case%22%3A%20_case%2C%20%22Number%22%3A%20_number%7D%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20))%0A%0A%20%20%20%20_GRC_DEF%20%3D%20%7B%0A%20%20%20%20%20%20%20%20(%22Masc%22%2C%22Sing%22%2C%22Nom%22)%3A%20%22%E1%BD%81%22%2C%20%20%20%20(%22Masc%22%2C%22Sing%22%2C%22Gen%22)%3A%20%22%CF%84%CE%BF%E1%BF%A6%22%2C%0A%20%20%20%20%20%20%20%20(%22Masc%22%2C%22Sing%22%2C%22Dat%22)%3A%20%22%CF%84%E1%BF%B7%22%2C%20%20%20(%22Masc%22%2C%22Sing%22%2C%22Acc%22)%3A%20%22%CF%84%CF%8C%CE%BD%22%2C%20%20(%22Masc%22%2C%22Sing%22%2C%22Voc%22)%3A%20%22%22%2C%0A%20%20%20%20%20%20%20%20(%22Masc%22%2C%22Plur%22%2C%22Nom%22)%3A%20%22%CE%BF%E1%BC%B1%22%2C%20%20%20(%22Masc%22%2C%22Plur%22%2C%22Gen%22)%3A%20%22%CF%84%E1%BF%B6%CE%BD%22%2C%0A%20%20%20%20%20%20%20%20(%22Masc%22%2C%22Plur%22%2C%22Dat%22)%3A%20%22%CF%84%CE%BF%E1%BF%96%CF%82%22%2C%20(%22Masc%22%2C%22Plur%22%2C%22Acc%22)%3A%20%22%CF%84%CE%BF%CF%8D%CF%82%22%2C%20(%22Masc%22%2C%22Plur%22%2C%22Voc%22)%3A%20%22%22%2C%0A%20%20%20%20%20%20%20%20(%22Fem%22%2C%20%22Sing%22%2C%22Nom%22)%3A%20%22%E1%BC%A1%22%2C%20%20%20%20(%22Fem%22%2C%20%22Sing%22%2C%22Gen%22)%3A%20%22%CF%84%E1%BF%86%CF%82%22%2C%0A%20%20%20%20%20%20%20%20(%22Fem%22%2C%20%22Sing%22%2C%22Dat%22)%3A%20%22%CF%84%E1%BF%87%22%2C%20%20%20(%22Fem%22%2C%20%22Sing%22%2C%22Acc%22)%3A%20%22%CF%84%CE%AE%CE%BD%22%2C%20%20(%22Fem%22%2C%20%22Sing%22%2C%22Voc%22)%3A%20%22%22%2C%0A%20%20%20%20%20%20%20%20(%22Fem%22%2C%20%22Plur%22%2C%22Nom%22)%3A%20%22%CE%B1%E1%BC%B1%22%2C%20%20%20(%22Fem%22%2C%20%22Plur%22%2C%22Gen%22)%3A%20%22%CF%84%E1%BF%B6%CE%BD%22%2C%0A%20%20%20%20%20%20%20%20(%22Fem%22%2C%20%22Plur%22%2C%22Dat%22)%3A%20%22%CF%84%CE%B1%E1%BF%96%CF%82%22%2C%20(%22Fem%22%2C%20%22Plur%22%2C%22Acc%22)%3A%20%22%CF%84%CE%AC%CF%82%22%2C%20%20(%22Fem%22%2C%20%22Plur%22%2C%22Voc%22)%3A%20%22%22%2C%0A%20%20%20%20%20%20%20%20(%22Neut%22%2C%22Sing%22%2C%22Nom%22)%3A%20%22%CF%84%CF%8C%22%2C%20%20%20(%22Neut%22%2C%22Sing%22%2C%22Gen%22)%3A%20%22%CF%84%CE%BF%E1%BF%A6%22%2C%0A%20%20%20%20%20%20%20%20(%22Neut%22%2C%22Sing%22%2C%22Dat%22)%3A%20%22%CF%84%E1%BF%B7%22%2C%20%20%20(%22Neut%22%2C%22Sing%22%2C%22Acc%22)%3A%20%22%CF%84%CF%8C%22%2C%20%20%20(%22Neut%22%2C%22Sing%22%2C%22Voc%22)%3A%20%22%22%2C%0A%20%20%20%20%20%20%20%20(%22Neut%22%2C%22Plur%22%2C%22Nom%22)%3A%20%22%CF%84%CE%AC%22%2C%20%20%20(%22Neut%22%2C%22Plur%22%2C%22Gen%22)%3A%20%22%CF%84%E1%BF%B6%CE%BD%22%2C%0A%20%20%20%20%20%20%20%20(%22Neut%22%2C%22Plur%22%2C%22Dat%22)%3A%20%22%CF%84%CE%BF%E1%BF%96%CF%82%22%2C%20(%22Neut%22%2C%22Plur%22%2C%22Acc%22)%3A%20%22%CF%84%CE%AC%22%2C%20%20%20(%22Neut%22%2C%22Plur%22%2C%22Voc%22)%3A%20%22%22%2C%0A%20%20%20%20%7D%0A%20%20%20%20_forms_map%20%3D%20%7B%22verb%22%3A%20_VERB_FORMS%2C%20%22noun%22%3A%20_NOUN_FORMS%2C%20%22adjective%22%3A%20_ADJ_FORMS%7D%0A%20%20%20%20_fg_noun%20%3D%20_gender%0A%20%20%20%20if%20_pos%20%3D%3D%20%22noun%22%20and%20_fg_noun%20is%20None%3A%0A%20%20%20%20%20%20%20%20for%20_g%20in%20(%22Masc%22%2C%20%22Fem%22%2C%20%22Neut%22)%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20try%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20_r%20%3D%20eee.inflect(_lemma%2C%20%7B%22Number%22%3A%20%22Sing%22%2C%20%22Case%22%3A%20%22Nom%22%2C%20%22Gender%22%3A%20_g%7D%2C%20_pos%2C%20language%3D%22grc%22%2C%20backend%3Dbackend_selector.value)%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20if%20_lemma%20in%20(_r%20or%20set())%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20_fg_noun%20%3D%20_g%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20break%0A%20%20%20%20%20%20%20%20%20%20%20%20except%20Exception%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20pass%0A%20%20%20%20_use_articles%20%3D%20_pos%20%3D%3D%20%22noun%22%20and%20_fg_noun%20is%20not%20None%0A%20%20%20%20rows%20%3D%20%5B%5D%0A%20%20%20%20if%20_lemma%3A%0A%20%20%20%20%20%20%20%20for%20_label%2C%20_features%20in%20_forms_map.get(_pos%2C%20%5B%5D)%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20try%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20_result%20%3D%20eee.inflect(_lemma%2C%20_features%2C%20_pos%2C%20language%3D%22grc%22%2C%20backend%3Dbackend_selector.value)%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20if%20_use_articles%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20_fn%20%3D%20_features.get(%22Number%22%2C%20%22%22)%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20_fc%20%3D%20_features.get(%22Case%22%2C%20%22%22)%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20_art%20%3D%20_GRC_DEF.get((_fg_noun%2C%20_fn%2C%20_fc)%2C%20%22%22)%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20rows.append(%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%22Form%22%3A%20%20%20%20%20_label%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%22Definite%22%3A%20%22%2C%20%22.join(f%22%7B_art%7D%20%7Bf%7D%22.strip()%20for%20f%20in%20sorted(_result))%20if%20_result%20else%20%22%E2%80%94%22%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%7D)%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20else%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20rows.append(%7B%22Form%22%3A%20_label%2C%20%22Inflected%20forms%22%3A%20%22%2C%20%22.join(sorted(_result))%20if%20_result%20else%20%22%E2%80%94%22%7D)%0A%20%20%20%20%20%20%20%20%20%20%20%20except%20Exception%20as%20_exc%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20if%20_use_articles%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20rows.append(%7B%22Form%22%3A%20_label%2C%20%22Definite%22%3A%20f%22error%3A%20%7B_exc%7D%22%7D)%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20else%3A%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20rows.append(%7B%22Form%22%3A%20_label%2C%20%22Inflected%20forms%22%3A%20f%22error%3A%20%7B_exc%7D%22%7D)%0A%20%20%20%20return%20(rows%2C)%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(corpus_table%2C%20mo%2C%20rows)%3A%0A%20%20%20%20_lemma%20%3D%20corpus_table.value%5B0%5D%5B%22Word%22%5D%20if%20(corpus_table%20is%20not%20None%20and%20corpus_table.value)%20else%20%22%22%0A%20%20%20%20if%20rows%3A%0A%20%20%20%20%20%20%20%20_output%20%3D%20mo.ui.table(rows%2C%20selection%3DNone)%0A%20%20%20%20elif%20_lemma%3A%0A%20%20%20%20%20%20%20%20_output%20%3D%20mo.md(f%22No%20forms%20found%20for%20**%7B_lemma%7D**.%22)%0A%20%20%20%20elif%20corpus_table%20is%20not%20None%3A%0A%20%20%20%20%20%20%20%20_output%20%3D%20mo.md(%22Select%20a%20word%20from%20the%20corpus%20table%20above.%22)%0A%20%20%20%20else%3A%0A%20%20%20%20%20%20%20%20_output%20%3D%20mo.md(%22%22)%0A%20%20%20%20_output%0A%20%20%20%20return%0A%0A%0Aif%20__name__%20%3D%3D%20%22__main__%22%3A%0A%20%20%20%20app.run()%0A</marimo-code></head>
+  <body>
+    <div id="root"></div>
+    <script data-marimo="true">
+      Object.defineProperty(window, "__MARIMO_MOUNT_CONFIG__", {
+        value: Object.freeze({
+            "filename": "notebook.py",
+            "cwd": "",
+            "lspWorkspace": null,
+            "mode": "read",
+            "version": "0.23.14",
+            "serverToken": "unused",
+            "config": {"ai": {"custom_providers": {}, "enabled": true, "models": {"custom_models": [], "displayed_models": []}}, "completion": {"activate_on_typing": true, "auto_close_pairs": true, "copilot": false, "signature_hint_on_typing": false}, "diagnostics": {"sql_linter": true}, "display": {"cell_output": "below", "code_editor_font_size": 14, "dataframes": "rich", "default_table_max_columns": 50, "default_table_page_size": 10, "default_width": "medium", "reference_highlighting": false, "theme": "light"}, "formatting": {"line_length": 79}, "keymap": {"overrides": {}, "preset": "default"}, "language_servers": {"pylsp": {"enable_flake8": false, "enable_mypy": true, "enable_pydocstyle": false, "enable_pyflakes": false, "enable_pylint": false, "enable_ruff": true, "enabled": false}}, "mcp": {"mcpServers": {}, "presets": []}, "package_management": {"manager": "uv"}, "runtime": {"auto_instantiate": false, "auto_reload": "off", "default_csv_encoding": "utf-8", "default_sql_output": "auto", "on_cell_change": "autorun", "output_max_bytes": 8000000, "reactive_tests": true, "show_tracebacks": false, "std_stream_max_bytes": 1000000, "watcher_on_save": "lazy"}, "save": {"autosave": "off", "autosave_delay": 1000, "format_on_save": false}, "server": {"browser": "default", "follow_symlink": false}, "snippets": {"custom_paths": [], "include_default_snippets": true}},
+            "configOverrides": {},
+            "appConfig": {"sql_output": "auto", "width": "medium"},
+            "view": {"showAppCode": false},
+            "notebook": null,
+            "session": null,
+            "runtimeConfig": null,
+        }),
+        writable: false,
+        configurable: false,
+      });
+    </script>
+  </body>
+</html>
