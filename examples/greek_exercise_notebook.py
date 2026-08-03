@@ -2,21 +2,17 @@
 # requires-python = ">=3.12"
 # dependencies = [
 #     "marimo>=0.23.13",
-#     "eee-project @ git+https://codeberg.org/EEE-project/eee-project.git",
-#     "modern-greek-backend-eee @ git+https://codeberg.org/EEE-project/modern-greek-backend-eee.git",
-#     "ancient-greek-backend-eee @ git+https://codeberg.org/EEE-project/ancient-greek-backend-eee.git",
+#     "eee-project>=1.1.0",
+#     "modern-greek-backend-eee>=1.0.0",
+#     "ancient-greek-backend-eee>=2.0.0",
+#     "pandas==3.0.5",
 # ]
-#
-# [tool.uv.sources]
-# eee-project = { git = "https://codeberg.org/EEE-project/eee-project.git" }
-# modern-greek-backend-eee = { git = "https://codeberg.org/EEE-project/modern-greek-backend-eee.git" }
-# ancient-greek-backend-eee = { git = "https://codeberg.org/EEE-project/ancient-greek-backend-eee.git" }
 # ///
 """GreekUtils demo — verb exercises, custom drill, greek_compare, and vocab quiz.
 
 Combines the exercise API demo with the vocabulary quiz in a single notebook.
 
-Run standalone (fetches packages from Codeberg):
+Run standalone (fetches packages from PyPI):
     uv run marimo run examples/greek_exercise_notebook.py
 
 Run from within the repo (uses local packages):
@@ -559,11 +555,15 @@ def _():
     gu_mg = GreekUtils(_mg_backend, mo, pd, eee_module=eee)
     gu_ag = GreekUtils(_ag_backend, mo, pd, eee_module=eee, config=ANCIENT_GREEK)
 
+    # remote_base lets load_vocab_tsv fall back to fetching these from
+    # Codeberg when the local file isn't found -- needed for the WASM
+    # export, whose browser sandbox doesn't have this directory's siblings.
     NB_DIR = Path(__file__).parent
-    WORDS = gu_ag.load_vocab_tsv("vocab.tsv", nb_dir=NB_DIR)
-    NOUNS = gu_ag.load_vocab_tsv("nouns.tsv", nb_dir=NB_DIR)
-    ADJS = gu_ag.load_vocab_tsv("adjectives.tsv", nb_dir=NB_DIR)
-    _ADV_ADJS = gu_ag.load_vocab_tsv("adverb_adjectives.tsv", nb_dir=NB_DIR)
+    _REMOTE_BASE = "https://codeberg.org/EEE-project/eee-project/raw/branch/main/examples"
+    WORDS = gu_ag.load_vocab_tsv("vocab.tsv", nb_dir=NB_DIR, remote_base=_REMOTE_BASE)
+    NOUNS = gu_ag.load_vocab_tsv("nouns.tsv", nb_dir=NB_DIR, remote_base=_REMOTE_BASE)
+    ADJS = gu_ag.load_vocab_tsv("adjectives.tsv", nb_dir=NB_DIR, remote_base=_REMOTE_BASE)
+    _ADV_ADJS = gu_ag.load_vocab_tsv("adverb_adjectives.tsv", nb_dir=NB_DIR, remote_base=_REMOTE_BASE)
     ADVERBS = gu_ag.adverb_vocab(_ADV_ADJS)
     return ADJS, ADVERBS, NOUNS, WORDS, eee, greek_compare, gu_ag, gu_mg, mo
 

@@ -2,20 +2,16 @@
 # requires-python = ">=3.12"
 # dependencies = [
 #     "marimo>=0.23.13",
-#     "eee-project @ git+https://codeberg.org/EEE-project/eee.git",
-#     "unimorph-backend-eee @ git+https://codeberg.org/EEE-project/unimorph-backend-eee.git",
+#     "eee-project>=1.1.0",
+#     "unimorph-backend-eee>=1.0.3",
 # ]
-#
-# [tool.uv.sources]
-# eee-project = { git = "https://codeberg.org/EEE-project/eee.git" }
-# unimorph-backend-eee = { git = "https://codeberg.org/EEE-project/unimorph-backend-eee.git" }
 # ///
 """Interactive UniMorph inflection browser — all 187 languages.
 
 Bundled languages (ell, grc, lat, rus, spa, tur) work offline.
 All others are fetched from GitHub on first selection and cached locally.
 
-Run standalone (fetches from Codeberg):
+Run standalone (fetches packages from PyPI):
     uv run marimo run examples/unimorph_notebook.py
 
 Run from within the repo (uses local packages):

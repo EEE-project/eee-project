@@ -2,19 +2,14 @@
 # requires-python = ">=3.12"
 # dependencies = [
 #     "marimo>=0.23.13",
-#     "eee-project @ git+https://codeberg.org/EEE-project/eee.git",
-#     "modern-greek-backend-eee @ git+https://codeberg.org/EEE-project/modern-greek-backend-eee.git",
-#     "unimorph-backend-eee @ git+https://codeberg.org/EEE-project/unimorph-backend-eee.git",
+#     "eee-project>=1.1.0",
+#     "modern-greek-backend-eee>=1.0.0",
+#     "unimorph-backend-eee>=1.0.3",
 # ]
-#
-# [tool.uv.sources]
-# eee-project = { git = "https://codeberg.org/EEE-project/eee.git" }
-# modern-greek-backend-eee = { git = "https://codeberg.org/EEE-project/modern-greek-backend-eee.git" }
-# unimorph-backend-eee = { git = "https://codeberg.org/EEE-project/unimorph-backend-eee.git" }
 # ///
 """Modern Greek morphology demo using the eee package.
 
-Run standalone (fetches eee from Codeberg):
+Run standalone (fetches packages from PyPI):
     uv run marimo run examples/modern_greek_notebook.py
 
 Run from within the repo (uses local package):

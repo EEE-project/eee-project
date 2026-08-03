@@ -34,20 +34,16 @@ def _():
     eee.register_backend("el", mg_backend)
     gu = GreekUtils(mg_backend, mo, pd, eee_module=eee)
     t_ui = gu.ui_label
-    return gu, mo, pd, t_ui
 
-
-@app.cell(hide_code=True)
-def _(mo):
-    # Kept in its own cell, undisplayed here: a cell that both builds this
-    # widget and displays it conditionally elsewhere would rerun (and reset
-    # the selection back to its default) on every dependent re-render.
+    # Kept undisplayed here: a cell that both builds this widget and displays
+    # it conditionally elsewhere would rerun (and reset the selection back to
+    # its default) on every dependent re-render.
     language_selector = mo.ui.dropdown(
         options={"English": "en", "Русский": "ru", "Ελληνικά": "el"},
         value="English",
         label="🌐",
     )
-    return (language_selector,)
+    return gu, language_selector, mo, pd, t_ui
 
 
 @app.cell(hide_code=True)
@@ -73,10 +69,22 @@ def _(language_selector, mo, t_ui):
 
 @app.cell(hide_code=True)
 def _(language_selector, mo, t_ui):
+    file_upload = mo.ui.file(label=t_ui("load_tsv_label", language_selector.value))
+    file_upload
+    return (file_upload,)
+
+
+@app.cell(hide_code=True)
+def _(language_selector, mo, t_ui):
+    _lang = language_selector.value
     pos_selector = mo.ui.radio(
-        options=["verb", "noun", "adjective"],
-        value="noun",
-        label=t_ui("pos_label", language_selector.value),
+        options={
+            t_ui("verb_test_topic", _lang): "verb",
+            t_ui("noun_test_topic", _lang): "noun",
+            t_ui("adj_test_topic", _lang): "adjective",
+        },
+        value=t_ui("noun_test_topic", _lang),
+        label=t_ui("pos_label", _lang),
         inline=True,
     )
     pos_selector
@@ -84,52 +92,7 @@ def _(language_selector, mo, t_ui):
 
 
 @app.cell(hide_code=True)
-def _(language_selector, mo, t_ui):
-    file_upload = mo.ui.file(label=t_ui("load_tsv_label", language_selector.value))
-    file_upload
-    return (file_upload,)
-
-
-@app.cell(hide_code=True)
-def _(language_selector, mo, t_ui, tbl_sel, vocab_df):
-    _lang = language_selector.value
-    _selected_words = tbl_sel()
-    if _selected_words is None:
-        _sel_indices = list(range(len(vocab_df)))
-    else:
-        _sel_indices = [i for i, w in enumerate(vocab_df["Word"]) if w in _selected_words]
-        if not _sel_indices:
-            # Stale selection from a different part-of-speech/upload: none of its
-            # words exist in the current vocab_df, so default back to "all selected"
-            # rather than showing an empty, seemingly-broken table.
-            _sel_indices = list(range(len(vocab_df)))
-    vocab_table_df = vocab_df.rename(columns={
-        "Word": t_ui("word_label", _lang),
-        "Translation": t_ui("translation_label", _lang).removesuffix(":"),
-    })
-    vocab_table = mo.ui.table(vocab_table_df, selection="multi", initial_selection=_sel_indices)
-    vocab_table
-    return (vocab_table,)
-
-
-@app.cell(hide_code=True)
-def _(vocab_table):
-    if vocab_table.value is not None and not vocab_table.value.empty:
-        # vocab_table.value carries the *translated* display column names
-        # (word_label/translation_label), not literal "Word"/"Translation" --
-        # map by position instead of by name.
-        _cols = list(vocab_table.value.columns)
-        vocab = [
-            {"form": str(r[_cols[0]]).strip(), "meaning": str(r[_cols[1]]).strip()}
-            for _, r in vocab_table.value.iterrows()
-        ]
-    else:
-        vocab = []
-    return (vocab,)
-
-
-@app.cell(hide_code=True)
-def _():
+def _(file_upload, gu, mo, pd, pos_selector):
     DEFAULT_VOCAB = {
         "verb": [
             {"form": "γράφω", "meaning": "I write"},
@@ -147,11 +110,9 @@ def _():
             {"form": "όμορφος", "meaning": "beautiful"},
         ],
     }
-    return (DEFAULT_VOCAB,)
 
+    tbl_sel, set_tbl_sel = mo.state(None)
 
-@app.cell(hide_code=True)
-def _(DEFAULT_VOCAB, file_upload, gu, pd, pos_selector):
     # An uploaded TSV always has Word/Translation columns regardless of the
     # currently-selected part of speech — the same uploaded list is reused
     # across all 3 POS tabs, matching modern-greek-eee's old behavior.
@@ -165,18 +126,88 @@ def _(DEFAULT_VOCAB, file_upload, gu, pd, pos_selector):
     else:
         _rows = [{"Word": w["form"], "Translation": w["meaning"]} for w in DEFAULT_VOCAB[pos_selector.value]]
     vocab_df = pd.DataFrame(_rows)
-    return (vocab_df,)
+    return tbl_sel, vocab_df
 
 
 @app.cell(hide_code=True)
 def _(mo):
-    tbl_sel, set_tbl_sel = mo.state(None)
-    return set_tbl_sel, tbl_sel
+    confirmed_vocab, set_confirmed_vocab = mo.state([])
+    return confirmed_vocab, set_confirmed_vocab
 
 
 @app.cell(hide_code=True)
-def _(gu, vocab):
-    # Re-created whenever the part of speech (or vocab) changes — switching resets the drill.
+def _(gu, language_selector, mo, t_ui):
+    # Kept in their own cell, undisplayed here: a cell that both builds a
+    # widget and displays/uses it conditionally elsewhere would rerun (and
+    # reset the widget to its default) on every dependent re-render -- these
+    # 4 widgets must depend on *only* language_selector, not on vocab_table
+    # or anything downstream of it, otherwise every checkbox click in the
+    # vocab table (or every POS switch) would silently discard whatever the
+    # user had picked here. Confirmed via a live regression test after an
+    # earlier merge folded these into the same cell as vocab_table-derived
+    # state, which silently broke it (indefinite_toggle reset to False on
+    # any table-selection change).
+    _lang = language_selector.value
+    tense_options = gu.tense_dropdown_options(_lang)
+    default_tense_label = next(
+        (k for k, v in tense_options.items() if v == "present"),
+        next(iter(tense_options)),
+    )
+    tense_selector = mo.ui.dropdown(options=tense_options, value=default_tense_label, label=t_ui("tense_label", _lang))
+    article_toggle = mo.ui.switch(label=t_ui("require_article_label", _lang), value=True)
+    indefinite_toggle = mo.ui.switch(label=t_ui("indefinite_label", _lang), value=False)
+    full_mode_toggle = mo.ui.switch(label=t_ui("full_paradigm_label", _lang), value=False)
+    return article_toggle, full_mode_toggle, indefinite_toggle, tense_selector
+
+
+@app.cell(hide_code=True)
+def _(mo, tbl_sel, vocab_df):
+    # Column headers are always "Word"/"Translation" (not translated) -- this
+    # table's own cell must not depend on language_selector. Making it do so
+    # once caused a confirmed live regression: since this table's *value*
+    # is the source vocab is derived from, and the drill state resets
+    # whenever vocab's upstream cell reruns, a plain language switch would
+    # silently wipe drill progress (hist/w4t) with no word-content change
+    # at all.
+    _selected_words = tbl_sel() or set()
+    _sel_indices = [i for i, w in enumerate(vocab_df["Word"]) if w in _selected_words]
+    if not _sel_indices:
+        # No selection yet, or a stale selection from a different part-of-
+        # speech/upload with no matching words: default to "all selected".
+        _sel_indices = list(range(len(vocab_df)))
+    vocab_table = mo.ui.table(vocab_df, selection="multi", initial_selection=_sel_indices)
+    vocab_table
+    return (vocab_table,)
+
+
+@app.cell(hide_code=True)
+def _(confirmed_vocab, set_confirmed_vocab, vocab_table):
+    # Only commits a new vocab list when its *content* actually changed --
+    # vocab_table rebuilds as a new object on every language switch (pos_selector
+    # and file_upload both have translated labels, so they rebuild too, and jCtf
+    # depends on both), but that's a cosmetic rebuild, not a real selection
+    # change. Without this guard, crmA would re-derive vocab from the rebuilt
+    # vocab_table and call gu.make_paradigm_drill_state() again on every language
+    # switch, silently wiping hist/w4t/etc with no word-content change at all --
+    # confirmed via a live regression test (hist wiped by a plain language
+    # switch, no completion involved).
+    if vocab_table.value is not None and not vocab_table.value.empty:
+        _cols = list(vocab_table.value.columns)
+        _new_vocab = [
+            {"form": str(r[_cols[0]]).strip(), "meaning": str(r[_cols[1]]).strip()}
+            for _, r in vocab_table.value.iterrows()
+        ]
+    else:
+        _new_vocab = []
+
+    if _new_vocab != confirmed_vocab():
+        set_confirmed_vocab(_new_vocab)
+    return
+
+
+@app.cell(hide_code=True)
+def _(confirmed_vocab, gu):
+    vocab = confirmed_vocab()
     (w4t, set_w4t, hist, set_hist, msg, set_msg, cap, set_cap,
      entered, set_entered, sub_cnt, set_sub_cnt, prev_cnt, set_prev_cnt,
      nxt_cnt, set_nxt_cnt, entercnt, set_entercnt, restart_cnt,
@@ -201,43 +232,9 @@ def _(gu, vocab):
         set_sub_cnt,
         set_w4t,
         sub_cnt,
+        vocab,
         w4t,
     )
-
-
-@app.cell(hide_code=True)
-def _(set_tbl_sel, tbl_sel, w4t):
-    # Keeps the table's checked state in sync with drill progress (completed
-    # words auto-uncheck). Guarded: only calls set_tbl_sel when the computed
-    # value actually differs from the current one, otherwise this and the
-    # table cell (which depends on tbl_sel) would retrigger each other forever
-    # -- w4t always comes back as a *new* state-getter object after Xref
-    # rebuilds it, so an unguarded write here would never stop cascading even
-    # once the actual word set has stopped changing.
-    _remaining_forms = {w["form"] for w in w4t()}
-    if _remaining_forms != (tbl_sel() or set()):
-        set_tbl_sel(_remaining_forms)
-    return
-
-
-@app.cell(hide_code=True)
-def _(gu, language_selector, mo, t_ui):
-    # Widgets kept in their own cell, undisplayed here: a cell that both
-    # builds a widget and displays it conditionally on pos_selector would
-    # rerun (and reset the widget to its default) on every part-of-speech
-    # switch, since marimo reruns a cell whole when any dependency changes.
-    # The next cell displays each conditionally instead, without recreating it.
-    _lang = language_selector.value
-    tense_options = gu.tense_dropdown_options(_lang)
-    default_tense_label = next(
-        (k for k, v in tense_options.items() if v == "present"),
-        next(iter(tense_options)),
-    )
-    tense_selector = mo.ui.dropdown(options=tense_options, value=default_tense_label, label=t_ui("tense_label", _lang))
-    article_toggle = mo.ui.switch(label=t_ui("require_article_label", _lang), value=True)
-    indefinite_toggle = mo.ui.switch(label=t_ui("indefinite_label", _lang), value=False)
-    full_mode_toggle = mo.ui.switch(label=t_ui("full_paradigm_label", _lang), value=False)
-    return article_toggle, full_mode_toggle, indefinite_toggle, tense_selector
 
 
 @app.cell(hide_code=True)
@@ -276,22 +273,23 @@ def _(
     cur = w4t()[0] if w4t() else None
     noun_meta = None
     adj_mode = "full" if full_mode_toggle.value else "simple"
+    _lang = language_selector.value
     if pos_selector.value == "verb":
         labels = gu.verb_slot_labels()
     elif pos_selector.value == "noun":
         noun_meta = gu.noun_drill_meta(cur["form"]) if cur else None
         active_cases = getattr(noun_meta, "active_cases", [])
-        labels = gu.noun_slot_labels(active_cases)
+        labels = gu.noun_slot_labels(active_cases, lang=_lang)
         if indefinite_toggle.value:
-            labels = labels + [f"Ind. {l}" for l in gu.noun_slot_labels(gu.noun_indef_cells(active_cases))]
+            labels = labels + [f"Ind. {l}" for l in gu.noun_slot_labels(gu.noun_indef_cells(active_cases), lang=_lang)]
     else:
-        labels = gu.adjective_slot_labels(adj_mode)
+        labels = gu.adjective_slot_labels(adj_mode, lang=_lang)
     drill_form, prev_btn, nxt_btn, restart_btn = gu.paradigm_drill_widgets(
         labels=labels,
         values=entered().get(cur["form"]) if cur else None,
         history_len=len(hist()),
         remaining_len=len(w4t()),
-        lang=language_selector.value,
+        lang=_lang,
     )
     set_prev_cnt(0)
     set_nxt_cnt(0)
