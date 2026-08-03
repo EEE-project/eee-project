@@ -337,9 +337,9 @@ startup, GA config inline):
 ```python
 from eee_project import ConfigStore
 
-_ROOT = "https://codeberg.org/EEE-project/created_with_eee/raw/branch/main"
+_ROOT = "https://codeberg.org/api/v1/repos/EEE-project/created_with_eee/raw"
 _cfg = ConfigStore.from_url(
-    f"{_ROOT}/palaestra/index.tsv",   # per-course TSV
+    f"{_ROOT}/ancient_greek/palaestra/index.tsv",   # per-course TSV
     ga=f"{_ROOT}/ga.json",              # shared GA config at repo root
 )
 ```

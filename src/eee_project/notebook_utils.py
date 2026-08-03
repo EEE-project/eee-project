@@ -250,6 +250,41 @@ def _raw_base_from_url(url: str) -> str:
     return url.rsplit("/", 1)[0]
 
 
+def _cors_safe_raw_url(url: str) -> str:
+    """Rewrite a git-forge raw-content URL to a form that sends CORS headers.
+
+    Codeberg's and GitLab's plain git-web raw endpoints
+    (``.../raw/branch/<branch>/...``, ``.../-/raw/<branch>/...``) send no
+    ``Access-Control-Allow-Origin`` header — confirmed via direct response
+    header dump, not assumed — so a browser ``fetch``/``urllib`` call from
+    inside a self-hosted marimo WASM/Pyodide export is silently blocked by
+    CORS, even though the identical URL works fine from ``curl`` (which
+    doesn't enforce CORS at all). Their REST APIs serve the identical
+    bytes with ``access-control-allow-origin: *``. GitHub's own raw
+    endpoint (``raw.githubusercontent.com``) already sends CORS headers,
+    so it — and any other URL this doesn't recognize — passes through
+    unchanged. Only called at an actual network-fetch site (never for a
+    human-facing click-through link like :func:`magnify_image`'s
+    ``raw_base``, which deliberately keeps the git-web form).
+    """
+    import re
+    import urllib.parse
+
+    m = re.match(r"^https://codeberg\.org/([^/]+)/([^/]+)/raw/branch/([^/]+)/(.+)$", url)
+    if m:
+        owner, repo, branch, path = m.groups()
+        return f"https://codeberg.org/api/v1/repos/{owner}/{repo}/raw/{path}?ref={branch}"
+
+    m = re.match(r"^https://gitlab\.com/([^/]+)/([^/]+)/-/raw/([^/]+)/(.+)$", url)
+    if m:
+        owner, repo, branch, path = m.groups()
+        project = urllib.parse.quote(f"{owner}/{repo}", safe="")
+        file_path = urllib.parse.quote(path, safe="")
+        return f"https://gitlab.com/api/v4/projects/{project}/repository/files/{file_path}/raw?ref={branch}"
+
+    return url
+
+
 class ConfigStore:
     """Navigation and GA config storage with pluggable backends.
 
@@ -272,9 +307,9 @@ class ConfigStore:
 
     Example — molab (fetch TSV and GA config from Codeberg)::
 
-        _ROOT = "https://codeberg.org/EEE-project/created_with_eee/raw/branch/main"
+        _ROOT = "https://codeberg.org/api/v1/repos/EEE-project/created_with_eee/raw"
         _cfg = ConfigStore.from_url(
-            f"{_ROOT}/palaestra/index.tsv",
+            f"{_ROOT}/ancient_greek/palaestra/index.tsv",
             ga=f"{_ROOT}/ga.json",
         )
         eee_topbar(mo, back_url=_cfg.index_url(), ...)
@@ -285,9 +320,9 @@ class ConfigStore:
 
     Example — index/card-list notebooks (local-first, molab-safe)::
 
-        _ROOT = "https://codeberg.org/EEE-project/created_with_eee/raw/branch/main"
+        _ROOT = "https://codeberg.org/api/v1/repos/EEE-project/created_with_eee/raw"
         _cfg = ConfigStore.from_file_or_url(
-            __file__, f"{_ROOT}/palaestra/index.tsv", ga=f"{_ROOT}/ga.json",
+            __file__, f"{_ROOT}/ancient_greek/palaestra/index.tsv", ga=f"{_ROOT}/ga.json",
         )
     """
 
@@ -352,10 +387,10 @@ class ConfigStore:
 
         _raw_base = _raw_base_from_url(url)
         try:
-            with _req.urlopen(url, timeout=timeout) as _f:
+            with _req.urlopen(_cors_safe_raw_url(url), timeout=timeout) as _f:
                 lessons = cls._parse_tsv(_f.read().decode("utf-8"))
             if isinstance(ga, str):
-                with _req.urlopen(ga, timeout=timeout) as _f:
+                with _req.urlopen(_cors_safe_raw_url(ga), timeout=timeout) as _f:
                     ga = _json.loads(_f.read().decode("utf-8"))
         except Exception:
             lessons = []
@@ -4840,7 +4875,7 @@ Translation: **{translation}**
 
         local = Path(nb_dir) / filename
         if not local.exists():
-            url = f"{remote_base.rstrip('/')}/{urllib.parse.quote(filename)}"
+            url = _cors_safe_raw_url(f"{remote_base.rstrip('/')}/{urllib.parse.quote(filename)}")
             prev = socket.getdefaulttimeout()
             socket.setdefaulttimeout(timeout)
             try:

@@ -200,9 +200,9 @@ def _(mo):
 def _(WORDS, cv_c, gu_ag, history_c, remaining_c, restore_entry_c):
     answer_radio_c, next_btn_c, prev_btn_c = gu_ag.word_quiz_widgets(
         cv=cv_c(),
+        remaining=remaining_c(),
         vocab=WORDS,
         restore_entry=restore_entry_c(),
-        done=gu_ag.word_drill_done(cv_c(), remaining_c()),
         history_len=len(history_c()),
         lang="en",
     )
@@ -319,8 +319,9 @@ def _(ADJS, ADVERBS, NOUNS, WORDS, mo, pos_sel_w):
 @app.cell(hide_code=True)
 def _(cv_w, gu_ag, history_w, remaining_w, restore_entry_w):
     write_input_w, dia_w, check_btn_w, prev_btn_w, next_btn_w = gu_ag.word_drill_widgets(
+        cv=cv_w(),
+        remaining=remaining_w(),
         restore_entry=restore_entry_w(),
-        done=gu_ag.word_drill_done(cv_w(), remaining_w()),
         history_len=len(history_w()),
         lang="en",
     )
@@ -480,8 +481,9 @@ def _(
     write_input_p = dia_p = wcheck_btn_p = wprev_btn_p = wnext_btn_p = None
     if pos_sel.value == "adverb":
         write_input_p, dia_p, wcheck_btn_p, wprev_btn_p, wnext_btn_p = gu_ag.word_drill_widgets(
+            cv=cvw_p(),
+            remaining=remaining_p(),
             restore_entry=restore_entry_p(),
-            done=gu_ag.word_drill_done(cvw_p(), remaining_p()),
             history_len=len(history_p()),
             placeholder="Greek adverb…",
             lang="en",
@@ -558,8 +560,12 @@ def _():
     # remote_base lets load_vocab_tsv fall back to fetching these from
     # Codeberg when the local file isn't found -- needed for the WASM
     # export, whose browser sandbox doesn't have this directory's siblings.
+    # Must be the Gitea API raw endpoint, not the plain git-web raw URL --
+    # codeberg.org/.../raw/branch/... sends no CORS headers, so a browser
+    # fetch from inside the WASM sandbox is silently blocked; api/v1/repos/
+    # .../raw/... serves identical bytes with access-control-allow-origin: *.
     NB_DIR = Path(__file__).parent
-    _REMOTE_BASE = "https://codeberg.org/EEE-project/eee-project/raw/branch/main/examples"
+    _REMOTE_BASE = "https://codeberg.org/api/v1/repos/EEE-project/eee-project/raw/examples"
     WORDS = gu_ag.load_vocab_tsv("vocab.tsv", nb_dir=NB_DIR, remote_base=_REMOTE_BASE)
     NOUNS = gu_ag.load_vocab_tsv("nouns.tsv", nb_dir=NB_DIR, remote_base=_REMOTE_BASE)
     ADJS = gu_ag.load_vocab_tsv("adjectives.tsv", nb_dir=NB_DIR, remote_base=_REMOTE_BASE)

@@ -50,9 +50,9 @@ def _(mo):
     Fetch `index.tsv` per-course and `ga.json` from the repo root:
 
     ```python
-    _ROOT = "https://codeberg.org/EEE-project/created_with_eee/raw/branch/main"
+    _ROOT = "https://codeberg.org/api/v1/repos/EEE-project/created_with_eee/raw"
     _cfg = ConfigStore.from_url(
-        f"{_ROOT}/palaestra/ancient_greek.2026.summer/index.tsv",
+        f"{_ROOT}/ancient_greek/palaestra/ancient_greek.2026.summer/index.tsv",
         ga=f"{_ROOT}/ga.json",
     )
     ```
@@ -127,9 +127,9 @@ def _():
     import marimo as mo
     from eee_project import ConfigStore, eee_topbar
 
-    _ROOT = "https://codeberg.org/EEE-project/created_with_eee/raw/branch/main"
+    _ROOT = "https://codeberg.org/api/v1/repos/EEE-project/created_with_eee/raw"
     cfg = ConfigStore.from_url(
-        f"{_ROOT}/palaestra/ancient_greek.2026.summer/index.tsv",
+        f"{_ROOT}/ancient_greek/palaestra/ancient_greek.2026.summer/index.tsv",
         ga=f"{_ROOT}/ga.json",
     )
 

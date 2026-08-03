@@ -44,6 +44,7 @@ from eee_project.notebook_utils import (
     _DIA_ESM_TMPL,
     _PARA_ESM,
     _ITEXT_ESM,
+    _cors_safe_raw_url,
 )
 from conftest import StubMo as _StubMo, StubBackend as _StubBackend, StubMoLayout as _StubMoLayout
 
@@ -1424,6 +1425,34 @@ class TestConfigStore:
             )
         assert cfg.ga_config() == _SAMPLE_GA
 
+    def test_from_url_rewrites_codeberg_urls_before_fetch(self):
+        # Both the lessons TSV and the ga= URL must go out via the CORS-safe
+        # Codeberg API form, not the plain git-web raw URL, since from_url()
+        # is the exact "molab pattern" that also runs under a self-hosted
+        # WASM export where CORS is enforced.
+        _tsv = "nb_id\ticon\tgreek\tlabel\ttitle\tdesc\tindex_url\n"
+        seen_urls = []
+
+        def fake_urlopen(url, timeout=None):
+            seen_urls.append(url)
+            if "ga.json" in url:
+                return _make_resp(json.dumps(_SAMPLE_GA).encode("utf-8"))
+            return _make_resp(_tsv.encode("utf-8"))
+
+        with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+            cfg = ConfigStore.from_url(
+                "https://codeberg.org/EEE-project/created_with_eee/raw/branch/main/palaestra/index.tsv",
+                ga="https://codeberg.org/EEE-project/created_with_eee/raw/branch/main/ga.json",
+            )
+        assert seen_urls == [
+            "https://codeberg.org/api/v1/repos/EEE-project/created_with_eee/raw/palaestra/index.tsv?ref=main",
+            "https://codeberg.org/api/v1/repos/EEE-project/created_with_eee/raw/ga.json?ref=main",
+        ]
+        assert cfg.ga_config() == _SAMPLE_GA
+        # raw_base stays on the original git-web form -- it backs the
+        # human-facing magnify_image() click-through link, not a fetch.
+        assert cfg.raw_base == "https://codeberg.org/EEE-project/created_with_eee/raw/branch/main/palaestra"
+
     def test_from_file_reads_tsv(self, tmp_path):
         tsv = tmp_path / "index.tsv"
         tsv.write_text(
@@ -2333,6 +2362,80 @@ class TestEnsureFile:
             result = gu_marimo.ensure_file("file.tsv", nb_dir=tmp_path, remote_base="http://example.com")
         assert result == tmp_path / "file.tsv"
         assert result.read_text() == "downloaded"
+
+    def test_codeberg_remote_base_rewritten_before_fetch(self, gu_marimo, tmp_path):
+        # ensure_file's remote fetch must go out via the CORS-safe Codeberg
+        # API form, not the plain git-web raw URL (which sends no
+        # Access-Control-Allow-Origin header and is silently blocked by a
+        # browser fetch inside a self-hosted WASM export).
+        seen = {}
+
+        def fake_retrieve(url, dest):
+            seen["url"] = url
+            Path(dest).write_text("x")
+
+        with patch("urllib.request.urlretrieve", side_effect=fake_retrieve):
+            gu_marimo.ensure_file(
+                "vocab.tsv", nb_dir=tmp_path,
+                remote_base="https://codeberg.org/EEE-project/eee-project/raw/branch/main/examples",
+            )
+        assert seen["url"] == (
+            "https://codeberg.org/api/v1/repos/EEE-project/eee-project/raw/examples/vocab.tsv?ref=main"
+        )
+
+
+class TestCorsSafeRawUrl:
+    """_cors_safe_raw_url: rewrite CORS-blind git-forge raw URLs at fetch time."""
+
+    def test_codeberg_raw_branch_url_rewritten(self):
+        assert _cors_safe_raw_url(
+            "https://codeberg.org/EEE-project/eee-project/raw/branch/main/examples/vocab.tsv"
+        ) == "https://codeberg.org/api/v1/repos/EEE-project/eee-project/raw/examples/vocab.tsv?ref=main"
+
+    def test_codeberg_nested_path_preserved(self):
+        assert _cors_safe_raw_url(
+            "https://codeberg.org/EEE-project/created_with_eee/raw/branch/main/"
+            "ancient_greek/palaestra/index.tsv"
+        ) == (
+            "https://codeberg.org/api/v1/repos/EEE-project/created_with_eee/raw/"
+            "ancient_greek/palaestra/index.tsv?ref=main"
+        )
+
+    def test_codeberg_non_main_branch_preserved(self):
+        assert _cors_safe_raw_url(
+            "https://codeberg.org/EEE-project/eee-project/raw/branch/dev/x.tsv"
+        ) == "https://codeberg.org/api/v1/repos/EEE-project/eee-project/raw/x.tsv?ref=dev"
+
+    def test_gitlab_raw_url_rewritten_with_percent_encoded_path(self):
+        assert _cors_safe_raw_url(
+            "https://gitlab.com/EEE-project/created_with_eee/-/raw/main/"
+            "ancient_greek/palaestra/index.tsv"
+        ) == (
+            "https://gitlab.com/api/v4/projects/EEE-project%2Fcreated_with_eee/"
+            "repository/files/ancient_greek%2Fpalaestra%2Findex.tsv/raw?ref=main"
+        )
+
+    def test_gitlab_flat_filename(self):
+        assert _cors_safe_raw_url(
+            "https://gitlab.com/EEE-project/eee-project/-/raw/main/README.md"
+        ) == (
+            "https://gitlab.com/api/v4/projects/EEE-project%2Feee-project/"
+            "repository/files/README.md/raw?ref=main"
+        )
+
+    def test_github_raw_url_unchanged(self):
+        # raw.githubusercontent.com already sends Access-Control-Allow-Origin.
+        url = "https://raw.githubusercontent.com/EEE-project/eee-project/main/README.md"
+        assert _cors_safe_raw_url(url) == url
+
+    def test_already_codeberg_api_form_unchanged(self):
+        # Idempotent: a URL already in the CORS-safe form must not be rewritten again.
+        url = "https://codeberg.org/api/v1/repos/EEE-project/eee-project/raw/examples/vocab.tsv"
+        assert _cors_safe_raw_url(url) == url
+
+    def test_unrelated_url_unchanged(self):
+        url = "https://example.com/some/file.tsv"
+        assert _cors_safe_raw_url(url) == url
 
 
 # ────────────────────────────────────────── make_paradigm_form ──
