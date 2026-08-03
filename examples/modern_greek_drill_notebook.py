@@ -91,17 +91,41 @@ def _(language_selector, mo, t_ui):
 
 
 @app.cell(hide_code=True)
-def _(language_selector, mo, t_ui, vocab_df, w4t):
+def _(language_selector, mo, t_ui, tbl_sel, vocab_df):
     _lang = language_selector.value
-    _remaining_forms = {w["form"] for w in w4t()}
-    vocab_table_df = vocab_df[vocab_df["Word"].isin(_remaining_forms)].reset_index(drop=True)
-    vocab_table_df = vocab_table_df.rename(columns={
+    _selected_words = tbl_sel()
+    if _selected_words is None:
+        _sel_indices = list(range(len(vocab_df)))
+    else:
+        _sel_indices = [i for i, w in enumerate(vocab_df["Word"]) if w in _selected_words]
+        if not _sel_indices:
+            # Stale selection from a different part-of-speech/upload: none of its
+            # words exist in the current vocab_df, so default back to "all selected"
+            # rather than showing an empty, seemingly-broken table.
+            _sel_indices = list(range(len(vocab_df)))
+    vocab_table_df = vocab_df.rename(columns={
         "Word": t_ui("word_label", _lang),
         "Translation": t_ui("translation_label", _lang).removesuffix(":"),
     })
-    vocab_table = mo.ui.table(vocab_table_df, selection=None)
+    vocab_table = mo.ui.table(vocab_table_df, selection="multi", initial_selection=_sel_indices)
     vocab_table
-    return
+    return (vocab_table,)
+
+
+@app.cell(hide_code=True)
+def _(vocab_table):
+    if vocab_table.value is not None and not vocab_table.value.empty:
+        # vocab_table.value carries the *translated* display column names
+        # (word_label/translation_label), not literal "Word"/"Translation" --
+        # map by position instead of by name.
+        _cols = list(vocab_table.value.columns)
+        vocab = [
+            {"form": str(r[_cols[0]]).strip(), "meaning": str(r[_cols[1]]).strip()}
+            for _, r in vocab_table.value.iterrows()
+        ]
+    else:
+        vocab = []
+    return (vocab,)
 
 
 @app.cell(hide_code=True)
@@ -133,15 +157,21 @@ def _(DEFAULT_VOCAB, file_upload, gu, pd, pos_selector):
     # across all 3 POS tabs, matching modern-greek-eee's old behavior.
     uploaded_df = gu.load_data(file_upload, None)
     if uploaded_df is not None and not uploaded_df.empty:
-        vocab = [
-            {"form": str(row["Word"]).strip(), "meaning": str(row["Translation"]).strip()}
+        _rows = [
+            {"Word": str(row["Word"]).strip(), "Translation": str(row["Translation"]).strip()}
             for _, row in uploaded_df.iterrows()
             if str(row.get("Word", "")).strip()
         ]
     else:
-        vocab = DEFAULT_VOCAB[pos_selector.value]
-    vocab_df = pd.DataFrame([{"Word": w["form"], "Translation": w["meaning"]} for w in vocab])
-    return vocab, vocab_df
+        _rows = [{"Word": w["form"], "Translation": w["meaning"]} for w in DEFAULT_VOCAB[pos_selector.value]]
+    vocab_df = pd.DataFrame(_rows)
+    return (vocab_df,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    tbl_sel, set_tbl_sel = mo.state(None)
+    return set_tbl_sel, tbl_sel
 
 
 @app.cell(hide_code=True)
@@ -173,6 +203,21 @@ def _(gu, vocab):
         sub_cnt,
         w4t,
     )
+
+
+@app.cell(hide_code=True)
+def _(set_tbl_sel, tbl_sel, w4t):
+    # Keeps the table's checked state in sync with drill progress (completed
+    # words auto-uncheck). Guarded: only calls set_tbl_sel when the computed
+    # value actually differs from the current one, otherwise this and the
+    # table cell (which depends on tbl_sel) would retrigger each other forever
+    # -- w4t always comes back as a *new* state-getter object after Xref
+    # rebuilds it, so an unguarded write here would never stop cascading even
+    # once the actual word set has stopped changing.
+    _remaining_forms = {w["form"] for w in w4t()}
+    if _remaining_forms != (tbl_sel() or set()):
+        set_tbl_sel(_remaining_forms)
+    return
 
 
 @app.cell(hide_code=True)
@@ -220,6 +265,7 @@ def _(
     full_mode_toggle,
     gu,
     hist,
+    indefinite_toggle,
     language_selector,
     pos_selector,
     set_entercnt,
@@ -234,7 +280,10 @@ def _(
         labels = gu.verb_slot_labels()
     elif pos_selector.value == "noun":
         noun_meta = gu.noun_drill_meta(cur["form"]) if cur else None
-        labels = gu.noun_slot_labels(getattr(noun_meta, "active_cases", []))
+        active_cases = getattr(noun_meta, "active_cases", [])
+        labels = gu.noun_slot_labels(active_cases)
+        if indefinite_toggle.value:
+            labels = labels + [f"Ind. {l}" for l in gu.noun_slot_labels(gu.noun_indef_cells(active_cases))]
     else:
         labels = gu.adjective_slot_labels(adj_mode)
     drill_form, prev_btn, nxt_btn, restart_btn = gu.paradigm_drill_widgets(

@@ -19,6 +19,8 @@ All examples are in `examples/`:
 | `examples/config_store_notebook.py` | `ConfigStore` demo — `from_url`, `from_file`, `from_dict` with `eee_topbar` |
 | `examples/modern_greek_drill_notebook.py` | Modern Greek paradigm drill — verb/noun/adjective, switchable, with personal vocab TSV upload |
 
+**Live demo:** [modern_greek_drill_notebook.py running in-browser via WebAssembly](https://eee-project.codeberg.page/eee-project/) — no install needed.
+
 Run directly:
 
 ```bash
