@@ -44,6 +44,8 @@ from eee_project.notebook_utils import (
     _PARA_ESM,
     _ITEXT_ESM,
     _cors_safe_raw_url,
+    _fetch_url_bytes,
+    _fetch_url_bytes_async,
 )
 from conftest import StubMo as _StubMo, StubBackend as _StubBackend, StubMoLayout as _StubMoLayout
 
@@ -2395,6 +2397,76 @@ class TestEnsureFile:
         )
 
 
+class TestEnsureFiles:
+    """GreekUtils.ensure_files: concurrent ensure_file() for several filenames at once."""
+
+    def test_all_local_returns_paths_without_fetching(self, gu_marimo, tmp_path):
+        import asyncio
+        (tmp_path / "a.tsv").write_text("a")
+        (tmp_path / "b.tsv").write_text("b")
+        with patch("urllib.request.urlopen") as mock_urlopen:
+            result = asyncio.run(gu_marimo.ensure_files(
+                "a.tsv", "b.tsv", nb_dir=tmp_path, remote_base="http://example.com",
+            ))
+        mock_urlopen.assert_not_called()
+        assert result == {"a.tsv": tmp_path / "a.tsv", "b.tsv": tmp_path / "b.tsv"}
+
+    def test_missing_files_fetched_and_written(self, gu_marimo, tmp_path):
+        import asyncio
+        with patch("urllib.request.urlopen", return_value=_make_resp(b"downloaded")):
+            result = asyncio.run(gu_marimo.ensure_files(
+                "x.tsv", "y.tsv", nb_dir=tmp_path, remote_base="http://example.com",
+            ))
+        assert result["x.tsv"] == tmp_path / "x.tsv"
+        assert result["y.tsv"] == tmp_path / "y.tsv"
+        assert (tmp_path / "x.tsv").read_text() == "downloaded"
+        assert (tmp_path / "y.tsv").read_text() == "downloaded"
+
+    def test_mixed_local_and_remote(self, gu_marimo, tmp_path):
+        import asyncio
+        (tmp_path / "local.tsv").write_text("already here")
+        with patch("urllib.request.urlopen", return_value=_make_resp(b"fetched")):
+            result = asyncio.run(gu_marimo.ensure_files(
+                "local.tsv", "remote.tsv", nb_dir=tmp_path, remote_base="http://example.com",
+            ))
+        assert result["local.tsv"].read_text() == "already here"
+        assert result["remote.tsv"].read_text() == "fetched"
+
+    def test_one_failure_does_not_affect_others(self, gu_marimo, tmp_path, capsys):
+        import asyncio
+        from urllib.error import HTTPError
+
+        def fake_urlopen(url, timeout=None):
+            if "missing" in url:
+                raise HTTPError(url, 404, "Not Found", {}, None)
+            return _make_resp(b"ok")
+
+        with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+            result = asyncio.run(gu_marimo.ensure_files(
+                "missing.tsv", "present.tsv", nb_dir=tmp_path, remote_base="http://example.com",
+            ))
+        assert result["missing.tsv"] is None
+        assert result["present.tsv"] == tmp_path / "present.tsv"
+        assert "missing.tsv" in capsys.readouterr().out
+
+    def test_codeberg_remote_base_rewritten_before_fetch(self, gu_marimo, tmp_path):
+        import asyncio
+        seen = []
+
+        def fake_urlopen(url, timeout=None):
+            seen.append(url)
+            return _make_resp(b"x")
+
+        with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+            asyncio.run(gu_marimo.ensure_files(
+                "vocab.tsv", nb_dir=tmp_path,
+                remote_base="https://codeberg.org/EEE-project/eee-project/raw/branch/main/examples",
+            ))
+        assert seen == [
+            "https://codeberg.org/api/v1/repos/EEE-project/eee-project/raw/examples/vocab.tsv?ref=main"
+        ]
+
+
 class TestCorsSafeRawUrl:
     """_cors_safe_raw_url: rewrite CORS-blind git-forge raw URLs at fetch time."""
 
@@ -2447,6 +2519,142 @@ class TestCorsSafeRawUrl:
     def test_unrelated_url_unchanged(self):
         url = "https://example.com/some/file.tsv"
         assert _cors_safe_raw_url(url) == url
+
+
+class TestFetchUrlBytes:
+    """_fetch_url_bytes: plain urlopen on CPython, raw sync XHR on Pyodide.
+
+    The XHR branch bypasses pyodide_http entirely because it raises
+    UnicodeEncodeError on a non-ASCII Content-Disposition response header
+    (confirmed via a diagnostic traceback pointing inside
+    pyodide_http/_urllib.py itself) -- e.g. Codeberg's raw-content API
+    sends the primary filename= parameter as raw UTF-8, un-percent-encoded,
+    for any non-ASCII filename. `js` only exists under Pyodide, so these
+    tests inject a fake module into sys.modules to exercise the branch.
+    """
+
+    @staticmethod
+    def _install_fake_js(monkeypatch, *, status=200, status_text="OK", body=b""):
+        import sys
+        import types
+
+        sent = {}
+
+        class _FakeXHR:
+            def open(self, method, url, is_async):
+                sent["method"], sent["url"], sent["async"] = method, url, is_async
+
+            def send(self, _body):
+                sent["timeout"] = self.timeout
+                self.status = status
+                self.statusText = status_text
+                self.response = body
+
+        class _FakeTypedArray:
+            def __init__(self, data):
+                self._data = data
+
+            def to_py(self):
+                return memoryview(self._data)
+
+        fake_js = types.ModuleType("js")
+        fake_js.XMLHttpRequest = types.SimpleNamespace(new=_FakeXHR)
+        fake_js.Uint8Array = types.SimpleNamespace(new=_FakeTypedArray)
+        monkeypatch.setitem(sys.modules, "js", fake_js)
+        monkeypatch.setattr(sys, "platform", "emscripten")
+        return sent
+
+    def test_cpython_uses_urlopen(self):
+        with patch("urllib.request.urlopen", return_value=_make_resp(b"cpython path")):
+            assert _fetch_url_bytes("https://example.com/x.tsv", 30) == b"cpython path"
+
+    def test_emscripten_uses_sync_xhr_and_returns_bytes(self, monkeypatch):
+        sent = self._install_fake_js(monkeypatch, status=200, body=b"pdf bytes here")
+        result = _fetch_url_bytes("https://example.com/Одиссея.pdf", 30)
+        assert result == b"pdf bytes here"
+        assert sent["method"] == "GET"
+        assert sent["url"] == "https://example.com/Одиссея.pdf"
+        assert sent["async"] is False
+        assert sent["timeout"] == 30 * 1000  # xhr.timeout is milliseconds
+
+    def test_emscripten_raises_http_error_on_failure_status(self, monkeypatch):
+        from urllib.error import HTTPError
+        self._install_fake_js(monkeypatch, status=404, status_text="Not Found")
+        with pytest.raises(HTTPError):
+            _fetch_url_bytes("https://example.com/missing.pdf", 30)
+
+
+class TestFetchUrlBytesAsync:
+    """_fetch_url_bytes_async: threaded urlopen on CPython, pyodide.http.pyfetch on Pyodide.
+
+    Exists so GreekUtils.ensure_files() can fetch several files concurrently
+    via asyncio.gather -- real network-level overlap, which sync XHR (used
+    by _fetch_url_bytes) can't provide. `pyodide.http` only exists under
+    Pyodide, so these tests inject a fake module into sys.modules to
+    exercise that branch, matching the `js`-faking pattern above.
+    """
+
+    @staticmethod
+    def _install_fake_pyfetch(monkeypatch, *, ok=True, status=200, status_text="OK", body=b"", hang=False):
+        import asyncio
+        import sys
+        import types
+
+        sent = {}
+
+        class _FakeResponse:
+            def __init__(self):
+                self.ok = ok
+                self.status = status
+                self.status_text = status_text
+
+            async def bytes(self):
+                return body
+
+        async def fake_pyfetch(url, **kwargs):
+            sent["url"] = url
+            sent["kwargs"] = kwargs
+            if hang:
+                await asyncio.sleep(10)
+            return _FakeResponse()
+
+        fake_http = types.ModuleType("pyodide.http")
+        fake_http.pyfetch = fake_pyfetch
+        fake_pyodide = types.ModuleType("pyodide")
+        fake_pyodide.http = fake_http
+        monkeypatch.setitem(sys.modules, "pyodide", fake_pyodide)
+        monkeypatch.setitem(sys.modules, "pyodide.http", fake_http)
+        monkeypatch.setattr(sys, "platform", "emscripten")
+        return sent
+
+    def test_cpython_delegates_to_sync_fetch_via_thread(self):
+        import asyncio
+        with patch("urllib.request.urlopen", return_value=_make_resp(b"cpython async path")):
+            result = asyncio.run(_fetch_url_bytes_async("https://example.com/x.tsv", 30))
+        assert result == b"cpython async path"
+
+    def test_emscripten_uses_pyfetch_and_returns_bytes(self, monkeypatch):
+        import asyncio
+        sent = self._install_fake_pyfetch(monkeypatch, body=b"pdf bytes here")
+        result = asyncio.run(_fetch_url_bytes_async("https://example.com/Одиссея.pdf", 30))
+        assert result == b"pdf bytes here"
+        assert sent["url"] == "https://example.com/Одиссея.pdf"
+        assert sent["kwargs"]["method"] == "GET"
+
+    def test_emscripten_raises_http_error_on_failure_status(self, monkeypatch):
+        import asyncio
+        from urllib.error import HTTPError
+        self._install_fake_pyfetch(monkeypatch, ok=False, status=404, status_text="Not Found")
+        with pytest.raises(HTTPError):
+            asyncio.run(_fetch_url_bytes_async("https://example.com/missing.pdf", 30))
+
+    def test_emscripten_enforces_timeout(self, monkeypatch):
+        # pyfetch has no native timeout (unlike XHR's .timeout); this must
+        # be enforced with asyncio.wait_for around the whole await chain.
+        import asyncio
+        self._install_fake_pyfetch(monkeypatch, hang=True)
+        with pytest.raises(asyncio.TimeoutError):
+            asyncio.run(_fetch_url_bytes_async("https://example.com/slow.pdf", 0.05))
 
 
 # ────────────────────────────────────────── make_paradigm_form ──

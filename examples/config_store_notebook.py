@@ -2,11 +2,8 @@
 # requires-python = ">=3.12"
 # dependencies = [
 #     "marimo>=0.23.13",
-#     "eee-project @ git+https://codeberg.org/EEE-project/eee-project.git",
+#     "eee-project>=1.2.1",
 # ]
-#
-# [tool.uv.sources]
-# eee-project = { git = "https://codeberg.org/EEE-project/eee-project.git" }
 # ///
 """ConfigStore demo — navigation config storage for molab notebooks.
 

@@ -285,6 +285,89 @@ def _cors_safe_raw_url(url: str) -> str:
     return url
 
 
+def _fetch_url_bytes(url: str, timeout: "int | float") -> bytes:
+    """GET *url* synchronously and return the raw response body.
+
+    Under Pyodide, ``urllib.request.urlopen`` goes through ``pyodide_http``'s
+    patched implementation, which raises ``UnicodeEncodeError`` ("'ascii'
+    codec can't encode...") whenever a response header contains non-ASCII
+    bytes — confirmed via a diagnostic traceback pointing inside
+    ``pyodide_http/_urllib.py`` itself, not anything on the caller's side.
+    Codeberg's raw-content API triggers this for any non-ASCII filename: it
+    sends the primary ``Content-Disposition: ...; filename="<raw UTF-8>"``
+    parameter un-percent-encoded (RFC 7230/6266 permit this; only the
+    fallback ``filename*=UTF-8''...`` parameter is required to be encoded).
+
+    So under Pyodide (``sys.platform == "emscripten"``) this bypasses
+    ``pyodide_http`` entirely with a raw synchronous ``XMLHttpRequest`` —
+    marimo's Pyodide kernel runs in a Web Worker, where synchronous XHR is
+    allowed (unlike the main thread, where it's deprecated) — since only
+    the status and binary body are needed here, the problematic header is
+    never touched at all. Plain CPython (local dev, no non-ASCII-header
+    bug to work around) uses ``urllib.request.urlopen`` as normal.
+    """
+    import sys
+
+    if sys.platform == "emscripten":
+        from js import XMLHttpRequest, Uint8Array
+
+        xhr = XMLHttpRequest.new()
+        xhr.open("GET", url, False)
+        xhr.responseType = "arraybuffer"
+        # timeout is legal on a synchronous XHR specifically when the global
+        # is a Worker, not a Window -- true here, since that's exactly where
+        # marimo runs the Pyodide kernel (see this function's docstring).
+        xhr.timeout = timeout * 1000
+        xhr.send(None)
+        if not (200 <= xhr.status < 300):
+            import urllib.error
+            raise urllib.error.HTTPError(url, xhr.status, xhr.statusText, {}, None)
+        return Uint8Array.new(xhr.response).to_py().tobytes()
+
+    import urllib.request
+    with urllib.request.urlopen(url, timeout=timeout) as _resp:
+        return _resp.read()
+
+
+async def _fetch_url_bytes_async(url: str, timeout: "int | float") -> bytes:
+    """Async GET *url*, returning the raw response body.
+
+    Exists so multiple fetches can run concurrently via ``asyncio.gather``
+    (see :meth:`GreekUtils.ensure_files`) — genuine network-level overlap,
+    not just interleaved scheduling. Real OS threads aren't an option here:
+    Pyodide's thread support needs COOP/COEP response headers, which
+    Codeberg Pages (this project's deployment target) doesn't send, so
+    ``concurrent.futures.ThreadPoolExecutor`` would silently run single
+    -threaded anyway. Async is the only mechanism that actually overlaps
+    requests in that environment.
+
+    Under Pyodide this uses ``pyodide.http.pyfetch()``, whose response
+    reads the non-ASCII ``Content-Disposition`` header just like
+    ``fetch()`` does natively (no ``pyodide_http`` monkeypatch involved),
+    so the bug ``_fetch_url_bytes`` works around never applies here. Plain
+    CPython runs the existing synchronous fetch in a thread so it doesn't
+    block the event loop. ``pyfetch()`` has no built-in timeout (unlike
+    XHR's native ``.timeout``), so it's enforced with ``asyncio.wait_for``
+    instead.
+    """
+    import asyncio
+    import sys
+
+    if sys.platform == "emscripten":
+        from pyodide.http import pyfetch
+
+        async def _do() -> bytes:
+            response = await pyfetch(url, method="GET")
+            if not response.ok:
+                import urllib.error
+                raise urllib.error.HTTPError(url, response.status, response.status_text, {}, None)
+            return await response.bytes()
+
+        return await asyncio.wait_for(_do(), timeout=timeout)
+
+    return await asyncio.to_thread(_fetch_url_bytes, url, timeout)
+
+
 class ConfigStore:
     """Navigation and GA config storage with pluggable backends.
 
@@ -383,15 +466,12 @@ class ConfigStore:
         URL without a network call.
         """
         import json as _json
-        import urllib.request as _req
 
         _raw_base = _raw_base_from_url(url)
         try:
-            with _req.urlopen(_cors_safe_raw_url(url), timeout=timeout) as _f:
-                lessons = cls._parse_tsv(_f.read().decode("utf-8"))
+            lessons = cls._parse_tsv(_fetch_url_bytes(_cors_safe_raw_url(url), timeout).decode("utf-8"))
             if isinstance(ga, str):
-                with _req.urlopen(_cors_safe_raw_url(ga), timeout=timeout) as _f:
-                    ga = _json.loads(_f.read().decode("utf-8"))
+                ga = _json.loads(_fetch_url_bytes(_cors_safe_raw_url(ga), timeout).decode("utf-8"))
         except Exception:
             lessons = []
             ga = {}
@@ -4869,24 +4949,13 @@ Translation: **{translation}**
         Returns None and prints a warning if the file is missing and the remote fetch fails.
         """
         from pathlib import Path
-        import urllib.request
         import urllib.parse
 
         local = Path(nb_dir) / filename
         if not local.exists():
             url = _cors_safe_raw_url(f"{remote_base.rstrip('/')}/{urllib.parse.quote(filename)}")
             try:
-                # Not urlretrieve(): under Pyodide (pyodide_http's patched
-                # urllib) it raises UnicodeEncodeError ("'ascii' codec can't
-                # encode...") whenever the local destination path contains
-                # non-ASCII characters (e.g. a Cyrillic filename) -- plain
-                # CPython's urlretrieve doesn't have this problem, confirmed
-                # by reproducing locally, so it's specific to urlretrieve's
-                # internals under Pyodide. urlopen + an explicit byte-write
-                # sidesteps it entirely and needs no separate global-timeout
-                # dance (timeout is a normal urlopen kwarg).
-                with urllib.request.urlopen(url, timeout=timeout) as _resp:
-                    local.write_bytes(_resp.read())
+                local.write_bytes(_fetch_url_bytes(url, timeout))
             except Exception as exc:
                 print(
                     f"ensure_file: could not fetch {filename!r} — {exc}\n"
@@ -4895,6 +4964,41 @@ Translation: **{translation}**
                 )
                 return None
         return local
+
+    @staticmethod
+    async def ensure_files(*filenames: str, nb_dir: Any, remote_base: str, timeout: int = 30) -> "dict[str, Any]":
+        """Concurrent :meth:`ensure_file` for each of *filenames* — must be called from an ``async def`` cell.
+
+        Missing files are fetched concurrently via ``asyncio.gather`` instead
+        of one-at-a-time, so this only beats calling :meth:`ensure_file` in a
+        loop when more than one of *filenames* is actually absent locally —
+        each already-local file resolves immediately either way. Returns a
+        ``{filename: path_or_None}`` dict with the same per-file contract as
+        :meth:`ensure_file` (``None`` on fetch failure, with a diagnostic
+        already printed for that file).
+        """
+        import asyncio
+        import urllib.parse
+        from pathlib import Path
+
+        async def _one(filename: str) -> Any:
+            local = Path(nb_dir) / filename
+            if local.exists():
+                return local
+            url = _cors_safe_raw_url(f"{remote_base.rstrip('/')}/{urllib.parse.quote(filename)}")
+            try:
+                local.write_bytes(await _fetch_url_bytes_async(url, timeout))
+            except Exception as exc:
+                print(
+                    f"ensure_files: could not fetch {filename!r} — {exc}\n"
+                    f"  local path checked: {local.resolve()}\n"
+                    f"  remote URL tried:   {url}"
+                )
+                return None
+            return local
+
+        results = await asyncio.gather(*(_one(f) for f in filenames))
+        return dict(zip(filenames, results))
 
     def _resolve_tsv_path(self, filename: str, *, nb_dir: Any, remote_base: "str | None") -> Any:
         """Return a local path for *filename*, fetching from *remote_base* if given.

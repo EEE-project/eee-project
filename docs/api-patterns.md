@@ -547,6 +547,24 @@ This means PDF links in homework cells gracefully degrade when the PDF has not
 yet been uploaded to the remote — the notebook still loads, vocabulary cells
 still run, and only the download warning appears in the kernel log.
 
+**`ensure_files` — concurrent variant, for a cell fetching several files at once:**
+
+```python
+fetched = await gu.ensure_files(
+    "greek.md", "translations_ru.md", "ictus.html",
+    nb_dir=NB_DIR, remote_base=NB_REMOTE,
+)
+greek_md = fetched["greek.md"]        # same Path-or-None contract as ensure_file
+```
+
+Only useful when the cell needs more than one file that might actually be
+missing locally — each fetch that's already on disk resolves immediately
+either way, so there's nothing to gain from concurrency there. Requires an
+`async def` cell (marimo supports top-level `await` in cells natively — no
+extra setup needed). Prefer plain `ensure_file` for a single file, or for a
+loop over an unbounded/variable-length list where you don't want every fetch
+in flight at once.
+
 ### Drill exercises
 
 For custom exercise types — multiple fields per item, non-standard slots —
