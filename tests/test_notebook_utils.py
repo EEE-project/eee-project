@@ -842,6 +842,23 @@ class TestEeeTopbar:
         assert eee_topbar(_StubHtmlMo(), back_url="", lang="en", titles="X") is None
         assert eee_topbar(_StubHtmlMo(), back_url=None, lang="en", titles="X") is None
 
+    def test_default_opens_new_tab(self):
+        result = eee_topbar(_StubHtmlMo(), back_url="https://x.com", lang="en", titles="X")
+        assert 'target="_blank" rel="noopener"' in result.s
+
+    def test_same_window_omits_target_blank(self):
+        # the topbar's separate "EEE Community" Telegram link is external and
+        # always target="_blank" regardless of same_window -- only the
+        # tb-back in-app navigation link is affected.
+        result = eee_topbar(_StubHtmlMo(), back_url="https://x.com", lang="en",
+                            titles="X", same_window=True)
+        assert '<a class="tb-back" href="https://x.com">' in result.s
+
+    def test_same_window_index_style_omits_target_blank(self):
+        result = eee_topbar(_StubHtmlMo(), back_url="https://x.com", lang="en",
+                            titles="X", style="index", same_window=True)
+        assert '<a class="tb-back" href="https://x.com">' in result.s
+
     def test_ga_script_injected(self):
         # mo.Html() can't execute inline <script> tags, so GA is fired by a
         # real anywidget instead — its _esm carries the measurement ID and
@@ -965,6 +982,11 @@ class TestEeeCardList:
     def test_card_link_has_target_blank_and_noopener(self):
         result = eee_card_list(_StubHtmlMo(), self._cfg([self._ROW]), lang="en")
         assert 'target="_blank" rel="noopener"' in result.s
+
+    def test_same_window_omits_target_blank(self):
+        result = eee_card_list(_StubHtmlMo(), self._cfg([self._ROW]), lang="en", same_window=True)
+        assert "target=" not in result.s
+        assert f'href="{self._ROW["url"]}"' in result.s
 
     def test_empty_url_renders_disabled_card(self):
         row = {**self._ROW, "url": ""}

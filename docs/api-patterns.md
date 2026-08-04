@@ -267,6 +267,14 @@ case) and **must be the last expression in a marimo cell** (no trailing
   or the link falls back to `titles` (this page's own name) and mislabels
   itself with the wrong page's name.
 
+`eee_topbar`'s back-link and `eee_card_list`'s cards both take
+`same_window=` (default `False`, opening a new tab via `target="_blank"
+rel="noopener"`). The default is required on molab — same-window navigation
+there duplicates its outer chrome, a molab-specific bug. Pass
+`same_window=True` for notebooks hosted outside molab (e.g. static WASM
+exports on Codeberg Pages), where that bug doesn't apply and same-window
+navigation is the expected behavior.
+
 ```python
 # index page with no parent to link to (top-level, or self-contained)
 eee_topbar(mo, back_url=None, lang=lang_sel.value,

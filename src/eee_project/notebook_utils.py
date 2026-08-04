@@ -547,7 +547,7 @@ class ConfigStore:
         return f"{self._raw_base}/{dir_name}"
 
 
-def eee_topbar(mo, back_url: str, lang: str, titles: "dict | str", *, style: str = "back", icon: str = "●", ga_config=None, parent_titles: "dict | str | None" = None):
+def eee_topbar(mo, back_url: str, lang: str, titles: "dict | str", *, style: str = "back", icon: str = "●", ga_config=None, parent_titles: "dict | str | None" = None, same_window: bool = False):
     """Render the EEE sticky navigation topbar.
 
     Must be the **last expression** in a marimo cell — no trailing ``return``.
@@ -582,6 +582,14 @@ def eee_topbar(mo, back_url: str, lang: str, titles: "dict | str", *, style: str
                        kept working for existing callers, but that mislabels
                        the link, so always pass it once ``back_url`` comes
                        from :func:`parent_back_url`.
+        same_window:   ``False`` (default) opens the link in a new tab
+                       (``target="_blank" rel="noopener"``) — required on
+                       molab, where same-window navigation duplicates its
+                       outer chrome (a molab-specific bug, not a general
+                       navigation problem). Pass ``True`` for notebooks
+                       hosted outside molab (e.g. static WASM exports on
+                       Codeberg Pages), where that bug doesn't apply and
+                       same-window navigation is the expected behavior.
 
     Example cell::
 
@@ -597,17 +605,18 @@ def eee_topbar(mo, back_url: str, lang: str, titles: "dict | str", *, style: str
     """
     ga_widget = _make_ga_widget(mo, ga_config)
     title = titles.get(lang, next(iter(titles.values()))) if isinstance(titles, dict) else titles
+    _target_attr = "" if same_window else ' target="_blank" rel="noopener"'
     if style == "index":
         if back_url:
             _parent = parent_titles if parent_titles is not None else titles
             parent_title = _parent.get(lang, next(iter(_parent.values()))) if isinstance(_parent, dict) else _parent
-            left = f'<a class="tb-back" href="{back_url}" target="_blank" rel="noopener">◀ {parent_title}</a>'
+            left = f'<a class="tb-back" href="{back_url}"{_target_attr}>◀ {parent_title}</a>'
         else:
             left = f'<span class="tb-back">{icon} {title}</span>'
     elif not back_url:
         return ga_widget
     else:
-        left = f'<a class="tb-back" href="{back_url}" target="_blank" rel="noopener">◀ {title}</a>'
+        left = f'<a class="tb-back" href="{back_url}"{_target_attr}>◀ {title}</a>'
     bar = mo.Html(f"""{_TOPBAR_CSS}
 <div id="eee-topbar">
   {left}
@@ -736,7 +745,7 @@ _CARD_LIST_CSS = """
 _CARD_LIST_SOON = {"ru": "скоро", "el": "σύντομα", "en": "coming soon"}
 
 
-def eee_card_list(mo, cfg: "ConfigStore", lang: str, *, lang_fallback: str = "el"):
+def eee_card_list(mo, cfg: "ConfigStore", lang: str, *, lang_fallback: str = "el", same_window: bool = False):
     """Render the EEE index-page lesson/course card list.
 
     Must be the **last expression** in a marimo cell — no trailing ``return``.
@@ -746,8 +755,9 @@ def eee_card_list(mo, cfg: "ConfigStore", lang: str, *, lang_fallback: str = "el
     — text falls back to ``lang_fallback`` when the current ``lang`` has no
     translation. ``url`` is used verbatim (no molab-specific construction —
     the TSV owns the full URL, so notebooks stay portable to other hosting).
-    A falsy ``url`` renders a disabled "coming soon" card. Card links use
-    ``target="_blank" rel="noopener"``. Renders a translated "couldn't load"
+    A falsy ``url`` renders a disabled "coming soon" card. Card links open in
+    a new tab (``target="_blank" rel="noopener"``) unless ``same_window`` is
+    set — see that parameter below. Renders a translated "couldn't load"
     message instead when ``cfg.lessons()`` comes back empty.
 
     Args:
@@ -756,6 +766,11 @@ def eee_card_list(mo, cfg: "ConfigStore", lang: str, *, lang_fallback: str = "el
         lang:          Current language code (e.g. ``"ru"``, ``"el"``, ``"en"``).
         lang_fallback: Language suffix for row text and the "soon"/error
                        strings when ``lang`` isn't translated. Default ``"el"``.
+        same_window:   ``False`` (default) opens card links in a new tab —
+                       required on molab, where same-window navigation
+                       duplicates its outer chrome (a molab-specific bug).
+                       Pass ``True`` for notebooks hosted outside molab
+                       (e.g. static WASM exports on Codeberg Pages).
 
     Example cell::
 
@@ -776,6 +791,7 @@ def eee_card_list(mo, cfg: "ConfigStore", lang: str, *, lang_fallback: str = "el
     label_key, label_fb = f'label_{lang}', f'label_{lang_fallback}'
     title_key, title_fb = f'title_{lang}', f'title_{lang_fallback}'
     desc_key, desc_fb = f'desc_{lang}', f'desc_{lang_fallback}'
+    _target_attr = "" if same_window else ' target="_blank" rel="noopener"'
     cards = []
     for row in rows:
         url = row["url"] or None
@@ -789,7 +805,7 @@ def eee_card_list(mo, cfg: "ConfigStore", lang: str, *, lang_fallback: str = "el
             </div>
             <div class="eee-card-desc">{row.get(desc_key, row[desc_fb])}</div>"""
         if url:
-            cards.append(f'<a class="eee-card" href="{url}" target="_blank" rel="noopener">{inner}<div class="eee-card-arrow">◀</div></a>')
+            cards.append(f'<a class="eee-card" href="{url}"{_target_attr}>{inner}<div class="eee-card-arrow">◀</div></a>')
         else:
             cards.append(f'<div class="eee-card eee-card-disabled">{inner}<div class="eee-card-arrow">{soon}</div></div>')
 
