@@ -4871,15 +4871,22 @@ Translation: **{translation}**
         from pathlib import Path
         import urllib.request
         import urllib.parse
-        import socket
 
         local = Path(nb_dir) / filename
         if not local.exists():
             url = _cors_safe_raw_url(f"{remote_base.rstrip('/')}/{urllib.parse.quote(filename)}")
-            prev = socket.getdefaulttimeout()
-            socket.setdefaulttimeout(timeout)
             try:
-                urllib.request.urlretrieve(url, local)
+                # Not urlretrieve(): under Pyodide (pyodide_http's patched
+                # urllib) it raises UnicodeEncodeError ("'ascii' codec can't
+                # encode...") whenever the local destination path contains
+                # non-ASCII characters (e.g. a Cyrillic filename) -- plain
+                # CPython's urlretrieve doesn't have this problem, confirmed
+                # by reproducing locally, so it's specific to urlretrieve's
+                # internals under Pyodide. urlopen + an explicit byte-write
+                # sidesteps it entirely and needs no separate global-timeout
+                # dance (timeout is a normal urlopen kwarg).
+                with urllib.request.urlopen(url, timeout=timeout) as _resp:
+                    local.write_bytes(_resp.read())
             except Exception as exc:
                 print(
                     f"ensure_file: could not fetch {filename!r} — {exc}\n"
@@ -4887,8 +4894,6 @@ Translation: **{translation}**
                     f"  remote URL tried:   {url}"
                 )
                 return None
-            finally:
-                socket.setdefaulttimeout(prev)
         return local
 
     def _resolve_tsv_path(self, filename: str, *, nb_dir: Any, remote_base: "str | None") -> Any:

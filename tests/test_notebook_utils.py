@@ -3,7 +3,6 @@ import pytest
 
 import json
 import unicodedata
-from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 import marimo as mo
@@ -2336,7 +2335,7 @@ class TestEnsureFile:
 
     def test_missing_remote_returns_none_and_prints(self, gu_marimo, tmp_path, capsys):
         from urllib.error import HTTPError
-        with patch("urllib.request.urlretrieve", side_effect=HTTPError(
+        with patch("urllib.request.urlopen", side_effect=HTTPError(
             "http://example.com/missing.pdf", 404, "Not Found", {}, None
         )):
             result = gu_marimo.ensure_file("missing.pdf", nb_dir=tmp_path, remote_base="http://example.com")
@@ -2347,21 +2346,33 @@ class TestEnsureFile:
 
     def test_failed_download_leaves_no_file(self, gu_marimo, tmp_path):
         from urllib.error import HTTPError
-        with patch("urllib.request.urlretrieve", side_effect=HTTPError(
+        with patch("urllib.request.urlopen", side_effect=HTTPError(
             "http://example.com/file.tsv", 404, "Not Found", {}, None
         )):
             gu_marimo.ensure_file("file.tsv", nb_dir=tmp_path, remote_base="http://example.com")
         assert not (tmp_path / "file.tsv").exists()
 
     def test_successful_download(self, gu_marimo, tmp_path):
-
-        def fake_retrieve(url, dest):
-            Path(dest).write_text("downloaded")
-
-        with patch("urllib.request.urlretrieve", side_effect=fake_retrieve):
+        with patch("urllib.request.urlopen", return_value=_make_resp(b"downloaded")):
             result = gu_marimo.ensure_file("file.tsv", nb_dir=tmp_path, remote_base="http://example.com")
         assert result == tmp_path / "file.tsv"
         assert result.read_text() == "downloaded"
+
+    def test_download_non_ascii_filename(self, gu_marimo, tmp_path):
+        # Regression: ensure_file used to call urllib.request.urlretrieve(),
+        # which raises UnicodeEncodeError ("'ascii' codec can't encode...")
+        # under Pyodide (pyodide_http's patched urllib) whenever the local
+        # destination path contains non-ASCII characters -- confirmed this
+        # is specific to urlretrieve's internals, not urlopen, by
+        # reproducing locally with plain CPython (urlretrieve itself was
+        # fine there, isolating the bug to the Pyodide-specific code path).
+        # Real course notebooks fetch Cyrillic-named PDFs this way.
+        with patch("urllib.request.urlopen", return_value=_make_resp(b"%PDF-1.4 fake")):
+            result = gu_marimo.ensure_file(
+                "Одиссея. Зачин.pdf", nb_dir=tmp_path, remote_base="http://example.com",
+            )
+        assert result == tmp_path / "Одиссея. Зачин.pdf"
+        assert result.read_bytes() == b"%PDF-1.4 fake"
 
     def test_codeberg_remote_base_rewritten_before_fetch(self, gu_marimo, tmp_path):
         # ensure_file's remote fetch must go out via the CORS-safe Codeberg
@@ -2370,11 +2381,11 @@ class TestEnsureFile:
         # browser fetch inside a self-hosted WASM export).
         seen = {}
 
-        def fake_retrieve(url, dest):
+        def fake_urlopen(url, timeout=None):
             seen["url"] = url
-            Path(dest).write_text("x")
+            return _make_resp(b"x")
 
-        with patch("urllib.request.urlretrieve", side_effect=fake_retrieve):
+        with patch("urllib.request.urlopen", side_effect=fake_urlopen):
             gu_marimo.ensure_file(
                 "vocab.tsv", nb_dir=tmp_path,
                 remote_base="https://codeberg.org/EEE-project/eee-project/raw/branch/main/examples",
@@ -4787,7 +4798,7 @@ class TestLoadVocabTsv:
             gu_marimo.load_vocab_tsv("missing.tsv", nb_dir=tmp_path)
 
     def test_missing_remote_fetch_fails_raises(self, gu_marimo, tmp_path):
-        with patch("urllib.request.urlretrieve", side_effect=Exception("net")):
+        with patch("urllib.request.urlopen", side_effect=Exception("net")):
             with pytest.raises(FileNotFoundError):
                 gu_marimo.load_vocab_tsv("missing.tsv", nb_dir=tmp_path,
                                    remote_base="https://example.com")
@@ -4801,9 +4812,7 @@ class TestLoadVocabTsv:
 
     def test_load_vocab_tsv_remote_fetch_success(self, gu_marimo, tmp_path):
         content = "Word\tTranslation\nλύω\tloosen\n"
-        def fake_retrieve(url, dest):
-            Path(dest).write_text(content, encoding="utf-8")
-        with patch("urllib.request.urlretrieve", side_effect=fake_retrieve):
+        with patch("urllib.request.urlopen", return_value=_make_resp(content.encode("utf-8"))):
             result = gu_marimo.load_vocab_tsv("remote.tsv", nb_dir=tmp_path,
                                         remote_base="https://example.com")
         assert len(result) == 1
@@ -4849,16 +4858,14 @@ class TestLoadInflectedVocabTsv:
             gu_marimo.load_inflected_vocab_tsv("missing.tsv", nb_dir=tmp_path)
 
     def test_missing_remote_fetch_fails_raises(self, gu_marimo, tmp_path):
-        with patch("urllib.request.urlretrieve", side_effect=Exception("net")):
+        with patch("urllib.request.urlopen", side_effect=Exception("net")):
             with pytest.raises(FileNotFoundError):
                 gu_marimo.load_inflected_vocab_tsv("missing.tsv", nb_dir=tmp_path,
                                    remote_base="https://example.com")
 
     def test_remote_fetch_success(self, gu_marimo, tmp_path):
         content = "form\tlemma\tpos\tcontext\tmeaning\nἔγνω\tγιγνώσκω\tverb\t...\tузнал\n"
-        def fake_retrieve(url, dest):
-            Path(dest).write_text(content, encoding="utf-8")
-        with patch("urllib.request.urlretrieve", side_effect=fake_retrieve):
+        with patch("urllib.request.urlopen", return_value=_make_resp(content.encode("utf-8"))):
             result = gu_marimo.load_inflected_vocab_tsv("remote.tsv", nb_dir=tmp_path,
                                         remote_base="https://example.com")
         assert len(result) == 1
