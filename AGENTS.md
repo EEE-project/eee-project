@@ -20,19 +20,22 @@ make check     # ruff, curated rule set — see [tool.ruff.lint] in pyproject.to
    passing before the change; that only proves nothing broke, not that new
    behavior is covered. Add a test that specifically exercises the new/fixed
    code path (a regression would need to fail it). `tests/test_notebook_utils.py`'s
-   existing style: one class per function, one test per behavior.
+   existing style: one class per function, one test per behavior. **Exception:**
+   JS living inside an anywidget's `_esm` string — pytest can't reach it at
+   all (no JS test runner in this repo); see the live-kernel-testing
+   Convention below, which is the only check that exists for that code.
 2. **`docs/api-patterns.md`** — any new public method or parameter on
    `GreekUtils`/`notebook_utils.py` needs a worked usage example here, not
    just a docstring or a passing mention elsewhere in the file.
-3. **README changelog** — this is an internal project, not a
-   publicly-tracked release feed. Keep each version's changelog entry to a
-   short line or a handful of bullets, not a full narrative — `docs/` is the
-   source of truth for current capability; the changelog just marks when
-   something landed.
-4. **Version bump** — `pyproject.toml` and `src/eee_project/__init__.py`'s
+3. **Version bump** — `pyproject.toml` and `src/eee_project/__init__.py`'s
    `__version__`, kept in sync. Patch for a fix, minor for a new
    capability/backend, major for a breaking change.
-5. **Lint** — `make check` on changed files.
+4. **Lint** — `make check` on changed files.
+
+`README.md` deliberately carries no changelog — one existed through v1.0.0 but
+was removed in the same commit as the PyPI-packaging README rework (`30fa087`)
+for being too noisy (dense multi-sentence entries per version). Don't re-add
+one; `docs/api-patterns.md` is the source of truth for current capability.
 
 ## Conventions
 
@@ -51,12 +54,20 @@ make check     # ruff, curated rule set — see [tool.ruff.lint] in pyproject.to
   workspace CLAUDE.md's tagging rule.
 - Test any notebook change with the `marimo-pair` skill against a real
   running kernel before considering it done — reading the `.py` source is
-  not equivalent to seeing it actually render and behave correctly.
+  not equivalent to seeing it actually render and behave correctly. For JS
+  inside an anywidget `_esm` string (e.g. `_ParadigmFormWidget`'s `render()`),
+  this live check is not optional polish — it's the *only* verification
+  that exists, since pytest never executes that code at all. A DOM-level
+  behavior (e.g. focus state) needs a real browser: `document.activeElement`
+  in the console/`javascript_tool`, not just a passing test run. If clicking
+  something freezes claude-in-chrome's screenshot capture (native `<select>`
+  dropdowns are known to do this — the page itself is fine, only
+  `Page.captureScreenshot` hangs), switch to JS-only interaction
+  (`javascript_exec` for DOM queries/events) rather than retrying screenshots.
 
 ## Commit messages
 
 One commit per version bump (`vX.Y.Z: ...`), squashed from whatever WIP
 happened during development — not one commit per change. Short single-line
 subject, no body, no attribution trailer. Full detail lives in
-`docs/api-patterns.md` and the README changelog line, not the commit
-message itself.
+`docs/api-patterns.md`, not the commit message itself.

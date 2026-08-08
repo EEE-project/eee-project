@@ -328,6 +328,49 @@ Returns `None` silently if the file is missing — GA is disabled, the topbar
 renders normally. When `back_url` is empty but `ga_config` is set, the topbar
 is suppressed but the GA script is still injected.
 
+### Language persistence
+
+Cross-page UI-language persistence via the browser's `localStorage` (key
+`"eee_lang"`), so a language choice made on one notebook page carries over
+when the visitor navigates to another:
+
+```python
+from eee_project import language_bridge, language_selector, save_language_selection
+
+# cell 1 — bridge, in its own cell, undisplayed: a cell that both builds
+# this and displays/uses it elsewhere would rerun (and reset the bridge)
+# on every dependent re-render
+bridge = language_bridge(mo)
+
+# cell 2 — selector, also in its own cell: must take *bridge* as a
+# parameter (not just reference it via closure) so marimo reruns this
+# cell — rebuilding the dropdown with the real persisted language — the
+# moment the browser's (async) localStorage read completes
+lang_sel = language_selector(mo, bridge)
+
+# cell 3 — persist the current selection, then display both
+save_language_selection(bridge, lang_sel)
+mo.Html(f"{lang_sel}{bridge}")
+```
+
+`language_bridge(mo)` returns `None` if `anywidget` isn't installed — pass
+that `None` straight through; `language_selector` then degrades to a plain,
+non-persisted dropdown and `save_language_selection` becomes a no-op.
+
+`language_selector(mo, bridge, options=None, default="en")` seeds the
+dropdown from *bridge*'s persisted value once the browser's async read
+lands — until then, or if `bridge` is `None`, it starts at `default`. Falls
+back to `default` if the stored value isn't one of `options`' codes (e.g. a
+stale/removed language). `options` defaults to `{"English": "en", "Русский":
+"ru", "Ελληνικά": "el"}`.
+
+`save_language_selection` skips writing until `bridge` has reported back a
+real (possibly empty) stored value — otherwise, on every fresh page load, it
+would write the selector's placeholder default over a real stored value
+before the async browser read has had a chance to apply it (the write is
+synchronous, the read isn't, so an unconditional write would win that race
+every time).
+
 ### Config storage (`ConfigStore`)
 
 `ConfigStore` is a unified abstraction for lesson navigation config and GA

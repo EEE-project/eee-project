@@ -957,6 +957,98 @@ def _make_ga_widget(mo, ga_config: "dict | None"):
     return mo.ui.anywidget(_make_ga_widget_class(measurement_id)())
 
 
+# ═══════════════════════════ cross-page language persistence (anywidget) ══
+# localStorage is main-thread-only -- inaccessible from marimo's Pyodide
+# kernel, which runs in a Web Worker (a plain `import js; js.localStorage`
+# from notebook code raises AttributeError: "Did you mean: 'CacheStorage'?",
+# CacheStorage being the Worker-accessible, async equivalent). A real
+# anywidget's render() runs on the actual main thread like any other
+# browser-rendered widget, so it has genuine localStorage access -- same
+# reasoning as the GA tracker above, different browser API.
+_LANG_ESM = """\
+function render({ model, el }) {
+  el.style.display = "none";
+  const KEY = "eee_lang";
+  const existing = localStorage.getItem(KEY) || "";
+  model.set("stored", existing);
+  model.save_changes();
+  model.on("change:save", () => {
+    const v = model.get("save");
+    if (v) localStorage.setItem(KEY, v);
+  });
+}
+export default { render };
+"""
+
+if _ANYWIDGET_OK:
+    class _LangPersistWidget(_anywidget.AnyWidget):
+        _esm = _LANG_ESM
+        # None means "the browser's async localStorage read hasn't landed
+        # yet" -- distinct from "" (a real, confirmed localStorage miss).
+        stored = _traitlets.Unicode(allow_none=True, default_value=None).tag(sync=True)
+        save = _traitlets.Unicode("").tag(sync=True)
+
+
+def language_bridge(mo):
+    """Anywidget bridge for cross-page UI-language persistence
+    (browser ``localStorage``, key ``"eee_lang"``) — pass the result to
+    :func:`language_selector` and :func:`save_language_selection`.
+
+    Returns ``None`` if ``anywidget`` isn't installed; the other two
+    functions degrade to a plain, non-persisted dropdown in that case.
+
+    Must be created in its own cell (not inlined into
+    :func:`language_selector`'s cell) — marimo's reactivity is
+    cell-scoped, so :func:`language_selector` needs to take this bridge
+    as an explicit cell parameter to be rerun once the browser's
+    (asynchronous) stored-value read completes.
+    """
+    if not _ANYWIDGET_OK:
+        return None
+    return mo.ui.anywidget(_LangPersistWidget())
+
+
+def language_selector(mo, bridge, options: dict | None = None, default: str = "en"):
+    """``mo.ui.dropdown`` for UI language, seeded from *bridge*'s
+    persisted value (see :func:`language_bridge`) once the browser read
+    completes — until then, or if *bridge* is ``None``, starts at
+    *default*. Falls back to *default* if the stored value isn't one of
+    *options*' codes (e.g. a stale/removed language).
+
+    Call from a cell that takes *bridge* as a parameter — marimo then
+    reruns this cell (rebuilding the dropdown with the real stored
+    value) the moment the browser read lands, since it's watching
+    *bridge* for changes.
+    """
+    options = options or {"English": "en", "Русский": "ru", "Ελληνικά": "el"}
+    initial_code = default
+    if bridge is not None:
+        stored = getattr(bridge, "stored", None)
+        if stored is not None and stored in options.values():
+            initial_code = stored
+    initial_label = next((label for label, code in options.items() if code == initial_code), next(iter(options)))
+    return mo.ui.dropdown(options=options, value=initial_label, label="🌐")
+
+
+def save_language_selection(bridge, selector) -> None:
+    """Persist *selector*'s current value via *bridge* (see
+    :func:`language_bridge`). No-op if *bridge* is ``None``.
+
+    Call from a cell depending on both *bridge* and *selector*. Skips
+    writing until *bridge* has reported back a real (possibly empty)
+    stored value — otherwise, on every fresh page load, this would
+    write *selector*'s placeholder default over a real stored value
+    before the (async) browser read has had a chance to apply it: the
+    write is synchronous, the read isn't, so an unconditional write
+    would win that race every time.
+    """
+    if bridge is None:
+        return
+    stored = getattr(bridge, "stored", None)
+    if stored is not None:
+        bridge.save = selector.value
+
+
 _BAR_CSS_TMPL = """\
 EEE_BAR{display:flex;flex-wrap:wrap;gap:5px;EEE_MARGIN;align-items:center}
 EEE_BAR .dia-lbl{font-size:12px;color:#555;margin-right:4px;font-family:sans-serif}
@@ -1297,6 +1389,8 @@ function render({model,el}){
   // before save_changes() does the real network round trip.
   const pendingOrigin=new Map();  // request_id -> origin field index, while its reply is in flight
 
+  function focusAndSelect(inp){inp.focus();inp.select();}
+
   // A field can (rarely) have more than one request in flight -- fireSubmit
   // itself refuses to re-lock an already-locked field, but the mobile "Go"
   // form-submit path and the keydown path both funnel through it, so treat
@@ -1449,6 +1543,19 @@ function render({model,el}){
   });
   el.appendChild(form);
 
+  // Auto-focus the first field on mount -- e.g. right after advancing to a
+  // fresh word's form, so typing can start immediately without a manual
+  // click. This cell also reruns for reasons that have nothing to do with
+  // the word advancing (e.g. a language switch, which rebuilds this widget
+  // for the *same* word), so only steal focus when nothing else already
+  // has it -- otherwise this would yank focus away from wherever the user
+  // actually is. When the previous word's form loses focus (its DOM node
+  // gets removed on advance), the browser moves focus to <body>, which is
+  // exactly the case this is meant to catch.
+  if (inputs.length && (!document.activeElement || document.activeElement === document.body)) {
+    focusAndSelect(inputs[0]);
+  }
+
   // Unlike the beforeinput/clrBtn guards above, this one doesn't need its
   // own readOnly check: values is only ever written by flushValues() below
   // (client -> server), so a change:values event is always an echo of data
@@ -1476,7 +1583,7 @@ function render({model,el}){
     if(focusedInp!==inputs[originIdx])return;
     // advance_to is null on a wrong answer or the last field -- this reply
     // exists only to release the lock, there's nowhere to move focus to.
-    if(advance_to!=null&&advance_to<inputs.length){inputs[advance_to].focus();inputs[advance_to].select();}
+    if(advance_to!=null&&advance_to<inputs.length){focusAndSelect(inputs[advance_to]);}
   });
 }
 export default{render};
@@ -1512,6 +1619,12 @@ def make_paradigm_form(mo, labels, values=None, polytonic=True):
     iota subscript were dropped in the 1982 reform, so offering them for
     Modern Greek content is confusing, not just unnecessary. Pass
     ``config.polytonic`` (from :class:`GreekConfig`) rather than hardcoding.
+
+    On mount, the first field auto-focuses (and its existing value, if
+    any, is selected) — but only when nothing else already has focus, so
+    a widget rebuilt for a reason unrelated to genuinely showing a new
+    word (e.g. a language switch elsewhere on the page) doesn't steal
+    focus from wherever the user actually is.
 
     Pressing Enter in any field (desktop keydown, or a mobile virtual
     keyboard's "Go"/submit action — both wired) flushes the current values
@@ -2808,8 +2921,9 @@ Translation: **{translation}**
             return False, None, set(), pref
         cv = uv
         if pref:
-            if uv.lower().startswith(pref):
-                cv = uv[len(pref):].strip()
+            ws = uv.split(None, 1)
+            if ws[0].lower() == pref.lower():
+                cv = ws[1] if len(ws) > 1 else ''
             else:
                 return False, None, set(), pref
         correct = self._verb_forms(verb_base, tense, per, n)

@@ -25,6 +25,9 @@ from eee_project.notebook_utils import (
     eee_card_list,
     eee_footer,
     magnify_image,
+    language_bridge,
+    language_selector,
+    save_language_selection,
     ConfigStore,
     build_grc_paradigm_table,
     build_modern_paradigm_table,
@@ -797,6 +800,124 @@ class TestUiLabel:
             for lang in ('en', 'ru', 'el'):
                 label = gu.ui_label(key, lang)
                 assert label != key, f"{key!r} missing a real {lang} label (echoed the key back)"
+
+
+# ──────── language_bridge / language_selector / save_language_selection ──
+
+class _FakeDropdown:
+    """Mirrors real marimo dropdown semantics: .value resolves through
+    *options* by the given label, not the label itself."""
+    def __init__(self, options=None, value=None, label=""):
+        self.options = options or {}
+        self.label = label
+        self.value = self.options.get(value)
+
+
+class _LangMo(_StubMoLayout):
+    class ui:
+        @staticmethod
+        def dropdown(options=None, value=None, label=""):
+            return _FakeDropdown(options, value, label)
+        @staticmethod
+        def anywidget(inst):
+            return inst
+
+
+class TestLanguageBridge:
+    def test_returns_none_without_anywidget(self):
+        import eee_project.notebook_utils as _nu
+        orig = _nu._ANYWIDGET_OK
+        try:
+            _nu._ANYWIDGET_OK = False
+            assert language_bridge(_LangMo()) is None
+        finally:
+            _nu._ANYWIDGET_OK = orig
+
+    def test_returns_wrapped_widget_with_anywidget(self):
+        import eee_project.notebook_utils as _nu
+        if not _nu._ANYWIDGET_OK:
+            pytest.skip("anywidget not installed")
+        bridge = language_bridge(_LangMo())
+        assert bridge is not None
+        assert bridge.stored is None
+
+
+class TestLanguageSelector:
+    def test_bridge_none_uses_default(self):
+        selector = language_selector(_LangMo(), None)
+        assert selector.value == "en"
+
+    def test_bridge_none_custom_default(self):
+        selector = language_selector(_LangMo(), None, default="ru")
+        assert selector.value == "ru"
+
+    def test_bridge_unset_uses_default(self):
+        # bridge exists but hasn't reported back a real value yet (still
+        # None) -- e.g. the very first cell execution, before the
+        # browser's (async) localStorage read has had a chance to land.
+        import eee_project.notebook_utils as _nu
+        if not _nu._ANYWIDGET_OK:
+            pytest.skip("anywidget not installed")
+        mo_stub = _LangMo()
+        bridge = language_bridge(mo_stub)
+        selector = language_selector(mo_stub, bridge)
+        assert selector.value == "en"
+
+    def test_bridge_real_valid_value_used(self):
+        import eee_project.notebook_utils as _nu
+        if not _nu._ANYWIDGET_OK:
+            pytest.skip("anywidget not installed")
+        mo_stub = _LangMo()
+        bridge = language_bridge(mo_stub)
+        bridge.stored = "ru"
+        selector = language_selector(mo_stub, bridge)
+        assert selector.value == "ru"
+
+    def test_bridge_real_invalid_value_falls_back_to_default(self):
+        # a stale/unrecognized stored value (e.g. a removed language) must
+        # not break the selector -- falls back to *default*, not "xx".
+        import eee_project.notebook_utils as _nu
+        if not _nu._ANYWIDGET_OK:
+            pytest.skip("anywidget not installed")
+        mo_stub = _LangMo()
+        bridge = language_bridge(mo_stub)
+        bridge.stored = "xx"
+        selector = language_selector(mo_stub, bridge)
+        assert selector.value == "en"
+
+    def test_custom_options(self):
+        selector = language_selector(_LangMo(), None, options={"Foo": "fo", "Bar": "ba"}, default="ba")
+        assert selector.value == "ba"
+
+
+class TestSaveLanguageSelection:
+    def test_bridge_none_is_noop(self):
+        selector = language_selector(_LangMo(), None)
+        save_language_selection(None, selector)  # must not raise
+
+    def test_skips_write_while_bridge_unset(self):
+        # the race-condition fix: don't clobber a real stored value with the
+        # placeholder default before the (async) browser read has landed --
+        # simulated here by the bridge still reporting None.
+        import eee_project.notebook_utils as _nu
+        if not _nu._ANYWIDGET_OK:
+            pytest.skip("anywidget not installed")
+        mo_stub = _LangMo()
+        bridge = language_bridge(mo_stub)
+        selector = language_selector(mo_stub, bridge)
+        save_language_selection(bridge, selector)
+        assert bridge.save == ""
+
+    def test_writes_once_bridge_has_real_value(self):
+        import eee_project.notebook_utils as _nu
+        if not _nu._ANYWIDGET_OK:
+            pytest.skip("anywidget not installed")
+        mo_stub = _LangMo()
+        bridge = language_bridge(mo_stub)
+        bridge.stored = "ru"  # simulates the browser read landing
+        selector = language_selector(mo_stub, bridge)
+        save_language_selection(bridge, selector)
+        assert bridge.save == "ru"
 
 
 # ──────────────────────────────────────── eee_topbar / eee_footer ──
@@ -3055,6 +3176,10 @@ class TestCheckVerbSlot:
     def test_prefix_required_but_missing(self):
         gu = GreekUtils(_StubBackend(self._mg_future_paradigm_fn), _StubMo())
         assert gu.check_verb_slot("λύω", "future", 0, "λύσω") is False
+
+    def test_prefix_glued_no_space_rejected(self):
+        gu = GreekUtils(_StubBackend(self._mg_future_paradigm_fn), _StubMo())
+        assert gu.check_verb_slot("λύω", "future", 0, "θαλύσω") is False
 
 
 # ────────────────────────────────────────── check_noun_slot ──

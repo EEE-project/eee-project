@@ -18,7 +18,7 @@ Run from within the repo (uses local packages):
 
 import marimo
 
-__generated_with = "0.23.14"
+__generated_with = "0.23.16"
 app = marimo.App(width="medium")
 
 
@@ -35,23 +35,33 @@ def _():
     gu = GreekUtils(mg_backend, mo, pd, eee_module=eee)
     t_ui = gu.ui_label
 
-    # Kept undisplayed here: a cell that both builds this widget and displays
-    # it conditionally elsewhere would rerun (and reset the selection back to
-    # its default) on every dependent re-render.
-    language_selector = mo.ui.dropdown(
-        options={"English": "en", "Русский": "ru", "Ελληνικά": "el"},
-        value="English",
-        label="🌐",
-    )
-    return gu, language_selector, mo, pd, t_ui
+    # Anywidget bridge for cross-page language persistence (localStorage).
+    # Kept in its own cell, undisplayed here: a cell that both builds this
+    # and displays/uses it elsewhere would rerun (and reset the bridge) on
+    # every dependent re-render.
+    bridge = eee.language_bridge(mo)
+    return bridge, eee, gu, mo, pd, t_ui
 
 
 @app.cell(hide_code=True)
-def _(language_selector, mo):
+def _(bridge, eee, mo):
+    # Kept undisplayed here, in its own cell (not folded into the bridge
+    # cell above): must take *bridge* as a parameter, not just reference it
+    # via closure, so marimo reruns this cell -- rebuilding the dropdown
+    # with the real persisted language -- once the browser's (async)
+    # localStorage read completes.
+    language_selector = eee.language_selector(mo, bridge)
+    return (language_selector,)
+
+
+@app.cell(hide_code=True)
+def _(bridge, eee, language_selector, mo):
+    eee.save_language_selection(bridge, language_selector)
     mo.Html(f"""
     <div style="position: fixed; top: 60px; right: 10px; z-index: 1000; background: white; padding: 8px 12px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
         {language_selector}
     </div>
+    {bridge}
     """)
     return
 
