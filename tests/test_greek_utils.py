@@ -114,6 +114,27 @@ class TestCheckNounSimple:
         assert ok is False
         assert "WRONG" in errs
 
+    def test_wrong_noun_form_when_backend_form_is_blank(self):
+        """Backend can legitimately return {''} for a case it has no data for
+        (e.g. modern-greek-inflexion-eee's without_gen_pl exceptions) --
+        feedback must fall back to '?', not render an empty '****'."""
+        blank_paradigm = {
+            'fem': {
+                'sg': {'nom': {'μνήμη'}, 'acc': {'μνήμη'}, 'gen': {'μνήμης'}},
+                'pl': {'nom': {'μνήμες'}, 'acc': {'μνήμες'}, 'gen': {''}},
+            }
+        }
+        gu = GreekUtils(StubBackend(lambda word, pos: blank_paradigm), _mo, _pd_real)
+        snap = _snap(
+            ["μνήμη", "μνήμη", "μνήμης", "μνήμες", "μνήμες", "WRONG"],
+            test_word="η μνήμη", is_pluralia_tantum=False,
+            active_cases=[["sg","nom"],["sg","acc"],["sg","gen"],["pl","nom"],["pl","acc"],["pl","gen"]],
+        )
+        ok, errs = gu.check_noun_test("η μνήμη", snap, mode='simple')
+        assert ok is False
+        assert "must be **?**" in errs
+        assert "****" not in errs
+
     def test_wrong_article_simple(self, gu):
         # wrong article in simple mode → error
         snap = _snap(

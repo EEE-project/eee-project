@@ -3612,19 +3612,27 @@ class _ParadigmDrillFormBase:
 class TestVerbParadigmDrillForm(_ParadigmDrillFormBase):
     _VOCAB = [{"form": "λύω", "meaning": "I loose"}, {"form": "ἄγω", "meaning": "I lead"}]
 
-    def _call(self, gu, state, cv, form, **kwargs):
-        return self._call_form(gu.verb_paradigm_drill_form, state, cv, form, **kwargs)
+    def _meta(self, active_slots=None):
+        import types
+        return types.SimpleNamespace(
+            active_slots=active_slots or [("sg", "pri"), ("sg", "sec"), ("sg", "ter"),
+                                           ("pl", "pri"), ("pl", "sec"), ("pl", "ter")],
+        )
+
+    def _call(self, gu, state, cv, form, verb_meta, **kwargs):
+        return self._call_form(gu.verb_paradigm_drill_form, state, cv, form,
+                               verb_meta=verb_meta, **kwargs)
 
     def test_done_shows_callout_and_restart(self, gu):
         state = self._state(words=[])
-        result = self._call(gu, state, None, _pdform([]))
+        result = self._call(gu, state, None, _pdform([]), self._meta())
         assert "callout" in str(result)
 
     def test_restart_click_resets_state(self, gu):
         state = self._state(
             words=[self._VOCAB[0]], hist=[self._VOCAB[1]], entered={"λύω": ["x"]},
         )
-        result = self._call(gu, state, self._VOCAB[0], _pdform([""]), restart_v=1)
+        result = self._call(gu, state, self._VOCAB[0], _pdform([""]), self._meta(), restart_v=1)
         assert result == "*...*"
         assert state["words"][2][0] == self._VOCAB
         assert state["hist"][2][0] == []
@@ -3634,7 +3642,7 @@ class TestVerbParadigmDrillForm(_ParadigmDrillFormBase):
         cv = self._VOCAB[0]
         state = self._state()
         with patch.object(gu, "check_verb_test", return_value=(True, "")):
-            result = self._call(gu, state, cv, _pdform(["λύω"]), check_v=1)
+            result = self._call(gu, state, cv, _pdform(["λύω"]), self._meta(), check_v=1)
         assert result == "*...*"
         assert cv not in state["words"][2][0]
         assert cv in state["hist"][2][0]
@@ -3645,7 +3653,7 @@ class TestVerbParadigmDrillForm(_ParadigmDrillFormBase):
         cv = self._VOCAB[0]
         state = self._state()
         with patch.object(gu, "check_verb_test", return_value=(False, "❌ wrong")):
-            result = self._call(gu, state, cv, _pdform(["asd"]), check_v=1)
+            result = self._call(gu, state, cv, _pdform(["asd"]), self._meta(), check_v=1)
         assert "❌ wrong" in str(result)
         assert cv in state["words"][2][0]
 
@@ -3655,7 +3663,7 @@ class TestVerbParadigmDrillForm(_ParadigmDrillFormBase):
         form = _pdform(["λύω", ""], submit_count=1, enter_field_index=0)
         with patch.object(gu, "check_verb_slot", return_value=True), \
              patch.object(gu, "check_verb_test", return_value=(False, "")):
-            self._call(gu, state, cv, form)
+            self._call(gu, state, cv, form, self._meta())
         assert form.widget.focus_request == {"request_id": 1, "advance_to": 1}
 
     def test_enter_on_correct_last_slot_has_no_advance_target(self, gu):
@@ -3666,7 +3674,7 @@ class TestVerbParadigmDrillForm(_ParadigmDrillFormBase):
         form = _pdform(["λύω"], submit_count=1, enter_field_index=0)
         with patch.object(gu, "check_verb_slot", return_value=True), \
              patch.object(gu, "check_verb_test", return_value=(False, "")):
-            self._call(gu, state, cv, form)
+            self._call(gu, state, cv, form, self._meta())
         assert form.widget.focus_request == {"request_id": 1, "advance_to": None}
 
     def test_enter_on_wrong_slot_does_not_advance_focus(self, gu):
@@ -3675,7 +3683,7 @@ class TestVerbParadigmDrillForm(_ParadigmDrillFormBase):
         form = _pdform(["asd", ""], submit_count=1, enter_field_index=0)
         with patch.object(gu, "check_verb_slot", return_value=False), \
              patch.object(gu, "check_verb_test", return_value=(False, "")):
-            self._call(gu, state, cv, form)
+            self._call(gu, state, cv, form, self._meta())
         # Still replies (advance_to=None, not omitted) -- the JS side locks
         # the origin field on every Enter and needs a reply to release that
         # lock, even when the answer was wrong.
@@ -3685,7 +3693,7 @@ class TestVerbParadigmDrillForm(_ParadigmDrillFormBase):
         cv = self._VOCAB[0]
         state = self._state()
         with patch.object(gu, "check_verb_test", return_value=(False, "")):
-            result = self._call(gu, state, cv, _pdform(["asd"]), nxt_v=1)
+            result = self._call(gu, state, cv, _pdform(["asd"]), self._meta(), nxt_v=1)
         assert result == "*...*"
         assert cv not in state["words"][2][0]
         assert cv in state["hist"][2][0]
@@ -3696,7 +3704,7 @@ class TestVerbParadigmDrillForm(_ParadigmDrillFormBase):
         cv = self._VOCAB[0]
         state = self._state(hist=[prev_word])
         with patch.object(gu, "check_verb_test", return_value=(False, "")):
-            result = self._call(gu, state, cv, _pdform([""]), prev_v=1)
+            result = self._call(gu, state, cv, _pdform([""]), self._meta(), prev_v=1)
         assert result == "*...*"
         assert state["words"][2][0][0] == prev_word
         assert state["hist"][2][0] == []
@@ -3705,7 +3713,7 @@ class TestVerbParadigmDrillForm(_ParadigmDrillFormBase):
         cv = {"Word": "λύω", "Translation": "I loose"}
         state = self._state(words=[cv])
         with patch.object(gu, "check_verb_test", return_value=(True, "")):
-            result = self._call(gu, state, cv, _pdform(["λύω"]), check_v=1, word_key="Word", meaning_key="Translation")
+            result = self._call(gu, state, cv, _pdform(["λύω"]), self._meta(), check_v=1, word_key="Word", meaning_key="Translation")
         assert result == "*...*"
         assert state["entered"][2][0].get("λύω") == ["λύω"]
 
@@ -3986,6 +3994,21 @@ class TestNounDrillMeta:
         assert meta.is_pluralia_tantum is True
         assert all(c[0] == 'pl' for c in meta.active_cases)
 
+    def test_excludes_cell_when_backend_form_is_blank(self):
+        # A backend can return {''} for a cell it has no data for (a real,
+        # deliberate sentinel -- e.g. modern-greek-inflexion-eee's
+        # without_gen_pl exceptions), not just an empty set. That cell must
+        # be excluded from active_cases the same way a truly empty set is.
+        class _BlankGenPlBackend:
+            def paradigm(self, word, pos):
+                return {"fem": {"sg": {"nom": {word}, "acc": {word}, "gen": {word + "ς"}},
+                                 "pl": {"nom": {word + "ες"}, "acc": {word + "ες"}, "gen": {''}}}}
+        gu = GreekUtils(_BlankGenPlBackend(), _RichMo(), config=MODERN_GREEK)
+        meta = gu.noun_drill_meta("η δοκιμή")
+        assert ('pl', 'gen') not in meta.active_cases
+        assert ('pl', 'nom') in meta.active_cases
+        assert meta.is_pluralia_tantum is False
+
 
 class TestNounSlotLabels:
     def test_formats_number_and_case(self):
@@ -4090,6 +4113,36 @@ class TestVerbSlotLabels:
         assert labels == [f"{lbl}:" for lbl in ANCIENT_GREEK.verb_labels]
         assert len(labels) == len(ANCIENT_GREEK.verb_slots)
 
+    def test_active_slots_restricts_and_reorders(self):
+        gu = GreekUtils(mo_module=_StubMo(), config=ANCIENT_GREEK)
+        by_slot = dict(zip(ANCIENT_GREEK.verb_slots, ANCIENT_GREEK.verb_labels))
+        active = [ANCIENT_GREEK.verb_slots[2], ANCIENT_GREEK.verb_slots[0]]
+        assert gu.verb_slot_labels(active) == [f"{by_slot[s]}:" for s in active]
+
+
+class TestVerbDrillMeta:
+    @staticmethod
+    def _paradigm_fn(word, pos):
+        if pos != "verb":
+            return {}
+        # sg.ter ("λύει") deliberately blank -- same {''} sentinel a real
+        # backend can return for a slot it has no data for.
+        return {"present": {"active": {"ind": {
+            "sg": {"pri": {"λύω"}, "sec": {"λύεις"}, "ter": {''}},
+            "pl": {"pri": {"λύομεν"}, "sec": {"λύετε"}, "ter": {"λύουσι"}},
+        }}}}
+
+    def test_excludes_slot_when_backend_form_is_blank(self):
+        gu = GreekUtils(_StubBackend(self._paradigm_fn), _StubMo(), config=ANCIENT_GREEK)
+        meta = gu.verb_drill_meta("λύω", "present")
+        assert ("sg", "ter") not in meta.active_slots
+        assert ("sg", "pri") in meta.active_slots
+
+    def test_falls_back_to_full_slots_when_backend_has_no_data(self):
+        gu = GreekUtils(_StubBackend(), _StubMo(), config=ANCIENT_GREEK)  # always {}
+        meta = gu.verb_drill_meta("ἄγνωστον", "present")
+        assert meta.active_slots == ANCIENT_GREEK.verb_slots
+
 
 # ────────────────────────────────────────── create_verb_test_ui ──
 
@@ -4102,34 +4155,57 @@ class TestCreateVerbTestUi:
         return GreekUtils(_StubBackend(), _RichMo(), config=ANCIENT_GREEK)
 
     def test_no_current_verb_returns_none_form(self, gu):
-        form, md = gu.create_verb_test_ui("Test", self._WORDS, self._WORDS, None)
+        form, md = gu.create_verb_test_ui("Test", self._WORDS, self._WORDS, None, "present")
         assert form is None
 
     def test_basic_form_created(self, gu):
-        form, md = gu.create_verb_test_ui("Test", self._WORDS, self._WORDS, self._VERB)
+        form, md = gu.create_verb_test_ui("Test", self._WORDS, self._WORDS, self._VERB, "present")
         assert form is not None
 
     def test_verb_word_attribute_set(self, gu):
-        form, _ = gu.create_verb_test_ui("Test", self._WORDS, self._WORDS, self._VERB)
+        form, _ = gu.create_verb_test_ui("Test", self._WORDS, self._WORDS, self._VERB, "present")
         assert form.verb_word == "λύω"
 
     def test_form_has_six_slots(self, gu):
-        form, _ = gu.create_verb_test_ui("Test", self._WORDS, self._WORDS, self._VERB)
+        # _StubBackend has no data at all -- verb_drill_meta falls back to
+        # the full slot list rather than showing an empty form.
+        form, _ = gu.create_verb_test_ui("Test", self._WORDS, self._WORDS, self._VERB, "present")
         assert len(form.value) == 6  # 3 sg + 3 pl slots
 
     def test_value_initially_empty(self, gu):
-        form, _ = gu.create_verb_test_ui("Test", self._WORDS, self._WORDS, self._VERB)
+        form, _ = gu.create_verb_test_ui("Test", self._WORDS, self._WORDS, self._VERB, "present")
         assert all(v == "" for v in form.value)
 
     def test_empty_words4test_shows_default_message(self, gu):
-        form, md = gu.create_verb_test_ui("Test", self._WORDS, [], self._VERB)
+        form, md = gu.create_verb_test_ui("Test", self._WORDS, [], self._VERB, "present")
         # form still created but md_view is the empty-list message
         assert form is not None
         assert "Test" in md   # title appears in default message
 
     def test_words4test_given_md_contains_translation(self, gu):
-        _, md = gu.create_verb_test_ui("Test", self._WORDS, self._WORDS, self._VERB)
+        _, md = gu.create_verb_test_ui("Test", self._WORDS, self._WORDS, self._VERB, "present")
         assert "I loosen" in md
+
+    def test_excludes_slot_with_blank_backend_form(self):
+        gu = GreekUtils(_StubBackend(TestVerbDrillMeta._paradigm_fn), _RichMo(), config=ANCIENT_GREEK)
+        form, _ = gu.create_verb_test_ui("Test", self._WORDS, self._WORDS, self._VERB, "present")
+        assert len(form.value) == 5  # sg.ter excluded
+        assert ("sg", "ter") not in form.active_slots
+
+    def test_snapshot_of_excluded_slot_form_does_not_crash_check(self):
+        # Regression: make_snapshot used to drop active_slots (missing from
+        # its attribute allowlist), so a snapshot of a form with a genuinely
+        # excluded slot fell back to the full slot list in check_verb_test,
+        # indexing form.value (5 entries) with an index meant for 6 slots --
+        # IndexError. The full create_verb_test_ui -> make_snapshot ->
+        # check_verb_test pipeline, not just make_snapshot in isolation.
+        gu = GreekUtils(_StubBackend(TestVerbDrillMeta._paradigm_fn), _RichMo(), config=ANCIENT_GREEK)
+        form, _ = gu.create_verb_test_ui("Test", self._WORDS, self._WORDS, self._VERB, "present")
+        for item, val in zip(form, ["λύω", "λύεις", "λύομεν", "λύετε", "λύουσι"]):
+            item.value = val
+        snap = gu.make_snapshot(form, verb_word="λύω", tense="present")
+        ok, _ = gu.check_verb_test("λύω", snap, "present")
+        assert ok is True
 
 
 # ────────────────────────────────────────── paste fix in ESM strings ──
@@ -4704,6 +4780,18 @@ class TestGreekUtilsDataIO:
         assert snap.value == ["x"]
         assert not hasattr(snap, "test_word")
 
+    def test_make_snapshot_copies_active_slots(self):
+        # Regression: create_verb_test_ui sets form.active_slots (the verb
+        # sibling of the noun form's active_cases, already covered above) --
+        # without copying it, check_verb_test falls back to the full,
+        # unfiltered slot list against a snapshot.value shorter than that,
+        # raising IndexError for any verb with an actually-excluded slot.
+        gu = GreekUtils(_StubBackend(), _StubMo(), config=ANCIENT_GREEK)
+        slots = [("sg", "pri"), ("sg", "sec")]
+        form = type("_F", (), {"value": ["a", "b"], "verb_word": "λύω", "active_slots": slots})()
+        snap = gu.make_snapshot(form)
+        assert snap.active_slots == slots
+
 
 # ──────────────────────────────── resolve_word_grammar exception ──
 
@@ -4798,6 +4886,18 @@ class TestCheckAdjectiveSlot:
 
     def test_falls_back_to_base_form_when_no_backend_data(self, gu):
         # _StubBackend returns {} -> _adj_forms empty -> falls back to {adj_base}
+        assert gu.check_adjective_slot(self._WORD, "simple", 0, "καλός") is True
+        assert gu.check_adjective_slot(self._WORD, "simple", 0, "wrong") is False
+
+    def test_falls_back_to_base_form_when_backend_form_is_blank(self):
+        # A backend can return {''} for a slot it has no data for (a real,
+        # deliberate sentinel, not just an empty set) -- must still fall
+        # back to {adj_base}, not leak the blank value through.
+        def _paradigm_fn(word, pos):
+            if pos != "adjective":
+                return {}
+            return {"adj": {"sg": {"masc": {"nom": {''}}}}}
+        gu = GreekUtils(_StubBackend(_paradigm_fn), _StubMo(), config=ANCIENT_GREEK)
         assert gu.check_adjective_slot(self._WORD, "simple", 0, "καλός") is True
         assert gu.check_adjective_slot(self._WORD, "simple", 0, "wrong") is False
 

@@ -2539,7 +2539,7 @@ class GreekUtils:
     def make_snapshot(self, form, **kwargs):
         snap = SimpleNamespace(value=list(form.value) if form is not None else [])
         for attr in ('test_word', 'verb_word', 'adj_word', 'adj_mode',
-                     'is_pluralia_tantum', 'active_cases'):
+                     'is_pluralia_tantum', 'active_cases', 'active_slots'):
             if hasattr(form, attr):
                 setattr(snap, attr, getattr(form, attr))
         for k, v in kwargs.items():
@@ -2627,13 +2627,13 @@ class GreekUtils:
         _sg_nom_forms = self._noun_forms(nw, 'sg', 'nom')
         is_pt = (
             (na is not None and na in self._plural_articles()) or
-            not bool(_sg_nom_forms)
+            not any(_sg_nom_forms)
         )
         active_cases = (
             pl_cells if is_pt else
             # noun_cells[0] is always ('sg', 'nom') — reuse _sg_nom_forms
             # instead of re-querying it (it's truthy here, since is_pt is False)
-            [noun_cells[0]] + [c for c in noun_cells[1:] if bool(self._noun_forms(nw, c[0], c[1]))] or noun_cells
+            [noun_cells[0]] + [c for c in noun_cells[1:] if any(self._noun_forms(nw, c[0], c[1]))]
         )
         return SimpleNamespace(is_pluralia_tantum=is_pt, active_cases=active_cases)
 
@@ -2794,7 +2794,7 @@ class GreekUtils:
                 elif not self._ci(ua, correct_arts):
                     errs.append(f'❌ [{_c} {_n}]: article **"{ua}"**, must be **{" / ".join(sorted(correct_arts))}**')
             if not self._ci(uw, correct):
-                errs.append(f'❌ [{_c} {_n}]: noun **"{uw}"**, must be **{" / ".join(sorted(correct)) if correct else "?"}**')
+                errs.append(f'❌ [{_c} {_n}]: noun **"{uw}"**, must be **{" / ".join(sorted(correct)) if any(correct) else "?"}**')
             return not errs, errs
 
         def _collect(results):
@@ -2880,22 +2880,46 @@ class GreekUtils:
 
     # ------------------------------------------------------------------ verbs
 
-    def verb_slot_labels(self) -> list:
+    def verb_slot_labels(self, active_slots: "list | None" = None) -> list:
         """Labels for the verb paradigm-drill's slots (``config.verb_labels``
         with trailing colons), in the same slot order ``check_verb_slot``
         indexes — what :meth:`create_verb_test_ui` renders.
-        """
-        return [f"{lbl}:" for lbl in self._cfg.verb_labels]
 
-    def create_verb_test_ui(self, title, words, words4test_val, current_verb):
+        ``active_slots`` (from :meth:`verb_drill_meta`) restricts the labels
+        to that subset, in that order — omit for the full, unfiltered list.
+        """
+        if active_slots is None:
+            return [f"{lbl}:" for lbl in self._cfg.verb_labels]
+        label_by_slot = dict(zip(self._cfg.verb_slots, self._cfg.verb_labels))
+        return [f"{label_by_slot[s]}:" for s in active_slots]
+
+    def verb_drill_meta(self, verb_base: str, tense: str) -> SimpleNamespace:
+        """Active ``(number, person)`` slots for one verb+tense — slots the
+        backend has no data for are excluded, the verb sibling of
+        :meth:`noun_drill_meta`. A verb's defectiveness can vary by tense
+        (e.g. missing a passive aorist), so this takes both, unlike nouns'
+        purely per-word ``active_cases``.
+
+        Falls back to the full ``config.verb_slots`` if every slot comes back
+        blank (backend has no data at all for this verb+tense).
+        """
+        active_slots = [
+            (n, per) for (n, per) in self._cfg.verb_slots
+            if any(self._verb_forms(verb_base, tense, per, n))
+        ] or self._cfg.verb_slots
+        return SimpleNamespace(active_slots=active_slots)
+
+    def create_verb_test_ui(self, title, words, words4test_val, current_verb, tense):
         mo = self._mo
         form = None
         md_view = mo.md(f'**The word list for {title} is empty.**')
         if current_verb:
             word = current_verb['Word']
             translation = current_verb['Translation']
-            form = mo.ui.array([mo.ui.text(label=l) for l in self.verb_slot_labels()])
+            active_slots = self.verb_drill_meta(word, tense).active_slots
+            form = mo.ui.array([mo.ui.text(label=l) for l in self.verb_slot_labels(active_slots)])
             form.verb_word = word
+            form.active_slots = active_slots
             if words4test_val:
                 md_view = mo.md(f"""
 ### {title}
@@ -2927,7 +2951,7 @@ Translation: **{translation}**
             else:
                 return False, None, set(), pref
         correct = self._verb_forms(verb_base, tense, per, n)
-        ok = bool(correct) and self._ci(cv, correct)
+        ok = any(correct) and self._ci(cv, correct)
         return ok, cv, correct, pref
 
     def check_verb_test(self, verb_base, form_array, tense):
@@ -2935,6 +2959,10 @@ Translation: **{translation}**
 
         Returns ``(ok, feedback_html)`` where ``feedback_html`` is a
         ``'<br>'``-joined string of error messages (empty when correct).
+
+        Reads ``form_array.active_slots`` (from :meth:`verb_drill_meta`, set
+        by :meth:`create_verb_test_ui`/:meth:`verb_paradigm_drill_form`) when
+        present, else falls back to the full ``config.verb_slots``.
         """
         if form_array is None or not form_array.value:
             return False, ""
@@ -2942,8 +2970,10 @@ Translation: **{translation}**
             return False, ""
         if tense not in self._cfg.tense_feats:
             return False, f"Unknown tense '{tense}'"
+        active_slots = getattr(form_array, 'active_slots', None) or self._cfg.verb_slots
+        labels = self.verb_slot_labels(active_slots)
         ok, errs = True, []
-        for i, ((n, per), lbl) in enumerate(zip(self._cfg.verb_slots, self._cfg.verb_labels)):
+        for i, ((n, per), lbl) in enumerate(zip(active_slots, labels)):
             uv = form_array.value[i].strip()
             if not uv:
                 ok = False
@@ -2954,22 +2984,24 @@ Translation: **{translation}**
                 if cv is None and pref:
                     errs.append(f'❌ [{lbl}]: Write with **"{pref}"**')
                 else:
-                    exp = '/'.join(correct) if correct else 'unknown'
+                    exp = '/'.join(correct) if any(correct) else 'unknown'
                     if pref:
                         exp = f"{pref} {exp}"
                     errs.append(f'❌ [{lbl}]: entered **"{uv}"**, must be **{exp}**')
         return ok, '<br>'.join(errs)
 
-    def check_verb_slot(self, verb_base, tense, slot_index, value):
-        """Check a single verb-form slot (index into config.verb_slots).
+    def check_verb_slot(self, verb_base, tense, slot_index, value, active_slots=None):
+        """Check a single verb-form slot (index into ``active_slots``, or
+        ``config.verb_slots`` when not given).
 
         Same comparison rules as ``check_verb_test``'s per-slot logic (prefix +
         form), for one slot only — for incremental per-field validation (e.g.
         on Enter) instead of a full-form check.
         """
-        if tense not in self._cfg.tense_feats or not (0 <= slot_index < len(self._cfg.verb_slots)):
+        slots = active_slots if active_slots is not None else self._cfg.verb_slots
+        if tense not in self._cfg.tense_feats or not (0 <= slot_index < len(slots)):
             return False
-        n, per = self._cfg.verb_slots[slot_index]
+        n, per = slots[slot_index]
         ok, _, _, _ = self._verb_slot_ok(verb_base, tense, per, n, value)
         return ok
 
@@ -3034,12 +3066,16 @@ Translation: **{translation}**
     def _adj_slot_ok(self, adj_base, g, n, c, value) -> tuple:
         """Check one adjective-form slot; returns (ok, correct_forms).
 
-        Falls back to the base form itself when no backend data exists.
+        Falls back to the base form itself when no backend data exists --
+        ``{''}`` (a real, deliberate "no data" sentinel some backends
+        return, not just an empty set) is truthy, so this checks content
+        with ``any()`` rather than the container's own truthiness.
         Shared by check_adjective_test (needs ``correct_forms`` for its
         error message) and check_adjective_slot (boolean only) — mirrors
         ``_verb_slot_ok``.
         """
-        correct = self._adj_forms(adj_base, n, g, c) or {adj_base}
+        forms = self._adj_forms(adj_base, n, g, c)
+        correct = forms if any(forms) else {adj_base}
         return self._ci(value, correct), correct
 
     def check_adjective_test(self, adj_base, form_array, mode='simple'):
@@ -3068,7 +3104,7 @@ Translation: **{translation}**
             slot_ok, correct = self._adj_slot_ok(adj_base, g, n, c, uv)
             if not slot_ok:
                 ok = False
-                errs.append(f'❌ [{label}]: entered **"{uv}"**, must be **{"/".join(sorted(correct))}**')
+                errs.append(f'❌ [{label}]: entered **"{uv}"**, must be **{"/".join(sorted(correct)) if any(correct) else "?"}**')
         if not has:
             return False, '❌ Please fill in at least one gender form'
         return ok, '<br>'.join(errs)
@@ -3705,6 +3741,7 @@ Translation: **{translation}**
         cv: "dict | None", form: Any, check_btn: Any, prev_btn: Any, nxt_btn: Any, restart_btn: Any,
         *,
         vocab: list,
+        verb_meta: Any,
         tense: str = "present",
         word_key: str = "form",
         meaning_key: str = "meaning",
@@ -3720,7 +3757,13 @@ Translation: **{translation}**
         the state and widgets cells — replaces the snapshot, full-check,
         correct-handler, next/prev-handler, restart-handler, and display
         cells a hand-rolled version of this exercise would otherwise need.
+
+        ``verb_meta`` (from :meth:`verb_drill_meta`, also set on the form
+        :meth:`create_verb_test_ui` returns) supplies ``active_slots`` — a
+        verb's testable slots vary by verb *and* tense, unlike a noun's
+        purely per-word ``active_cases``.
         """
+        active_slots = getattr(verb_meta, "active_slots", None) or self._cfg.verb_slots
         state = self._pack_paradigm_state(
             get_words, set_words, get_hist, set_hist, get_msg, set_msg,
             get_cap, set_cap, get_entered, set_entered,
@@ -3734,9 +3777,9 @@ Translation: **{translation}**
             meaning_label=meaning_label, title=title, done_message=done_message,
             cap_word_attr="verb_word",
             make_cap=lambda live: (
-                SimpleNamespace(verb_word=cv[word_key], tense=tense, value=live)
+                SimpleNamespace(verb_word=cv[word_key], tense=tense, active_slots=active_slots, value=live)
                 if cv else None),
-            slot_ok=lambda i, v: bool(cv) and self.check_verb_slot(cv[word_key], tense, i, v),
+            slot_ok=lambda i, v: bool(cv) and self.check_verb_slot(cv[word_key], tense, i, v, active_slots=active_slots),
             full_check=lambda cap: self.check_verb_test(cv[word_key], cap, tense),
         )
 

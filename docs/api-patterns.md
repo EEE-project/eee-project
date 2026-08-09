@@ -808,8 +808,10 @@ three:
 ```python
 # Cell 2 — widgets (form + Prev/Next/Restart) + check button, separately
 cv = words()[0] if words() else None
+tense = "present"
+verb_meta = gu.verb_drill_meta(cv["form"], tense) if cv else None
 form, prev_btn, nxt_btn, restart_btn = gu.paradigm_drill_widgets(
-    labels=gu.verb_slot_labels(),
+    labels=gu.verb_slot_labels(verb_meta.active_slots if verb_meta else None),
     values=entered().get(cv["form"]) if cv else None,
     history_len=len(hist()), remaining_len=len(words()),
 )
@@ -823,7 +825,7 @@ gu.verb_paradigm_drill_form(
     entered, set_entered, sub_cnt, set_sub_cnt, prev_cnt, set_prev_cnt,
     nxt_cnt, set_nxt_cnt, entercnt, set_entercnt, restart_cnt, set_restart_cnt,
     cv, form, check_btn, prev_btn, nxt_btn, restart_btn,
-    vocab=VERBS, title="## Упражнение 5",
+    vocab=VERBS, verb_meta=verb_meta, tense=tense, title="## Упражнение 5",
 )
 ```
 
@@ -832,6 +834,15 @@ of Cell 3's call — same order, no repacking. `check_btn` is built in its own
 cell (not bundled into `paradigm_drill_widgets`) because it depends on `cap`,
 which changes on every check; bundling it would rebuild `form` from scratch
 on each check and lose whatever the student just typed.
+
+`verb_meta` (from `gu.verb_drill_meta(cv["form"], tense)`) supplies
+`active_slots` — the slots `verb_paradigm_drill_form` and
+`verb_slot_labels` restrict the drill to, skipping any the backend has no
+form for. A verb's testable slots vary by verb *and* tense (e.g. a
+defective passive aorist), unlike nouns' purely per-word `active_cases`.
+`create_verb_test_ui` computes this internally the same way
+`create_noun_test_ui` computes `noun_meta` (see "Noun paradigm" below) —
+pass it `tense` and read `.active_slots` off the form it returns.
 
 For nouns, swap in `noun_paradigm_drill_form` and pass `noun_meta` (from
 `gu.noun_drill_meta(cv["form"])` — active cases vary per word for pluralia
