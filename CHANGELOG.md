@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.6.0 - 2026-08-12
+- `eee_footer()` takes optional `prev_url`/`next_url` and renders ◀/▶ links
+  to the neighboring lesson, each omitted when there's no neighbor (start/end
+  of a course). New `same_window` param (default `False`) controls prev/next
+  link target, matching `eee_topbar`'s existing molab-safe convention; the
+  "Source" link is unaffected.
+- Add `ConfigStore.adjacent_urls(own_url)` to compute them from the same
+  `index.tsv` the topbar already reads — finds the row matching `own_url`
+  and returns the previous/next row's URL, so a course that skips a number
+  (no chapter 5, say) skips it in navigation too, for free.
+
 ## 1.5.3 - 2026-08-12
 - Fix `_source_host_base()` (1.5.2's host-aware `eee_footer()` link): used
   `js.window.location.hostname`, but marimo's Pyodide kernel runs in a Web

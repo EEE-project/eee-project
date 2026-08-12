@@ -1432,6 +1432,43 @@ class TestEeeFooter:
         result = eee_footer(_StubHtmlMo(), lang="de")
         assert "Source:" in result.s
 
+    def test_no_prev_next_renders_spacers_not_links(self):
+        result = eee_footer(_StubHtmlMo(), lang="en")
+        assert "footer-nav-spacer" in result.s
+        assert "footer-nav\"" not in result.s
+
+    def test_prev_url_renders_left_triangle_link(self):
+        result = eee_footer(_StubHtmlMo(), lang="en", prev_url="/course/chapter_01/", same_window=True)
+        assert '<a class="footer-nav" href="/course/chapter_01/">◀</a>' in result.s
+        assert "▶" not in result.s
+
+    def test_next_url_renders_right_triangle_link(self):
+        result = eee_footer(_StubHtmlMo(), lang="en", next_url="/course/chapter_03/", same_window=True)
+        assert '<a class="footer-nav" href="/course/chapter_03/">▶</a>' in result.s
+        assert "◀" not in result.s
+
+    def test_prev_and_next_both_render(self):
+        result = eee_footer(_StubHtmlMo(), lang="en",
+                             prev_url="/course/chapter_01/", next_url="/course/chapter_03/")
+        assert '<a class="footer-nav" href="/course/chapter_01/"' in result.s
+        assert '<a class="footer-nav" href="/course/chapter_03/"' in result.s
+        # Missing side still gets no spacer element once the other side is
+        # present (the CSS rule for it is always embedded, so check for the
+        # actual <span>, not the bare class-name substring).
+        assert '<span class="footer-nav-spacer">' not in result.s
+
+    def test_prev_next_default_new_tab(self):
+        result = eee_footer(_StubHtmlMo(), lang="en", prev_url="/course/chapter_01/")
+        assert '<a class="footer-nav" href="/course/chapter_01/" target="_blank" rel="noopener">◀</a>' in result.s
+
+    def test_prev_next_same_window_true_omits_target(self):
+        result = eee_footer(_StubHtmlMo(), lang="en", prev_url="/course/chapter_01/", same_window=True)
+        assert '<a class="footer-nav" href="/course/chapter_01/">◀</a>' in result.s
+
+    def test_same_window_does_not_affect_source_link(self):
+        result = eee_footer(_StubHtmlMo(), lang="en", same_window=True)
+        assert '<a href="https://codeberg.org/EEE-project" target="_blank">' in result.s
+
 
 class TestSourceHostBase:
     """_source_host_base() / eee_footer()'s link must match the serving
@@ -4379,6 +4416,47 @@ class TestConfigStoreAdditional:
         with patch("urllib.request.urlopen", side_effect=AssertionError("should not hit network")):
             cfg = ConfigStore.from_file_or_url(nb_file, "https://example.com/index.tsv")
         assert cfg.index_url() == "https://example.com/"
+
+
+_CHAPTER_LESSONS = [
+    {"url": "chapter_01/", "index_url": "/course/"},
+    {"url": "chapter_02/", "index_url": "/course/"},
+    {"url": "chapter_04/", "index_url": "/course/"},  # chapter_03 is skipped
+]
+
+
+class TestConfigStoreAdjacentUrls:
+    def test_middle_row_has_both_neighbors(self):
+        # Also covers the gap: no row for chapter_03, so chapter_02's next
+        # must be chapter_04, never a naively-incremented "chapter_03".
+        cfg = ConfigStore.from_dict(_CHAPTER_LESSONS)
+        prev_url, next_url = cfg.adjacent_urls("chapter_02/")
+        assert prev_url == "/course/chapter_01/"
+        assert next_url == "/course/chapter_04/"
+
+    def test_first_row_has_no_prev(self):
+        cfg = ConfigStore.from_dict(_CHAPTER_LESSONS)
+        prev_url, next_url = cfg.adjacent_urls("chapter_01/")
+        assert prev_url is None
+        assert next_url == "/course/chapter_02/"
+
+    def test_last_row_has_no_next(self):
+        cfg = ConfigStore.from_dict(_CHAPTER_LESSONS)
+        prev_url, next_url = cfg.adjacent_urls("chapter_04/")
+        assert prev_url == "/course/chapter_02/"
+        assert next_url is None
+
+    def test_trailing_slash_optional_on_own_url(self):
+        cfg = ConfigStore.from_dict(_CHAPTER_LESSONS)
+        assert cfg.adjacent_urls("chapter_02") == cfg.adjacent_urls("chapter_02/")
+
+    def test_unknown_own_url_returns_none_none(self):
+        cfg = ConfigStore.from_dict(_CHAPTER_LESSONS)
+        assert cfg.adjacent_urls("chapter_99/") == (None, None)
+
+    def test_empty_lessons_returns_none_none(self):
+        cfg = ConfigStore.from_dict([])
+        assert cfg.adjacent_urls("chapter_01/") == (None, None)
 
 
 # ──────────────────────────────── eee_topbar style="index" ──

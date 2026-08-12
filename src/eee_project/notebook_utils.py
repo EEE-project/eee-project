@@ -104,12 +104,16 @@ _FOOTER_CSS = """
 <style>
 #eee-footer {
   height: 40px; background: #f5f5f5; border-top: 1px solid #e0e0e0;
-  display: flex; align-items: center; justify-content: center; gap: 6px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 16px;
   margin: 16px -16px -16px -16px;
   font-family: "DM Mono", monospace;
 }
+#eee-footer .footer-center { display: flex; align-items: center; gap: 6px; }
 #eee-footer .footer-label { font-size: 10px; color: #1a1a1a; }
 #eee-footer a { font-size: 11px; color: #003d82; text-decoration: none; }
+#eee-footer .footer-nav { font-size: 15px; width: 20px; text-align: center; }
+#eee-footer .footer-nav-spacer { display: inline-block; width: 20px; }
 </style>"""
 
 _FOOTER_LABEL = {"ru": "Исходный код:", "en": "Source:", "el": "Πηγαίος κώδικας:"}
@@ -521,6 +525,37 @@ class ConfigStore:
         """Return the back-link URL from the first lesson row's ``index_url`` column."""
         return self._lessons[0].get("index_url") if self._lessons else None
 
+    def _lesson_index(self, own_url: str) -> "int | None":
+        """Return the index of the lesson row whose ``url`` column matches
+        ``own_url`` (trailing slash optional on either side), or ``None``.
+        """
+        own_url = own_url.rstrip("/")
+        for i, row in enumerate(self._lessons):
+            if row.get("url", "").rstrip("/") == own_url:
+                return i
+        return None
+
+    def adjacent_urls(self, own_url: str) -> "tuple[str | None, str | None]":
+        """Return ``(prev_url, next_url)`` for the lesson whose ``url`` column
+        matches ``own_url`` (trailing slash optional on either side).
+
+        Neighbors are the previous/next *row* in ``index.tsv`` — courses
+        that skip numbers (e.g. no chapter 5) simply have no row for it, so
+        the gap is invisible here for free. Either side is ``None`` at the
+        start/end of the list, or if ``own_url`` isn't found. Each URL is
+        ``index_url() + row["url"]`` — root-relative like ``index_url()``
+        itself, so it resolves correctly on every hosting mirror.
+        """
+        i = self._lesson_index(own_url)
+        if i is None:
+            return (None, None)
+        base = self.index_url() or ""
+
+        def _at(idx: int) -> "str | None":
+            return f"{base}{self._lessons[idx]['url']}" if 0 <= idx < len(self._lessons) else None
+
+        return (_at(i - 1), _at(i + 1))
+
     @property
     def raw_base(self) -> "str | None":
         """Raw Codeberg base URL (parent of the index.tsv directory), or None."""
@@ -836,7 +871,8 @@ def _source_host_base() -> str:
     return "https://codeberg.org/EEE-project"
 
 
-def eee_footer(mo, lang: str):
+def eee_footer(mo, lang: str, *, prev_url: "str | None" = None, next_url: "str | None" = None,
+                same_window: bool = False):
     """Render the EEE source footer bar.
 
     Links to whichever host is actually serving the page (Codeberg, GitHub,
@@ -846,21 +882,48 @@ def eee_footer(mo, lang: str):
     Must be the **last expression** in a marimo cell — no trailing ``return``.
 
     Args:
-        mo:   The marimo module.
-        lang: Current language code for the "Source:" label.
+        mo:          The marimo module.
+        lang:        Current language code for the "Source:" label.
+        prev_url:    Root-relative URL to the previous lesson, or ``None`` to
+                     omit the ◀ link (e.g. this is the first lesson). See
+                     :meth:`ConfigStore.adjacent_urls`.
+        next_url:    Root-relative URL to the next lesson, or ``None`` to omit
+                     the ▶ link.
+        same_window: ``False`` (default) opens prev/next links in a new tab
+                     (``target="_blank" rel="noopener"``) — required on
+                     molab, same as :func:`eee_topbar`'s ``back_url``, where
+                     same-window navigation duplicates its outer chrome. Pass
+                     ``True`` for notebooks hosted outside molab. Only
+                     affects prev/next — the "Source" link always opens in a
+                     new tab, since it leaves the course entirely.
 
     Example cell::
 
         from eee_project.notebook_utils import eee_footer
-        eee_footer(mo, lang=lang_sel.value)
+        _prev_url, _next_url = _cfg.adjacent_urls("chapter_01/")
+        eee_footer(mo, lang=lang_sel.value, prev_url=_prev_url, next_url=_next_url,
+                   same_window=True)
     """
     lbl = _FOOTER_LABEL.get(lang, _FOOTER_LABEL["en"])
     base = _source_host_base()
     label_text = base.removeprefix("https://")
+    _target_attr = "" if same_window else ' target="_blank" rel="noopener"'
+
+    def _nav_link(url: "str | None", arrow: str) -> str:
+        if not url:
+            return '<span class="footer-nav-spacer"></span>'
+        return f'<a class="footer-nav" href="{url}"{_target_attr}>{arrow}</a>'
+
+    prev_html = _nav_link(prev_url, "◀")
+    next_html = _nav_link(next_url, "▶")
     return mo.Html(f"""{_FOOTER_CSS}
 <div id="eee-footer">
-  <span class="footer-label">{lbl}</span>
-  <a href="{base}" target="_blank">{label_text}</a>
+  {prev_html}
+  <span class="footer-center">
+    <span class="footer-label">{lbl}</span>
+    <a href="{base}" target="_blank">{label_text}</a>
+  </span>
+  {next_html}
 </div>""")
 
 

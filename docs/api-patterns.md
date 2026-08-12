@@ -244,7 +244,7 @@ eee_hero(mo, lang_sel.value, {
 # index-page lesson/course card list — see "Wiring to eee_card_list" below
 eee_card_list(mo, cfg, lang_sel.value)
 
-# source footer bar
+# source footer bar (optionally with prev/next lesson links — see below)
 eee_footer(mo, lang=lang_sel.value)
 ```
 
@@ -327,6 +327,26 @@ _ga = load_ga_config()                  # looks in the current working directory
 Returns `None` silently if the file is missing — GA is disabled, the topbar
 renders normally. When `back_url` is empty but `ga_config` is set, the topbar
 is suppressed but the GA script is still injected.
+
+#### Lesson navigation (prev/next)
+
+`eee_footer` takes optional `prev_url=`/`next_url=` to render ◀/▶ links to
+the neighboring lesson, each omitted (not just hidden) when there's no
+neighbor. Use `ConfigStore.adjacent_urls()` to compute them from the same
+`index.tsv` the topbar already reads — it finds the row matching your own
+lesson's `url` column and returns the previous/next row's URL, so a course
+that skips a number (no chapter 5, say) skips it in navigation too, with no
+special-casing needed. Prev/next links respect the same `same_window=`
+convention as `eee_topbar`'s `back_url` (default `False`, new tab — required
+on molab); the "Source" link is unaffected and always opens in a new tab:
+
+```python
+from eee_project.notebook_utils import eee_footer
+
+_prev_url, _next_url = _cfg.adjacent_urls("chapter_02/")
+eee_footer(mo, lang=lang_sel.value, prev_url=_prev_url, next_url=_next_url,
+           same_window=True)
+```
 
 ### Language persistence
 
