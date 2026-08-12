@@ -3,7 +3,7 @@
 Navigation
 ----------
 eee_topbar(mo, back_url, lang, titles)  — sticky topbar with back link + EEE badge
-eee_footer(mo, lang)                    — source footer bar (codeberg.org/EEE-project)
+eee_footer(mo, lang)                    — source footer bar, links to the source-code host matching the current page (Codeberg/GitHub/GitLab)
 diacritics_text(mo, *, placeholder, label) — polytonic diacritics bar + text input
 
 Both functions return a mo.Html() object and must be used as the **last expression**
@@ -812,8 +812,32 @@ def eee_card_list(mo, cfg: "ConfigStore", lang: str, *, lang_fallback: str = "el
     return mo.Html(_CARD_LIST_CSS + "\n".join(cards))
 
 
+def _source_host_base() -> str:
+    """Return the EEE org URL for whichever host is actually serving this page.
+
+    Detected via Pyodide's ``js`` bridge to ``window.location.hostname`` —
+    only available when running as a WASM export in a real browser. Falls
+    back to Codeberg (the canonical dev host) for local ``marimo edit``/
+    ``marimo run`` and any other environment without that bridge.
+    """
+    try:
+        from js import window
+        hostname = window.location.hostname
+    except Exception:
+        return "https://codeberg.org/EEE-project"
+    if hostname.endswith("github.io"):
+        return "https://github.com/EEE-project"
+    if hostname.endswith("gitlab.io"):
+        return "https://gitlab.com/EEE-project"
+    return "https://codeberg.org/EEE-project"
+
+
 def eee_footer(mo, lang: str):
     """Render the EEE source footer bar.
+
+    Links to whichever host is actually serving the page (Codeberg, GitHub,
+    or GitLab) rather than always pointing at Codeberg — see
+    :func:`_source_host_base`.
 
     Must be the **last expression** in a marimo cell — no trailing ``return``.
 
@@ -827,10 +851,12 @@ def eee_footer(mo, lang: str):
         eee_footer(mo, lang=lang_sel.value)
     """
     lbl = _FOOTER_LABEL.get(lang, _FOOTER_LABEL["en"])
+    base = _source_host_base()
+    label_text = base.removeprefix("https://")
     return mo.Html(f"""{_FOOTER_CSS}
 <div id="eee-footer">
   <span class="footer-label">{lbl}</span>
-  <a href="https://codeberg.org/EEE-project" target="_blank">codeberg.org/EEE-project</a>
+  <a href="{base}" target="_blank">{label_text}</a>
 </div>""")
 
 

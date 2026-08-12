@@ -24,6 +24,7 @@ from eee_project.notebook_utils import (
     eee_hero,
     eee_card_list,
     eee_footer,
+    _source_host_base,
     magnify_image,
     language_bridge,
     language_selector,
@@ -1430,6 +1431,55 @@ class TestEeeFooter:
     def test_unknown_lang_falls_back_to_english(self):
         result = eee_footer(_StubHtmlMo(), lang="de")
         assert "Source:" in result.s
+
+
+class TestSourceHostBase:
+    """_source_host_base() / eee_footer()'s link must match the serving
+    host, not always Codeberg -- see eee_footer's own docstring."""
+
+    @staticmethod
+    def _install_fake_js(monkeypatch, hostname):
+        import sys
+        import types
+        fake_location = types.SimpleNamespace(hostname=hostname)
+        fake_window = types.SimpleNamespace(location=fake_location)
+        fake_js = types.SimpleNamespace(window=fake_window)
+        monkeypatch.setitem(sys.modules, "js", fake_js)
+
+    def test_github_pages_host(self, monkeypatch):
+        self._install_fake_js(monkeypatch, "eee-project.github.io")
+        assert _source_host_base() == "https://github.com/EEE-project"
+
+    def test_gitlab_pages_host(self, monkeypatch):
+        self._install_fake_js(monkeypatch, "eee-project.gitlab.io")
+        assert _source_host_base() == "https://gitlab.com/EEE-project"
+
+    def test_split_gitlab_project_host_still_maps_to_gitlab(self, monkeypatch):
+        # A split course lives on the same eee-project.gitlab.io domain,
+        # just a different path -- hostname-only detection must not need
+        # special-casing per split project.
+        self._install_fake_js(monkeypatch, "eee-project.gitlab.io")
+        assert _source_host_base() == "https://gitlab.com/EEE-project"
+
+    def test_codeberg_pages_host(self, monkeypatch):
+        self._install_fake_js(monkeypatch, "eee-project.codeberg.page")
+        assert _source_host_base() == "https://codeberg.org/EEE-project"
+
+    def test_no_js_module_falls_back_to_codeberg(self, monkeypatch):
+        import sys
+        monkeypatch.delitem(sys.modules, "js", raising=False)
+        assert _source_host_base() == "https://codeberg.org/EEE-project"
+
+    def test_unrecognized_hostname_falls_back_to_codeberg(self, monkeypatch):
+        self._install_fake_js(monkeypatch, "localhost")
+        assert _source_host_base() == "https://codeberg.org/EEE-project"
+
+    def test_eee_footer_links_to_detected_host(self, monkeypatch):
+        self._install_fake_js(monkeypatch, "eee-project.github.io")
+        result = eee_footer(_StubHtmlMo(), lang="en")
+        assert 'href="https://github.com/EEE-project"' in result.s
+        assert "github.com/EEE-project" in result.s
+        assert "codeberg.org/EEE-project" not in result.s
 
 
 class TestMagnifyImage:

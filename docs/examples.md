@@ -19,14 +19,14 @@ All examples are in `examples/`:
 | `examples/config_store_notebook.py` | `ConfigStore` demo — `from_url`, `from_file`, `from_dict` with `eee_topbar` |
 | `examples/modern_greek_drill_notebook.py` | Modern Greek paradigm drill — verb/noun/adjective, switchable, with personal vocab TSV upload |
 
-**Live demos:** all 6 interactive notebooks below run in-browser via WebAssembly — no install needed. Start at the [hub page](https://eee-project.codeberg.page/eee-project/), or jump directly:
+**Live demos:** all 6 interactive notebooks below run in-browser via WebAssembly — no install needed, and each is mirrored on all 3 hosts. Start at a hub page — [GitHub](https://eee-project.github.io/eee-project/) · [GitLab](https://eee-project.gitlab.io/eee-project/) · [Codeberg](https://eee-project.codeberg.page/eee-project/) — or jump directly to a notebook:
 
-- [Paradigm Drill](https://eee-project.codeberg.page/eee-project/drill/) — `modern_greek_drill_notebook.py`
-- [Greek Morphology Explorer](https://eee-project.codeberg.page/eee-project/greek/) — `greek_notebook.py`
-- [Ancient Greek Morphology](https://eee-project.codeberg.page/eee-project/ancient-greek/) — `ancient_greek_notebook.py`
-- [Modern Greek Morphology](https://eee-project.codeberg.page/eee-project/modern-greek/) — `modern_greek_notebook.py`
-- [UniMorph Browser](https://eee-project.codeberg.page/eee-project/unimorph/) — `unimorph_notebook.py`
-- [Exercise & Quiz Demo](https://eee-project.codeberg.page/eee-project/exercise/) — `greek_exercise_notebook.py`
+- **Paradigm Drill** (`modern_greek_drill_notebook.py`) — [GitHub](https://eee-project.github.io/eee-project/drill/) · [GitLab](https://eee-project.gitlab.io/eee-project/drill/) · [Codeberg](https://eee-project.codeberg.page/eee-project/drill/)
+- **Greek Morphology Explorer** (`greek_notebook.py`) — [GitHub](https://eee-project.github.io/eee-project/greek/) · [GitLab](https://eee-project.gitlab.io/eee-project/greek/) · [Codeberg](https://eee-project.codeberg.page/eee-project/greek/)
+- **Ancient Greek Morphology** (`ancient_greek_notebook.py`) — [GitHub](https://eee-project.github.io/eee-project/ancient-greek/) · [GitLab](https://eee-project.gitlab.io/eee-project/ancient-greek/) · [Codeberg](https://eee-project.codeberg.page/eee-project/ancient-greek/)
+- **Modern Greek Morphology** (`modern_greek_notebook.py`) — [GitHub](https://eee-project.github.io/eee-project/modern-greek/) · [GitLab](https://eee-project.gitlab.io/eee-project/modern-greek/) · [Codeberg](https://eee-project.codeberg.page/eee-project/modern-greek/)
+- **UniMorph Browser** (`unimorph_notebook.py`) — [GitHub](https://eee-project.github.io/eee-project/unimorph/) · [GitLab](https://eee-project.gitlab.io/eee-project/unimorph/) · [Codeberg](https://eee-project.codeberg.page/eee-project/unimorph/)
+- **Exercise & Quiz Demo** (`greek_exercise_notebook.py`) — [GitHub](https://eee-project.github.io/eee-project/exercise/) · [GitLab](https://eee-project.gitlab.io/eee-project/exercise/) · [Codeberg](https://eee-project.codeberg.page/eee-project/exercise/)
 
 Run directly:
 

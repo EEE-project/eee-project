@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.5.2 - 2026-08-12
+- `eee_footer()`'s "Source" link now points at whichever host is actually
+  serving the page (Codeberg, GitHub, or GitLab), detected via Pyodide's
+  `js` bridge — it previously always linked to Codeberg regardless of
+  host, including on GitHub/GitLab-hosted deployments. Falls back to
+  Codeberg for local `marimo edit`/`marimo run`, where no browser is
+  available to detect from.
+- `docs/examples.md` live-demo links now cover all 3 hosts (GitHub, GitLab,
+  Codeberg) per notebook, not just Codeberg — the notebooks were already
+  mirrored on all 3, the docs just hadn't caught up.
+
 ## 1.5.1 - 2026-08-09
 - Fix noun/verb/adjective drills testing cells with no backend form: a
   backend can return `{''}` for a blank cell, which is truthy under
