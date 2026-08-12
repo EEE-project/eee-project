@@ -1439,11 +1439,15 @@ class TestSourceHostBase:
 
     @staticmethod
     def _install_fake_js(monkeypatch, hostname):
+        # Mocks js.self (the Worker global marimo's Pyodide kernel actually
+        # runs in), not js.window -- confirmed directly against a real
+        # exported notebook that `from js import window` raises ImportError
+        # there; only `self` is valid.
         import sys
         import types
         fake_location = types.SimpleNamespace(hostname=hostname)
-        fake_window = types.SimpleNamespace(location=fake_location)
-        fake_js = types.SimpleNamespace(window=fake_window)
+        fake_self = types.SimpleNamespace(location=fake_location)
+        fake_js = types.SimpleNamespace(**{"self": fake_self})
         monkeypatch.setitem(sys.modules, "js", fake_js)
 
     def test_github_pages_host(self, monkeypatch):

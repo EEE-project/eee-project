@@ -815,14 +815,18 @@ def eee_card_list(mo, cfg: "ConfigStore", lang: str, *, lang_fallback: str = "el
 def _source_host_base() -> str:
     """Return the EEE org URL for whichever host is actually serving this page.
 
-    Detected via Pyodide's ``js`` bridge to ``window.location.hostname`` —
-    only available when running as a WASM export in a real browser. Falls
-    back to Codeberg (the canonical dev host) for local ``marimo edit``/
-    ``marimo run`` and any other environment without that bridge.
+    Detected via Pyodide's ``js`` bridge to ``self.location.hostname`` —
+    only available when running as a WASM export in a real browser. Uses
+    ``self``, not ``window``: marimo's Pyodide kernel runs in a Web Worker,
+    which has no ``window`` global (confirmed directly — ``from js import
+    window`` raises ``ImportError`` there); ``self`` is the Worker's own
+    global scope and still exposes ``location``. Falls back to Codeberg
+    (the canonical dev host) for local ``marimo edit``/``marimo run`` and
+    any other environment without that bridge.
     """
     try:
-        from js import window
-        hostname = window.location.hostname
+        from js import self as _self
+        hostname = _self.location.hostname
     except Exception:
         return "https://codeberg.org/EEE-project"
     if hostname.endswith("github.io"):

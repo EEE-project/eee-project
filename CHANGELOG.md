@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.5.3 - 2026-08-12
+- Fix `_source_host_base()` (1.5.2's host-aware `eee_footer()` link): used
+  `js.window.location.hostname`, but marimo's Pyodide kernel runs in a Web
+  Worker, where `window` doesn't exist (`from js import window` raises
+  `ImportError` there) — confirmed directly against a real exported
+  notebook in a browser, not just unit tests. 1.5.2's link silently fell
+  back to Codeberg on every host, including GitHub/GitLab, exactly the bug
+  it was meant to fix. Now uses `js.self.location.hostname` (`self` is the
+  Worker's own global scope) — verified against a real WASM export before
+  shipping this time.
+
 ## 1.5.2 - 2026-08-12
 - `eee_footer()`'s "Source" link now points at whichever host is actually
   serving the page (Codeberg, GitHub, or GitLab), detected via Pyodide's
