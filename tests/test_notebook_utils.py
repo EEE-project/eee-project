@@ -184,6 +184,33 @@ class TestModernParadigmTable:
         assert hasattr(eee, "build_modern_paradigm_table")
         assert callable(eee.build_modern_paradigm_table)
 
+    def test_pronoun_gendered_singular_only(self):
+        # κανένας is singular-only (no plural in this "no one/not any" sense,
+        # see Pronoun('κανένας').all() -- only a "sg" key exists at all) and
+        # has no vocative (no pronoun does) -- both must render as em-dash,
+        # not be silently omitted or crash the table.
+        html = self._bt()({"lemma": "κανένας", "form": "κανένας", "pos": "pronoun"})
+        assert html and "κανένας" in html and "καμία" in html and "κανενός" in html
+        # 4 rows (Nom/Gen/Acc/Voc) x 2 cols (Sg/Pl) = 8 cells; only Nom/Gen/Acc
+        # Sg have real data -- the other 5 (Nom/Gen/Acc Pl + Voc Sg/Pl) are —.
+        assert html.count(chr(8212)) == 5
+
+    def test_pronoun_personal_case_number(self):
+        # εγώ: Case+Number shape, no Gender axis -- must resolve through the
+        # same Case x Number table as gendered pronouns (Gender is unioned
+        # away, ignored by mg_pron_path("personal", ...) on the backend
+        # side), not crash or silently return nothing.
+        html = self._bt()({"lemma": "εγώ", "form": "εγώ", "pos": "pronoun"})
+        assert html and "εγώ" in html and "εμένα" in html and "εμείς" in html
+
+    def test_pronoun_indeclinable_returns_none(self):
+        # πού never changes form regardless of Case/Number/Gender -- showing
+        # it in every cell of a declension table would misrepresent an
+        # invariant word as if it declines, so this must return None rather
+        # than a table repeating the same word 8 times.
+        html = self._bt()({"lemma": "πού", "form": "πού", "pos": "pronoun"})
+        assert html is None
+
 
 # ──────────────────────────── Modern rung in build_grc_lexicon_tabs ──
 
@@ -4938,6 +4965,90 @@ class TestResolveWordGrammarException:
         assert result[0]["grammar_label"] == ""
 
 
+# ──────────────────────────────── adjective_drill_meta / pronoun_drill_meta ──
+
+class TestAdjectiveDrillMeta:
+    def test_defective_word_excludes_empty_slots(self):
+        # A word with only 3 (of 6) real forms -- mirrors κανένας's real
+        # shape when mistakenly routed through the adjective path (it isn't,
+        # after the modern-greek-inflexion-eee guard, but the mechanism
+        # must hold for any genuinely defective adjective too).
+        def _paradigm_fn(word, pos):
+            if pos != "adjective":
+                return {}
+            return {"adj": {"sg": {"masc": {"nom": {"x"}}, "fem": {"nom": {"y"}}, "neut": {"nom": {"z"}}}}}
+        gu = GreekUtils(_StubBackend(_paradigm_fn), _StubMo(), config=ANCIENT_GREEK)
+        meta = gu.adjective_drill_meta("test", "simple")
+        assert len(meta.active_slots) == 3
+        assert all(n == "sg" for _, n, _ in meta.active_slots)
+
+    def test_fully_regular_word_keeps_all_slots(self):
+        def _paradigm_fn(word, pos):
+            if pos != "adjective":
+                return {}
+            full = {"nom": {"x"}}
+            return {"adj": {n: {g: full for g in ("masc", "fem", "neut")} for n in ("sg", "pl")}}
+        gu = GreekUtils(_StubBackend(_paradigm_fn), _StubMo(), config=ANCIENT_GREEK)
+        meta = gu.adjective_drill_meta("test", "simple")
+        assert len(meta.active_slots) == 6
+
+    def test_totally_unknown_word_falls_back_to_full_list(self):
+        # StubBackend's default paradigm_fn returns {} for everything --
+        # every slot is empty, so active_slots must fall back to the full
+        # static list rather than leaving the form with zero fields.
+        gu = GreekUtils(_StubBackend(), _StubMo(), config=ANCIENT_GREEK)
+        meta = gu.adjective_drill_meta("test", "simple")
+        assert len(meta.active_slots) == 6
+
+
+class TestPronounDrillMeta:
+    def test_singular_only_word_excludes_plural_slots(self):
+        # κανένας's real shape: Pronoun.all() has no "pl" key at all.
+        def _paradigm_fn(word, pos):
+            if pos != "pronoun":
+                return {}
+            return {"sg": {"masc": {"nom": {"κανένας"}}, "fem": {"nom": {"καμία"}}, "neut": {"nom": {"κανένα"}}}}
+        gu = GreekUtils(_StubBackend(_paradigm_fn), _StubMo(), config=ANCIENT_GREEK)
+        meta = gu.pronoun_drill_meta("κανένας", "simple")
+        assert len(meta.active_slots) == 3
+        assert all(n == "sg" for _, n, _ in meta.active_slots)
+
+    def test_fully_regular_pronoun_keeps_all_slots(self):
+        def _paradigm_fn(word, pos):
+            if pos != "pronoun":
+                return {}
+            full = {"nom": {"x"}}
+            return {n: {g: full for g in ("masc", "fem", "neut")} for n in ("sg", "pl")}
+        gu = GreekUtils(_StubBackend(_paradigm_fn), _StubMo(), config=ANCIENT_GREEK)
+        meta = gu.pronoun_drill_meta("ίδιος", "simple")
+        assert len(meta.active_slots) == 6
+
+    def test_totally_unknown_word_falls_back_to_full_list(self):
+        gu = GreekUtils(_StubBackend(), _StubMo(), config=ANCIENT_GREEK)
+        meta = gu.pronoun_drill_meta("test", "simple")
+        assert len(meta.active_slots) == 6
+
+    def test_check_pronoun_test_passes_when_only_active_slots_filled(self):
+        # The whole point of the fix: a singular-only word's full-form check
+        # must be achievable (ok=True) when the 3 real slots are correct --
+        # not permanently stuck at ok=False because 3 nonexistent plural
+        # slots are still part of the static list. Mirrors the live check
+        # already confirmed against the real Modern Greek backend.
+        def _paradigm_fn(word, pos):
+            if pos != "pronoun":
+                return {}
+            return {"sg": {"masc": {"nom": {"κανένας"}}, "fem": {"nom": {"καμία"}}, "neut": {"nom": {"κανένα"}}}}
+        gu = GreekUtils(_StubBackend(_paradigm_fn), _RichMo(), config=ANCIENT_GREEK)
+        active_slots = gu.pronoun_drill_meta("κανένας", "simple").active_slots
+        form = type("_F", (), {
+            "value": ["κανένας", "καμία", "κανένα"],
+            "pron_word": "κανένας", "pron_mode": "simple", "active_slots": active_slots,
+        })()
+        ok, fb = gu.check_pronoun_test("κανένας", form)
+        assert ok is True
+        assert fb == ""
+
+
 # ──────────────────────────────── create_adjective_test_ui / check_adjective_test ──
 
 class TestCreateAdjectiveTestUi:
@@ -5016,21 +5127,27 @@ class TestCheckAdjectiveSlot:
     def test_negative_index_returns_false(self, gu):
         assert gu.check_adjective_slot(self._WORD, "simple", -1, "x") is False
 
-    def test_falls_back_to_base_form_when_no_backend_data(self, gu):
-        # _StubBackend returns {} -> _adj_forms empty -> falls back to {adj_base}
-        assert gu.check_adjective_slot(self._WORD, "simple", 0, "καλός") is True
+    def test_no_backend_data_never_passes_even_for_the_base_word_itself(self, gu):
+        # _StubBackend returns {} -> _adj_forms empty -> no correct answer
+        # exists, so nothing passes -- not even the base word typed back
+        # verbatim (the old fallback silently accepted exactly that, which
+        # turns "we have no data" into "anything is right" for every slot
+        # of a mis-tested word; see the real κανένας incident this guards
+        # against: an irregular pronoun wrongly listed as an adjective
+        # would have "passed" for its actual base form on every field).
+        assert gu.check_adjective_slot(self._WORD, "simple", 0, "καλός") is False
         assert gu.check_adjective_slot(self._WORD, "simple", 0, "wrong") is False
 
-    def test_falls_back_to_base_form_when_backend_form_is_blank(self):
+    def test_blank_backend_form_sentinel_never_passes(self):
         # A backend can return {''} for a slot it has no data for (a real,
-        # deliberate sentinel, not just an empty set) -- must still fall
-        # back to {adj_base}, not leak the blank value through.
+        # deliberate sentinel, not just an empty set) -- any(correct) is
+        # False for {''} same as for set(), so this must not pass either.
         def _paradigm_fn(word, pos):
             if pos != "adjective":
                 return {}
             return {"adj": {"sg": {"masc": {"nom": {''}}}}}
         gu = GreekUtils(_StubBackend(_paradigm_fn), _StubMo(), config=ANCIENT_GREEK)
-        assert gu.check_adjective_slot(self._WORD, "simple", 0, "καλός") is True
+        assert gu.check_adjective_slot(self._WORD, "simple", 0, "καλός") is False
         assert gu.check_adjective_slot(self._WORD, "simple", 0, "wrong") is False
 
     def test_full_mode_has_more_slots_than_simple(self, gu):
@@ -5060,13 +5177,191 @@ class TestAdjectiveSlotLabels:
         assert len(labels) == len(slots)
 
 
+# ──────────────────────────────── create_pronoun_test_ui ──
+
+class TestCreatePronounTestUi:
+    _WORD = {"Word": "κανένας", "Translation": "no one/any"}
+
+    @pytest.fixture
+    def gu(self):
+        return GreekUtils(_StubBackend(), _RichMo(), config=ANCIENT_GREEK)
+
+    def test_no_current_pron_returns_none_form(self, gu):
+        form, md = gu.create_pronoun_test_ui([], [], None)
+        assert form is None
+
+    def test_basic_form_created(self, gu):
+        form, md = gu.create_pronoun_test_ui([self._WORD], [self._WORD], self._WORD)
+        assert form is not None
+        assert form.pron_word == "κανένας"
+        assert form.pron_mode == "simple"
+
+    def test_full_mode_more_inputs(self, gu):
+        form_s, _ = gu.create_pronoun_test_ui([self._WORD], [self._WORD], self._WORD, mode="simple")
+        form_f, _ = gu.create_pronoun_test_ui([self._WORD], [self._WORD], self._WORD, mode="full")
+        assert len(form_f.value) > len(form_s.value)
+
+    def test_singular_only_word_gets_three_fields_not_six(self):
+        # The exact user-reported case: κανένας must show only its 3 real
+        # (singular) fields, not all 6 with 3 destined to fail with "?".
+        def _paradigm_fn(word, pos):
+            if pos != "pronoun":
+                return {}
+            return {"sg": {"masc": {"nom": {"κανένας"}}, "fem": {"nom": {"καμία"}}, "neut": {"nom": {"κανένα"}}}}
+        gu = GreekUtils(_StubBackend(_paradigm_fn), _RichMo(), config=ANCIENT_GREEK)
+        form, _ = gu.create_pronoun_test_ui([self._WORD], [self._WORD], self._WORD)
+        assert len(form.value) == 3
+        assert len(form.active_slots) == 3
+
+    def test_empty_words4test_shows_empty_message(self, gu):
+        form, md = gu.create_pronoun_test_ui([self._WORD], [], self._WORD)
+        assert form is not None
+        assert "empty" in md.lower()
+
+    def test_words4test_md_contains_translation(self, gu):
+        _, md = gu.create_pronoun_test_ui([self._WORD], [self._WORD], self._WORD)
+        assert "no one/any" in md
+
+
+class TestCheckPronounTest:
+    _WORD = "κανένας"
+
+    @pytest.fixture
+    def gu(self):
+        return GreekUtils(_StubBackend(), _RichMo(), config=ANCIENT_GREEK)
+
+    def test_none_form_returns_false(self, gu):
+        ok, fb = gu.check_pronoun_test(self._WORD, None)
+        assert ok is False and fb == ""
+
+    def test_empty_value_returns_false(self, gu):
+        form = type("_F", (), {"value": []})()
+        ok, fb = gu.check_pronoun_test(self._WORD, form)
+        assert ok is False and fb == ""
+
+    def test_pron_word_mismatch_returns_false(self, gu):
+        form = type("_F", (), {"value": ["x", "y"], "pron_word": "ίδιος"})()
+        ok, fb = gu.check_pronoun_test(self._WORD, form)
+        assert ok is False and fb == ""
+
+    def test_all_empty_returns_please_fill(self, gu):
+        form = type("_F", (), {"value": ["", "", "", "", "", ""]})()
+        ok, fb = gu.check_pronoun_test(self._WORD, form)
+        assert ok is False
+        assert "fill" in fb.lower()
+
+    def test_correct_singular_forms_pass_via_paradigm_fallback(self):
+        # κανένας's real (singular-only) paradigm shape: {num: {gender: {case: forms}}}.
+        # check_pronoun_test (mirroring check_adjective_test) requires every
+        # slot non-blank to report ok=True for the WHOLE form -- a genuinely
+        # singular-only word can never satisfy that through this 6-slot
+        # widget (the 3 plural slots have no correct answer at all), so this
+        # checks the 3 real (singular) slots individually via
+        # check_pronoun_slot instead -- that's where "does a correct answer
+        # actually pass" is meaningfully testable for this word shape.
+        def _paradigm_fn(word, pos):
+            if pos != "pronoun":
+                return {}
+            return {"sg": {
+                "masc": {"nom": {"κανένας"}}, "fem": {"nom": {"καμία", "καμιά"}},
+                "neut": {"nom": {"κανένα"}},
+            }}
+        gu = GreekUtils(_StubBackend(_paradigm_fn), _RichMo(), config=ANCIENT_GREEK)
+        assert gu.check_pronoun_slot(self._WORD, "simple", 0, "κανένας") is True   # masc sg nom
+        assert gu.check_pronoun_slot(self._WORD, "simple", 1, "καμία") is True     # fem sg nom
+        assert gu.check_pronoun_slot(self._WORD, "simple", 2, "κανένα") is True    # neut sg nom
+        assert gu.check_pronoun_slot(self._WORD, "simple", 3, "anything") is False  # masc pl nom -- no data
+
+    def test_no_backend_data_never_passes_even_for_the_base_word_itself(self, gu):
+        # Same "no fallback to input-as-correct" contract as
+        # test_no_backend_data_never_passes_even_for_the_base_word_itself
+        # in TestCheckAdjectiveSlot -- StubBackend returns {} -> _pronoun_forms
+        # empty -> nothing passes, not even the base word typed back verbatim.
+        form = type("_F", (), {"value": ["κανένας", "", "", "", "", ""]})()
+        ok, fb = gu.check_pronoun_test(self._WORD, form)
+        assert ok is False
+        assert "?" in fb
+
+
+# ──────────────────────────────── check_pronoun_slot / pronoun_slot_labels ──
+
+class TestCheckPronounSlot:
+    _WORD = "κανένας"
+
+    @pytest.fixture
+    def gu(self):
+        return GreekUtils(_StubBackend(), _StubMo(), config=ANCIENT_GREEK)
+
+    def test_simple_mode_has_six_slots(self, gu):
+        assert gu.check_pronoun_slot(self._WORD, "simple", 6, "x") is False
+
+    def test_negative_index_returns_false(self, gu):
+        assert gu.check_pronoun_slot(self._WORD, "simple", -1, "x") is False
+
+    def test_no_backend_data_never_passes_even_for_the_base_word_itself(self, gu):
+        # Mirrors TestCheckAdjectiveSlot's identically-named test -- the same
+        # "show real forms or nothing, never a free pass" contract this
+        # whole pronoun feature exists to uphold (see check_adjective_slot's
+        # own docstring / the real κανένας incident it guards against).
+        assert gu.check_pronoun_slot(self._WORD, "simple", 0, "κανένας") is False
+        assert gu.check_pronoun_slot(self._WORD, "simple", 0, "wrong") is False
+
+    def test_blank_backend_form_sentinel_never_passes(self):
+        def _paradigm_fn(word, pos):
+            if pos != "pronoun":
+                return {}
+            return {"sg": {"masc": {"nom": {''}}}}
+        gu = GreekUtils(_StubBackend(_paradigm_fn), _StubMo(), config=ANCIENT_GREEK)
+        assert gu.check_pronoun_slot(self._WORD, "simple", 0, "κανένας") is False
+        assert gu.check_pronoun_slot(self._WORD, "simple", 0, "wrong") is False
+
+    def test_no_vocative_in_full_mode(self, gu):
+        # No pronoun has a vocative form (verified against every entry in
+        # modern_greek_inflexion_eee/resources/pronouns.py) -- 'full' mode's
+        # case list must be nom/gen/acc only, unlike adjective's 4 cases.
+        full_slots = gu._pronoun_slot_list("full")
+        cases = {c for _, _, c in full_slots}
+        assert cases == {"nom", "gen", "acc"}
+
+    def test_full_mode_has_more_slots_than_simple(self, gu):
+        simple_slots = gu._pronoun_slot_list("simple")
+        full_slots = gu._pronoun_slot_list("full")
+        assert len(full_slots) > len(simple_slots)
+
+
+class TestPronounSlotLabels:
+    @pytest.fixture
+    def gu(self):
+        return GreekUtils(_StubBackend(), _StubMo(), config=ANCIENT_GREEK)
+
+    def test_simple_mode_has_six_labels(self, gu):
+        labels = gu.pronoun_slot_labels("simple")
+        assert len(labels) == 6
+
+    def test_full_mode_has_more_labels(self, gu):
+        assert len(gu.pronoun_slot_labels("full")) > len(gu.pronoun_slot_labels("simple"))
+
+    def test_labels_match_slot_list_order(self, gu):
+        labels = gu.pronoun_slot_labels("simple")
+        slots = gu._pronoun_slot_list("simple")
+        assert len(labels) == len(slots)
+
+
 # ──────────────────────────────── adjective_paradigm_drill_form ──
 
 class TestAdjectiveParadigmDrillForm(_ParadigmDrillFormBase):
     _VOCAB = [{"form": "καλός", "meaning": "beautiful"}, {"form": "ἀγαθός", "meaning": "good"}]
 
-    def _call(self, gu, state, cv, form, **kwargs):
-        return self._call_form(gu.adjective_paradigm_drill_form, state, cv, form, **kwargs)
+    def _meta(self, active_slots=None):
+        import types
+        return types.SimpleNamespace(
+            active_slots=active_slots or [(g, 'sg', 'nom') for g in ('masc', 'fem', 'neut')] +
+                                          [(g, 'pl', 'nom') for g in ('masc', 'fem', 'neut')],
+        )
+
+    def _call(self, gu, state, cv, form, adj_meta=None, **kwargs):
+        return self._call_form(gu.adjective_paradigm_drill_form, state, cv, form,
+                               adj_meta=adj_meta or self._meta(), **kwargs)
 
     def test_done_shows_callout_and_restart(self, gu):
         state = self._state(words=[])

@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.7.0 - 2026-08-14
+- `PosNotSupportedError` (previously raised only from the internal UniMorph
+  tag-translation layer) is now raised by the top-level `inflect_slot()`
+  whenever the resolved backend has no data at all for `pos`, checked via
+  `get_slot_templates(...) is None` — the same signal every bundled
+  backend already used internally, now surfaced consistently instead of
+  falling through to a backend-specific `ValueError` or an ambiguous empty
+  result. Distinct from a supported `pos` with no forms for one particular
+  lemma/slot, which still returns an empty set as before. Message
+  generalized (was hardcoded to "...not supported by the UniMorph
+  translator"); constructor now accepts an optional `language` for context.
+- New pronoun paradigm test/drill (`GreekUtils.check_pronoun_test`/
+  `check_pronoun_slot`/`pronoun_slot_labels`/`create_pronoun_test_ui`/
+  `pronoun_paradigm_drill_form`/`pronoun_drill_meta`), gendered pronouns
+  only (κανένας, ίδιος, αυτός, ...; see `PRONOUN_LEMMAS_GENDERED` in
+  modern-greek-inflexion-eee) — mirrors the adjective test's shape (same
+  Case x Number x Gender paradigm), except `mode="full"` tests
+  `nom`/`gen`/`acc` only (no pronoun has a vocative form).
+- Both the adjective and pronoun tests now filter their fields to only the
+  slots the backend actually has data for (`adjective_drill_meta`, a new
+  sibling of the existing `noun_drill_meta`/`verb_drill_meta`) — previously
+  a defective word (e.g. κανένας, which has no plural at all) showed every
+  static field regardless, revealing an uninformative "must be ?" only
+  after the student filled it in and checked. `adjective_paradigm_drill_form`/
+  `pronoun_paradigm_drill_form` now take a required `adj_meta`/`pron_meta`
+  keyword (from the matching `*_drill_meta` call), matching
+  `verb_paradigm_drill_form`'s existing `verb_meta` shape.
+- `examples/modern_greek_drill_notebook.py` gains "Pronouns" as a 4th
+  switchable option alongside Verb/Noun/Adjective.
+- Internal: the adjective and pronoun test clusters (previously ~150 lines
+  of copy-pasted logic between the two) now share one Case x Number x
+  Gender implementation (`_gendered_slot_list`/`_gendered_slot_names`/
+  `_gendered_slot_ok`/`_gendered_drill_meta`/`_check_gendered_test`/
+  `_check_gendered_slot`/`_create_gendered_test_ui`), parametrized by pos
+  name, forms-lookup function, and full-mode case list. No change to any
+  public method's signature or behavior.
+
 ## 1.6.0 - 2026-08-12
 - `eee_footer()` takes optional `prev_url`/`next_url` and renders ◀/▶ links
   to the neighboring lesson, each omitted when there's no neighbor (start/end

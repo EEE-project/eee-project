@@ -881,14 +881,28 @@ tantum) plus two independent toggles:
   unset (Ancient Greek) — fine to pass unconditionally from a notebook that
   doesn't branch on config itself.
 
-For adjectives, swap in `adjective_paradigm_drill_form` and pass
+For adjectives, swap in `adjective_paradigm_drill_form` and pass `adj_meta`
+(from `gu.adjective_drill_meta(cv["form"], mode)` — active slots vary per
+word, e.g. a defective adjective has fewer than the full 6/18) plus
 `mode: str = "simple"` (nominative only, 6 slots — matches
 `adjective_slot_labels("simple")`; anything else drills every case in
 `config.adj_cases`).
 
-`noun_slot_labels`/`adjective_slot_labels` both take `lang: str = "en"` —
-routes through `get_slot_templates(..., terms_lang=lang)`, backed by
-`data/labels/{noun,adj}-{lang}.tsv`. Pass the notebook's own
+For pronouns, swap in `pronoun_paradigm_drill_form` and pass `pron_meta`
+(from `gu.pronoun_drill_meta(cv["form"], mode)`) plus the same `mode` as
+adjectives — gendered pronouns only (`ίδιος`, `κανένας`, `αυτός`, ...;
+`vocab` should be pre-filtered to `PRONOUN_LEMMAS_GENDERED` lemmas from
+`modern_greek_inflexion_eee`). `mode="full"` tests `nom`/`gen`/`acc` only —
+no pronoun has a vocative form. `pron_meta`'s active-slot filtering matters
+more here than for adjectives: some gendered pronouns are singular-only
+(`κανένας` has no plural at all), so without it the drill would show fields
+with no possible correct answer at all, not just a rarely-empty one.
+
+`noun_slot_labels`/`adjective_slot_labels`/`pronoun_slot_labels` all take
+`lang: str = "en"` — routes through `get_slot_templates(..., terms_lang=lang)`,
+backed by `data/labels/{noun,adj,pronoun}-{lang}.tsv` (no bundled
+`pronoun-{lang}.tsv` yet — falls back to the English quiz-label dicts
+regardless of `lang` until one is added). Pass the notebook's own
 `language_selector.value`; never hand-roll per-language label text in the
 notebook itself.
 

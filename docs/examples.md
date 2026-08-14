@@ -17,7 +17,7 @@ All examples are in `examples/`:
 | `examples/unimorph_notebook.py` | Interactive browser for all 187 UniMorph languages with slot template support |
 | `examples/greek_exercise_notebook.py` | `GreekUtils` full demo — verb drills, custom drill, `greek_compare`, vocab quiz (MG + AG) |
 | `examples/config_store_notebook.py` | `ConfigStore` demo — `from_url`, `from_file`, `from_dict` with `eee_topbar` |
-| `examples/modern_greek_drill_notebook.py` | Modern Greek paradigm drill — verb/noun/adjective, switchable, with personal vocab TSV upload |
+| `examples/modern_greek_drill_notebook.py` | Modern Greek paradigm drill — verb/noun/adjective/pronoun, switchable, with personal vocab TSV upload |
 
 **Live demos:** all 6 interactive notebooks below run in-browser via WebAssembly — no install needed, and each is mirrored on all 3 hosts. Start at a hub page — [GitHub](https://eee-project.github.io/eee-project/) · [GitLab](https://eee-project.gitlab.io/eee-project/) · [Codeberg](https://eee-project.codeberg.page/eee-project/) — or jump directly to a notebook:
 

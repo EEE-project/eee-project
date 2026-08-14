@@ -239,6 +239,33 @@ def test_inflect_slot_unregistered_tag_type_raises():
         eee.inflect_slot("λέξη", slot, "noun", language="el")
 
 
+def test_inflect_slot_raises_pos_not_supported_when_backend_says_so():
+    class FakeBackend:
+        def get_slot_templates(self, lang, pos, terms_lang="en"):
+            return None if pos == "pronoun" else []
+
+        def inflect(self, lemma, features, pos, **kw):
+            return {"should not be reached"}
+
+    eee.register_backend("el", FakeBackend())
+    slot = SlotTemplate(label="Nom Sg", tag_type="ud", features={"Case": "Nom", "Number": "Sing"})
+    with pytest.raises(eee.PosNotSupportedError):
+        eee.inflect_slot("κανένας", slot, "pronoun", language="el")
+
+
+def test_inflect_slot_still_dispatches_when_get_slot_templates_is_not_none():
+    class FakeBackend:
+        def get_slot_templates(self, lang, pos, terms_lang="en"):
+            return []  # supported pos, just no cached templates for this call
+
+        def inflect(self, lemma, features, pos, **kw):
+            return {"γυναίκες"}
+
+    eee.register_backend("el", FakeBackend())
+    slot = SlotTemplate(label="Nom Pl", tag_type="ud", features={"Case": "Nom", "Number": "Plur"})
+    assert eee.inflect_slot("γυναίκα", slot, "noun", language="el") == {"γυναίκες"}
+
+
 def test_inflect_str_features_passes_str_to_backend():
     received = {}
 

@@ -2,6 +2,7 @@ from eee_project._exceptions import (
     UnsupportedLanguageError,
     BackendLoadError,
     AmbiguousPOSError,
+    PosNotSupportedError,
 )
 
 
@@ -35,3 +36,17 @@ def test_ambiguous_pos_error_has_lemma():
     exc = AmbiguousPOSError("λύω")
     assert "λύω" in str(exc)
     assert exc.lemma == "λύω"
+
+
+def test_pos_not_supported_error_has_pos():
+    exc = PosNotSupportedError("pronoun")
+    assert "pronoun" in str(exc)
+    assert exc.pos == "pronoun"
+    assert exc.language is None
+
+
+def test_pos_not_supported_error_includes_language_when_given():
+    exc = PosNotSupportedError("pronoun", "grc")
+    assert "pronoun" in str(exc)
+    assert "grc" in str(exc)
+    assert exc.language == "grc"

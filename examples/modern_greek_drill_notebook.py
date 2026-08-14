@@ -92,6 +92,7 @@ def _(language_selector, mo, t_ui):
             t_ui("verb_test_topic", _lang): "verb",
             t_ui("noun_test_topic", _lang): "noun",
             t_ui("adj_test_topic", _lang): "adjective",
+            t_ui("pron_test_topic", _lang): "pronoun",
         },
         value=t_ui("noun_test_topic", _lang),
         label=t_ui("pos_label", _lang),
@@ -118,6 +119,15 @@ def _(file_upload, gu, mo, pd, pos_selector):
             {"form": "καλός", "meaning": "good"},
             {"form": "μεγάλος", "meaning": "big"},
             {"form": "όμορφος", "meaning": "beautiful"},
+        ],
+        # Gendered pronouns only (Case x Number x Gender shape) -- see
+        # PRONOUN_LEMMAS_GENDERED in modern_greek_inflexion_eee. κανένας is
+        # singular-only (no plural at all); ίδιος has a full paradigm like
+        # a regular adjective -- both drill correctly, on purpose, to show
+        # the "no data for this slot" vs "has data" cases side by side.
+        "pronoun": [
+            {"form": "κανένας", "meaning": "any, no one's"},
+            {"form": "ίδιος", "meaning": "the same"},
         ],
     }
 
@@ -282,6 +292,8 @@ def _(
 ):
     cur = w4t()[0] if w4t() else None
     noun_meta = None
+    adj_meta = None
+    pron_meta = None
     adj_mode = "full" if full_mode_toggle.value else "simple"
     _lang = language_selector.value
     if pos_selector.value == "verb":
@@ -292,8 +304,12 @@ def _(
         labels = gu.noun_slot_labels(active_cases, lang=_lang)
         if indefinite_toggle.value:
             labels = labels + [f"Ind. {l}" for l in gu.noun_slot_labels(gu.noun_indef_cells(active_cases), lang=_lang)]
-    else:
-        labels = gu.adjective_slot_labels(adj_mode, lang=_lang)
+    elif pos_selector.value == "adjective":
+        adj_meta = gu.adjective_drill_meta(cur["form"], adj_mode) if cur else None
+        labels = gu.adjective_slot_labels(adj_mode, lang=_lang, active_slots=getattr(adj_meta, "active_slots", None))
+    elif pos_selector.value == "pronoun":
+        pron_meta = gu.pronoun_drill_meta(cur["form"], adj_mode) if cur else None
+        labels = gu.pronoun_slot_labels(adj_mode, lang=_lang, active_slots=getattr(pron_meta, "active_slots", None))
     drill_form, prev_btn, nxt_btn, restart_btn = gu.paradigm_drill_widgets(
         labels=labels,
         values=entered().get(cur["form"]) if cur else None,
@@ -304,14 +320,14 @@ def _(
     set_prev_cnt(0)
     set_nxt_cnt(0)
     set_entercnt(0)
-    return adj_mode, cur, drill_form, noun_meta, nxt_btn, prev_btn, restart_btn
+    return adj_meta, adj_mode, cur, drill_form, noun_meta, nxt_btn, pron_meta, prev_btn, restart_btn
 
 
 @app.cell(hide_code=True)
 def _(cap, cur, drill_form, gu, language_selector, pos_selector, t_ui):
     check_btn = gu.dirty_check_button(
         drill_form, cap, cur,
-        {"verb": "verb_word", "noun": "test_word", "adjective": "adj_word"}[pos_selector.value],
+        {"verb": "verb_word", "noun": "test_word", "adjective": "adj_word", "pronoun": "pron_word"}[pos_selector.value],
         label=t_ui("check_label", language_selector.value),
     )
     return (check_btn,)
@@ -319,6 +335,7 @@ def _(cap, cur, drill_form, gu, language_selector, pos_selector, t_ui):
 
 @app.cell(hide_code=True)
 def _(
+    adj_meta,
     adj_mode,
     article_toggle,
     cap,
@@ -338,6 +355,7 @@ def _(
     pos_selector,
     prev_btn,
     prev_cnt,
+    pron_meta,
     restart_btn,
     restart_cnt,
     set_cap,
@@ -389,7 +407,7 @@ def _(
             meaning_label=_meaning_label,
             done_message=t_ui("noun_done", _lang),
         )
-    else:
+    elif pos_selector.value == "adjective":
         out = gu.adjective_paradigm_drill_form(
             w4t, set_w4t, hist, set_hist, msg, set_msg,
             cap, set_cap, entered, set_entered,
@@ -398,9 +416,24 @@ def _(
             restart_cnt, set_restart_cnt,
             cur, drill_form, check_btn, prev_btn, nxt_btn, restart_btn,
             vocab=vocab,
+            adj_meta=adj_meta,
             mode=adj_mode,
             meaning_label=_meaning_label,
             done_message=t_ui("adj_done", _lang),
+        )
+    elif pos_selector.value == "pronoun":
+        out = gu.pronoun_paradigm_drill_form(
+            w4t, set_w4t, hist, set_hist, msg, set_msg,
+            cap, set_cap, entered, set_entered,
+            sub_cnt, set_sub_cnt, prev_cnt, set_prev_cnt,
+            nxt_cnt, set_nxt_cnt, entercnt, set_entercnt,
+            restart_cnt, set_restart_cnt,
+            cur, drill_form, check_btn, prev_btn, nxt_btn, restart_btn,
+            vocab=vocab,
+            pron_meta=pron_meta,
+            mode=adj_mode,
+            meaning_label=_meaning_label,
+            done_message=t_ui("pron_done", _lang),
         )
     out
     return

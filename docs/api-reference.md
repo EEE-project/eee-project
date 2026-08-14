@@ -118,6 +118,7 @@ my-backend = "my_xx_eee.backend:MyBackend"
 |-----------|-------------|
 | `eee.UnsupportedLanguageError` | No backend registered for `language` / `backend` combination |
 | `eee.BackendLoadError` | Backend found but failed to load |
+| `eee.PosNotSupportedError` | The resolved backend has no data at all for `pos` (checked via `get_slot_templates(...) is None`) — raised by `inflect_slot()`. Distinct from a supported `pos` that simply has no forms for one particular lemma/slot, which still returns an empty set. |
 
 **Chain vs. single backend — different failure handling, on purpose.** With
 `chain=[...]` (or a registered chain), a backend that fails to load or raises

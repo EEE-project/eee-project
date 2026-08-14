@@ -28,7 +28,7 @@ from eee_project.notebook_utils import (
     _INC as increment_counter,
 )
 
-__version__ = "1.6.0"
+__version__ = "1.7.0"
 
 _UNSET = object()  # sentinel distinguishing "not provided" from explicit None
 
@@ -372,6 +372,30 @@ def analyze(form: str, language: str | None = None, backend: str | None = None) 
     return fn(form)
 
 
+def _resolved_backend_slot_templates(
+    backend_instance: object, lang: str, pos: str, terms_lang: str = "en"
+) -> "list[SlotTemplate] | None":
+    """``get_slot_templates(...)`` for an already-resolved backend instance --
+    shared by :func:`get_slot_templates` (resolves a backend by name/lang
+    first) and :func:`inflect_slot` (may already hold an instance, not just
+    a name -- see its own ``backend`` parameter). None if the backend has no
+    ``get_slot_templates`` attribute, or the backend returns None itself --
+    :func:`get_slot_templates`'s own docstring already documents both as
+    the same "no templates" signal, so this collapses them the same way.
+
+    :func:`inflect_slot` needs a finer distinction that this collapsed
+    return can't express (a backend without this attribute at all must NOT
+    be treated as "pos not supported" -- many lightweight backends never
+    implemented slot-template introspection but still dispatch correctly
+    for every pos they handle), so it checks ``hasattr`` itself rather than
+    relying solely on this helper's return value.
+    """
+    fn = getattr(backend_instance, "get_slot_templates", None)
+    if fn is None:
+        return None
+    return fn(lang, pos, terms_lang)
+
+
 def get_slot_templates(
     lang: str, pos: str, terms_lang: str = "en", *, backend: "str | None" = None
 ) -> "list[SlotTemplate] | None":
@@ -389,10 +413,7 @@ def get_slot_templates(
         _backend = _registry.get_backend(resolved, backend)
     except (UnsupportedLanguageError, BackendLoadError):
         return None
-    fn = getattr(_backend, "get_slot_templates", None)
-    if fn is None:
-        return None
-    return fn(lang, pos, terms_lang)
+    return _resolved_backend_slot_templates(_backend, lang, pos, terms_lang)
 
 
 def inflect_slot(
@@ -420,6 +441,12 @@ def inflect_slot(
     ------
     KeyError                  if slot.tag_type is not registered
     UnsupportedLanguageError  if no backend is found for language (and backend=None)
+    PosNotSupportedError      if the resolved backend does not support pos at all --
+                               checked via get_slot_templates(...) is None, the same
+                               signal every bundled backend already uses to report an
+                               unsupported pos. Distinct from a supported pos that
+                               simply has no forms for this particular lemma/slot,
+                               which still returns an empty set as before.
     """
     from eee_project._tag_registry import _get_tag_dispatch
     dispatch_fn = _get_tag_dispatch(slot.tag_type)
@@ -428,6 +455,8 @@ def inflect_slot(
         _backend = _registry.get_backend(lang, backend=backend)
     else:
         _backend = backend
+    if hasattr(_backend, "get_slot_templates") and _resolved_backend_slot_templates(_backend, lang, pos) is None:
+        raise PosNotSupportedError(pos, lang)
     return dispatch_fn(_backend, lemma, slot, pos, lang)
 
 

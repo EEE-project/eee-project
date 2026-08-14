@@ -118,10 +118,10 @@ Core functions: `inflect()` and `inflect_traced()` (shown in Quick Start above),
 `list_lemmas()`/`list_lemmas_traced()`, `analyze()`/`analyze_traced()` (reverse
 lookup), `register_backend()`, `set_chain()`, `set_fallback_backend()`,
 `supported_languages()`, `language_info()` — plus a slot-template system for
-building structured inflection tables, and two exception types
-(`UnsupportedLanguageError`, `BackendLoadError`) with chain-aware failure
-handling. Full signatures, the slot-template API, writing a new backend, and
-exception semantics: [docs/api-reference.md](docs/api-reference.md).
+building structured inflection tables, and three exception types
+(`UnsupportedLanguageError`, `BackendLoadError`, `PosNotSupportedError`) with
+chain-aware failure handling. Full signatures, the slot-template API, writing
+a new backend, and exception semantics: [docs/api-reference.md](docs/api-reference.md).
 
 ## Backends
 

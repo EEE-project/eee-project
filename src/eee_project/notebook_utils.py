@@ -2495,6 +2495,22 @@ class GreekUtils:
             return forms
         return self._paradigm(word, 'adjective').get('adj', {}).get(num, {}).get(gender, {}).get(case, set())
 
+    def _pronoun_forms(self, word: str, num: str, gender: str, case: str) -> set:
+        """Gendered-pronoun forms only (Case x Number x Gender) -- the shape
+        PRONOUN_LEMMAS_GENDERED lemmas (κανένας, ίδιος, αυτός, ...) resolve
+        to. Personal (εγώ/εσύ) and indeclinable (πού/πότε) pronouns use a
+        different shape entirely and are not covered by this helper or the
+        pronoun test built on it -- content curation is responsible for only
+        routing gendered pronouns here, same as adjective testing already
+        relies on curation to route real adjectives (see _PRONOUN_ONLY_LEMMAS
+        in modern-greek-inflexion-eee for the enforced half of that contract).
+        """
+        forms = self._eee_forms(word, "pronoun", {
+            "Case": _CASE[case], "Number": _NUM[num], "Gender": _GENDER[gender]})
+        if forms is not None:
+            return forms
+        return self._paradigm(word, 'pronoun').get(num, {}).get(gender, {}).get(case, set())
+
     @functools.cached_property
     def _adv_slot(self) -> "SlotTemplate | None":
         """The backend's adjective→adverb slot template, resolved once per
@@ -2733,7 +2749,7 @@ class GreekUtils:
     def _slot_label_index(self, pos: str, lang: str) -> dict:
         """``{frozenset(features): label}`` for every backend-resolved slot
         template of *pos* in *lang* — shared by :meth:`noun_slot_labels` and
-        :meth:`_adj_slot_names`. ``label == tag`` means the backend echoed
+        :meth:`_gendered_slot_names`. ``label == tag`` means the backend echoed
         its internal tag string back unresolved (no real localized text
         available for this slot, or at all -- e.g. ancient-greek-backend-eee's
         get_slot_templates() never resolves terms_lang, by its own
@@ -3098,55 +3114,55 @@ Translation: **{translation}**
         ok, _, _, _ = self._verb_slot_ok(verb_base, tense, per, n, value)
         return ok
 
-    # --------------------------------------------------------------- adjectives
+    # --------------------------------------------- gendered-paradigm shared core
+    #
+    # adjective and pronoun (gendered lemmas only -- κανένας, ίδιος, αυτός,
+    # ...) share the identical Case x Number x Gender test/drill shape, so
+    # both are thin wrappers around this one implementation, parametrized by
+    # pos name, forms-lookup function, and full-mode case list. Extracted
+    # after a /simplify pass found the two POS clusters had been hand-copied
+    # line-for-line (a correctness fix made during the pronoun test's own
+    # first pass -- the "no fallback to input-as-correct" rule -- had to be
+    # manually applied twice as a result). The two differences between the
+    # POS are real and stay parametrized rather than papered over: adjective
+    # tests every case in ``config.adj_cases`` (includes vocative) in 'full'
+    # mode; pronoun is hardcoded to ('nom', 'gen', 'acc') -- no pronoun has a
+    # vocative form at all (verified against every entry in
+    # modern_greek_inflexion_eee/resources/pronouns.py).
+    #
+    # noun_drill_meta/verb_drill_meta are NOT part of this family -- nouns
+    # have no Gender axis in their test (genders are unioned, not tested
+    # separately) and verbs have a Tense/Person/Number shape with per-tense
+    # defectiveness, both genuinely different problems, not copies of this one.
 
-    def create_adjective_test_ui(self, words, words4test_val, current_adj, mode='simple'):
-        mo = self._mo
-        form = None
-        md_view = mo.md('**The word list for adjective test is empty.**')
-        if current_adj:
-            word = current_adj['Word']
-            translation = current_adj['Translation']
-            labels = self.adjective_slot_labels(mode)
-            form = mo.ui.array([mo.ui.text(label=l) for l in labels])
-            form.adj_word = word
-            form.adj_mode = mode
-            if words4test_val:
-                md_view = mo.md(f"""
-### Test: Adjective Declension ({len(words4test_val)}/{len(words)})
-Translation: **{translation}**
-{form}
-""")
-        return form, md_view
-
-    def _adj_slot_list(self, mode: str) -> list:
-        """(gender, number, case) tuples for check_adjective_test/check_adjective_slot/
-        adjective_slot_labels, shared so the three stay in sync. ``'simple'``
-        tests nominative only (6 slots: 3 genders x 2 numbers); anything
-        else tests every case in ``config.adj_cases`` (masc/fem/neut x sg/pl
-        x case).
+    def _gendered_slot_list(self, mode: str, full_cases) -> list:
+        """(gender, number, case) tuples shared by the adjective/pronoun
+        slot lists. ``'simple'`` tests nominative only (6 slots: 3 genders x
+        2 numbers); anything else tests every case in *full_cases*.
         """
         if mode == 'simple':
             return ([(g, 'sg', 'nom') for g in ('masc', 'fem', 'neut')] +
                     [(g, 'pl', 'nom') for g in ('masc', 'fem', 'neut')])
         return [(g, n, c) for n in ('sg', 'pl')
-                for g in ('masc', 'fem', 'neut') for c in self._cfg.adj_cases]
+                for g in ('masc', 'fem', 'neut') for c in full_cases]
 
-    def _adj_slot_names(self, mode: str, lang: str = "en") -> list:
-        """Human-readable name per ``_adj_slot_list`` slot (no trailing
-        colon), e.g. "Nom. Sg. m." — the single source behind
-        check_adjective_test's error labels and adjective_slot_labels.
+    def _gendered_slot_names(self, pos: str, mode: str, lang: str, full_cases, *,
+                              active_slots: "list | None" = None) -> list:
+        """Human-readable name per ``_gendered_slot_list`` slot (no trailing
+        colon), e.g. "Nom. Sg. m." — shared by the adjective/pronoun
+        error-label and slot-label methods.
 
         ``lang`` (``"en"``/``"ru"``/``"el"``) selects the label language via
         ``get_slot_templates(..., terms_lang=lang)`` — see
         :meth:`noun_slot_labels` for the mechanism (same routing layer,
-        backed by ``eee_project.data.labels/adj-{lang}.tsv`` here instead).
-        Falls back to the English quiz-label dicts for any slot the
-        template doesn't cover.
+        backed by ``eee_project.data.labels/{pos}-{lang}.tsv``). Falls back
+        to the English quiz-label dicts for any slot the template doesn't
+        cover. ``active_slots`` restricts the names to that subset, in that
+        order — omit for the full, mode-derived list.
         """
-        cm = {c: c.title() for c in self._cfg.adj_cases}
-        fk = self._adj_slot_list(mode)
-        by_feats = self._slot_label_index("adjective", lang)
+        cm = {c: c.title() for c in full_cases}
+        fk = active_slots if active_slots is not None else self._gendered_slot_list(mode, full_cases)
+        by_feats = self._slot_label_index(pos, lang)
         names = []
         for g, n, c in fk:
             label = by_feats.get(frozenset({"Case": _CASE.get(c, c), "Number": _NUM.get(n, n), "Gender": _GENDER.get(g, g)}.items()))
@@ -3156,37 +3172,59 @@ Translation: **{translation}**
             names.append(label)
         return names
 
-    def _adj_slot_ok(self, adj_base, g, n, c, value) -> tuple:
-        """Check one adjective-form slot; returns (ok, correct_forms).
+    def _gendered_slot_ok(self, forms_fn, g, n, c, value) -> tuple:
+        """Check one gendered-paradigm slot; returns (ok, correct_forms).
 
-        Falls back to the base form itself when no backend data exists --
-        ``{''}`` (a real, deliberate "no data" sentinel some backends
-        return, not just an empty set) is truthy, so this checks content
-        with ``any()`` rather than the container's own truthiness.
-        Shared by check_adjective_test (needs ``correct_forms`` for its
-        error message) and check_adjective_slot (boolean only) — mirrors
-        ``_verb_slot_ok``.
+        No backend data means there is no correct answer to check
+        against -- returns (False, set()) rather than accepting the bare
+        input word as a free pass (that silently turned "we don't know
+        the answer" into "anything you type is right" for every slot of
+        a mis-tested word, e.g. an irregular pronoun wrongly listed as an
+        adjective, per a real user report). ``any(correct)`` (not the
+        container's own truthiness) correctly treats a ``{''}`` "no data"
+        sentinel some backends return the same as a genuinely empty set.
+        Matches ``_verb_slot_ok``'s own "any(correct) and _ci(...)" behavior,
+        which never had this fallback to begin with.
         """
-        forms = self._adj_forms(adj_base, n, g, c)
-        correct = forms if any(forms) else {adj_base}
-        return self._ci(value, correct), correct
+        correct = forms_fn(n, g, c)
+        return any(correct) and self._ci(value, correct), correct
 
-    def check_adjective_test(self, adj_base, form_array, mode='simple'):
-        """Check adjective paradigm form against backend.
+    def _gendered_drill_meta(self, static: list, forms_fn) -> SimpleNamespace:
+        """Active (gender, number, case) slots from *static* -- slots
+        *forms_fn* has no data for are excluded, same principle as
+        :meth:`noun_drill_meta`/:meth:`verb_drill_meta` (never show a field
+        with no possible correct answer, not even to reveal "?" once
+        checked -- e.g. κανένας has no plural at all, so those 3 slots must
+        not even be shown, a real, strongly-worded user complaint after the
+        pronoun test's first version showed all 6 static fields regardless).
+
+        Falls back to the full *static* list if every slot comes back
+        blank (backend has no data at all for this word+mode).
+        """
+        active_slots = [(g, n, c) for g, n, c in static if any(forms_fn(n, g, c))] or static
+        return SimpleNamespace(active_slots=active_slots)
+
+    def _check_gendered_test(self, base, form_array, mode, *, word_attr: str, mode_attr: str,
+                              slot_list_fn, slot_names_fn, slot_ok_fn) -> tuple:
+        """Check a full gendered-paradigm form against backend — shared body
+        of check_adjective_test/check_pronoun_test.
 
         Returns ``(ok, feedback_html)`` where ``feedback_html`` is a
         ``'<br>'``-joined string of error messages (empty when correct).
-        ``mode`` selects the slot list (``'simple'`` = nom sg/pl all genders;
-        see ``_adj_slot_list``).
+        Reads ``form_array.active_slots`` (from adjective_drill_meta/
+        pronoun_drill_meta, set by the matching create_*_test_ui/
+        *_paradigm_drill_form) when present, else falls back to
+        ``slot_list_fn(mode)`` — matches :meth:`check_verb_test`'s own
+        fallback shape.
         """
         if form_array is None or not form_array.value:
             return False, ""
-        if hasattr(form_array, 'adj_word') and form_array.adj_word != adj_base:
+        if hasattr(form_array, word_attr) and getattr(form_array, word_attr) != base:
             return False, ""
-        if hasattr(form_array, 'adj_mode'):
-            mode = form_array.adj_mode
-        fk = self._adj_slot_list(mode)
-        fl = self._adj_slot_names(mode)
+        if hasattr(form_array, mode_attr):
+            mode = getattr(form_array, mode_attr)
+        fk = getattr(form_array, 'active_slots', None) or slot_list_fn(mode)
+        fl = slot_names_fn(mode, active_slots=fk)
         ok, has, errs = True, False, []
         for i, ((g, n, c), label) in enumerate(zip(fk, fl)):
             uv = form_array.value[i].strip()
@@ -3194,7 +3232,7 @@ Translation: **{translation}**
                 ok = False
                 continue
             has = True
-            slot_ok, correct = self._adj_slot_ok(adj_base, g, n, c, uv)
+            slot_ok, correct = slot_ok_fn(g, n, c, uv)
             if not slot_ok:
                 ok = False
                 errs.append(f'❌ [{label}]: entered **"{uv}"**, must be **{"/".join(sorted(correct)) if any(correct) else "?"}**')
@@ -3202,28 +3240,149 @@ Translation: **{translation}**
             return False, '❌ Please fill in at least one gender form'
         return ok, '<br>'.join(errs)
 
-    def check_adjective_slot(self, adj_base, mode, slot_index, value):
-        """Check a single adjective-form slot (index into the same slot list
-        check_adjective_test uses for the given mode). Same comparison rule
-        (fall back to the base form itself when no backend data exists),
-        for one slot only — for incremental per-field validation (e.g. on
-        Enter) instead of a full-form check.
+    def _check_gendered_slot(self, mode, slot_index, value, active_slots, *, slot_list_fn, slot_ok_fn) -> bool:
+        """Check a single gendered-paradigm slot (index into ``active_slots``,
+        or the full mode-derived list when not given) — shared body of
+        check_adjective_slot/check_pronoun_slot. Same comparison rule as
+        _check_gendered_test (no backend data means no correct answer, never
+        a free pass), for one slot only — for incremental per-field
+        validation (e.g. on Enter) instead of a full-form check.
         """
-        fk = self._adj_slot_list(mode)
+        fk = active_slots if active_slots is not None else slot_list_fn(mode)
         if not (0 <= slot_index < len(fk)):
             return False
         g, n, c = fk[slot_index]
-        ok, _ = self._adj_slot_ok(adj_base, g, n, c, (value or '').strip())
+        ok, _ = slot_ok_fn(g, n, c, (value or '').strip())
         return ok
 
-    def adjective_slot_labels(self, mode: str = 'simple', lang: str = "en") -> list:
-        """Labels for the adjective paradigm-drill's slots, matching the
-        same order as check_adjective_slot's slot list for the same mode.
+    def _create_gendered_test_ui(self, words, words4test_val, current, mode, *, word_attr: str,
+                                  mode_attr: str, drill_meta_fn, slot_labels_fn, title: str, empty_msg: str):
+        """Shared body of create_adjective_test_ui/create_pronoun_test_ui."""
+        mo = self._mo
+        form = None
+        md_view = mo.md(f'**{empty_msg}**')
+        if current:
+            word = current['Word']
+            translation = current['Translation']
+            active_slots = drill_meta_fn(word, mode).active_slots
+            labels = slot_labels_fn(mode, active_slots=active_slots)
+            form = mo.ui.array([mo.ui.text(label=l) for l in labels])
+            setattr(form, word_attr, word)
+            setattr(form, mode_attr, mode)
+            form.active_slots = active_slots
+            if words4test_val:
+                md_view = mo.md(f"""
+### {title} ({len(words4test_val)}/{len(words)})
+Translation: **{translation}**
+{form}
+""")
+        return form, md_view
 
-        ``lang`` (``"en"``/``"ru"``/``"el"``) selects the label language —
-        see :meth:`_adj_slot_names`.
+    # --------------------------------------------------------------- adjectives
+
+    def adjective_drill_meta(self, word: str, mode: str) -> SimpleNamespace:
+        """Active (gender, number, case) slots for one adjective+mode.
+        See :meth:`_gendered_drill_meta`.
         """
-        return [f"{name}:" for name in self._adj_slot_names(mode, lang)]
+        return self._gendered_drill_meta(self._adj_slot_list(mode), lambda n, g, c: self._adj_forms(word, n, g, c))
+
+    def create_adjective_test_ui(self, words, words4test_val, current_adj, mode='simple'):
+        return self._create_gendered_test_ui(
+            words, words4test_val, current_adj, mode,
+            word_attr='adj_word', mode_attr='adj_mode',
+            drill_meta_fn=self.adjective_drill_meta, slot_labels_fn=self.adjective_slot_labels,
+            title='Test: Adjective Declension', empty_msg='The word list for adjective test is empty.')
+
+    def _adj_slot_list(self, mode: str) -> list:
+        """(gender, number, case) tuples for check_adjective_test/check_adjective_slot/
+        adjective_slot_labels, shared so the three stay in sync. See
+        :meth:`_gendered_slot_list` — 'full' mode tests every case in
+        ``config.adj_cases``.
+        """
+        return self._gendered_slot_list(mode, self._cfg.adj_cases)
+
+    def check_adjective_test(self, adj_base, form_array, mode='simple'):
+        """Check adjective paradigm form against backend. See
+        :meth:`_check_gendered_test`.
+        """
+        return self._check_gendered_test(
+            adj_base, form_array, mode, word_attr='adj_word', mode_attr='adj_mode',
+            slot_list_fn=self._adj_slot_list, slot_names_fn=self._adj_slot_names,
+            slot_ok_fn=lambda g, n, c, v: self._gendered_slot_ok(lambda n2, g2, c2: self._adj_forms(adj_base, n2, g2, c2), g, n, c, v))
+
+    def check_adjective_slot(self, adj_base, mode, slot_index, value, active_slots=None):
+        """Check a single adjective-form slot. See :meth:`_check_gendered_slot`."""
+        return self._check_gendered_slot(
+            mode, slot_index, value, active_slots, slot_list_fn=self._adj_slot_list,
+            slot_ok_fn=lambda g, n, c, v: self._gendered_slot_ok(lambda n2, g2, c2: self._adj_forms(adj_base, n2, g2, c2), g, n, c, v))
+
+    def _adj_slot_names(self, mode: str = 'simple', lang: str = "en", *, active_slots: "list | None" = None) -> list:
+        """Names (no trailing colon) for the adjective paradigm-drill's slots."""
+        return self._gendered_slot_names("adjective", mode, lang, self._cfg.adj_cases, active_slots=active_slots)
+
+    def adjective_slot_labels(self, mode: str = 'simple', lang: str = "en", *, active_slots: "list | None" = None) -> list:
+        """Labels for the adjective paradigm-drill's slots (trailing colon),
+        matching the same order as check_adjective_slot's slot list for the
+        same mode. ``lang`` (``"en"``/``"ru"``/``"el"``) selects the label
+        language; ``active_slots`` (from :meth:`adjective_drill_meta`)
+        restricts the labels to that subset — omit for the full,
+        mode-derived list.
+        """
+        return [f"{name}:" for name in self._adj_slot_names(mode, lang, active_slots=active_slots)]
+
+    # ------------------------------------------------------------- pronoun test
+    #
+    # Gendered pronouns only (κανένας, ίδιος, αυτός, ...) -- see the shared
+    # core above. ``words`` passed to create_pronoun_test_ui/
+    # pronoun_paradigm_drill_form should be pre-filtered to gendered pronoun
+    # lemmas (PRONOUN_LEMMAS_GENDERED in modern_greek_inflexion_eee) -- see
+    # :meth:`_pronoun_forms`.
+
+    def pronoun_drill_meta(self, word: str, mode: str) -> SimpleNamespace:
+        """Active (gender, number, case) slots for one pronoun+mode.
+        See :meth:`_gendered_drill_meta`.
+        """
+        return self._gendered_drill_meta(self._pronoun_slot_list(mode), lambda n, g, c: self._pronoun_forms(word, n, g, c))
+
+    def create_pronoun_test_ui(self, words, words4test_val, current_pron, mode='simple'):
+        return self._create_gendered_test_ui(
+            words, words4test_val, current_pron, mode,
+            word_attr='pron_word', mode_attr='pron_mode',
+            drill_meta_fn=self.pronoun_drill_meta, slot_labels_fn=self.pronoun_slot_labels,
+            title='Test: Pronoun Declension', empty_msg='The word list for pronoun test is empty.')
+
+    def _pronoun_slot_list(self, mode: str) -> list:
+        """(gender, number, case) tuples for check_pronoun_test/check_pronoun_slot/
+        pronoun_slot_labels, shared so the three stay in sync. See
+        :meth:`_gendered_slot_list` — 'full' mode's case list is
+        ('nom', 'gen', 'acc') -- no pronoun has a vocative form.
+        """
+        return self._gendered_slot_list(mode, ('nom', 'gen', 'acc'))
+
+    def check_pronoun_test(self, pron_base, form_array, mode='simple'):
+        """Check pronoun paradigm form against backend. See
+        :meth:`_check_gendered_test`.
+        """
+        return self._check_gendered_test(
+            pron_base, form_array, mode, word_attr='pron_word', mode_attr='pron_mode',
+            slot_list_fn=self._pronoun_slot_list, slot_names_fn=self._pronoun_slot_names,
+            slot_ok_fn=lambda g, n, c, v: self._gendered_slot_ok(lambda n2, g2, c2: self._pronoun_forms(pron_base, n2, g2, c2), g, n, c, v))
+
+    def check_pronoun_slot(self, pron_base, mode, slot_index, value, active_slots=None):
+        """Check a single pronoun-form slot. See :meth:`_check_gendered_slot`."""
+        return self._check_gendered_slot(
+            mode, slot_index, value, active_slots, slot_list_fn=self._pronoun_slot_list,
+            slot_ok_fn=lambda g, n, c, v: self._gendered_slot_ok(lambda n2, g2, c2: self._pronoun_forms(pron_base, n2, g2, c2), g, n, c, v))
+
+    def _pronoun_slot_names(self, mode: str = 'simple', lang: str = "en", *, active_slots: "list | None" = None) -> list:
+        """Names (no trailing colon) for the pronoun paradigm-drill's slots."""
+        return self._gendered_slot_names("pronoun", mode, lang, ('nom', 'gen', 'acc'), active_slots=active_slots)
+
+    def pronoun_slot_labels(self, mode: str = 'simple', lang: str = "en", *, active_slots: "list | None" = None) -> list:
+        """Labels for the pronoun paradigm-drill's slots (trailing colon).
+        See :meth:`adjective_slot_labels`.
+        """
+        return [f"{name}:" for name in self._pronoun_slot_names(mode, lang, active_slots=active_slots)]
 
     # --------------------------------------------------------------- item drills
 
@@ -3708,8 +3867,9 @@ Translation: **{translation}**
         slot_ok: Any,
         full_check: Any,
     ) -> Any:
-        """Shared engine behind the three public ``*_paradigm_drill_form``
-        siblings, which differ only in their POS-specific hooks:
+        """Shared engine behind the public ``*_paradigm_drill_form``
+        siblings (noun/verb/adjective/pronoun), which differ only in their
+        POS-specific hooks:
         ``make_cap(live)`` builds the dirty-check snapshot (or returns None
         to skip capturing — each sibling embeds its own capture guard),
         ``cap_word_attr`` names the snapshot attribute holding the checked
@@ -3969,6 +4129,7 @@ Translation: **{translation}**
         cv: "dict | None", form: Any, check_btn: Any, prev_btn: Any, nxt_btn: Any, restart_btn: Any,
         *,
         vocab: list,
+        adj_meta: Any,
         mode: str = "simple",
         word_key: str = "form",
         meaning_key: str = "meaning",
@@ -3982,7 +4143,15 @@ Translation: **{translation}**
         (``"simple"`` = nominative only, 6 slots; anything else = every
         case in ``config.adj_cases``), matching :meth:`adjective_slot_labels`'s
         labels for the same mode.
+
+        ``adj_meta`` (from :meth:`adjective_drill_meta`, also set on the form
+        :meth:`create_adjective_test_ui` returns) supplies ``active_slots`` --
+        a word tested here can be genuinely defective the same way a noun or
+        verb can (e.g. a singular-only or plural-only word), so the fields
+        actually shown must be filtered the same way, not just the full
+        static per-mode list.
         """
+        active_slots = getattr(adj_meta, "active_slots", None) or self._adj_slot_list(mode)
         state = self._pack_paradigm_state(
             get_words, set_words, get_hist, set_hist, get_msg, set_msg,
             get_cap, set_cap, get_entered, set_entered,
@@ -3996,10 +4165,64 @@ Translation: **{translation}**
             meaning_label=meaning_label, title=title, done_message=done_message,
             cap_word_attr="adj_word",
             make_cap=lambda live: (
-                SimpleNamespace(adj_word=cv[word_key], adj_mode=mode, value=live)
+                SimpleNamespace(adj_word=cv[word_key], adj_mode=mode, active_slots=active_slots, value=live)
                 if cv else None),
-            slot_ok=lambda i, v: bool(cv) and self.check_adjective_slot(cv[word_key], mode, i, v),
+            slot_ok=lambda i, v: bool(cv) and self.check_adjective_slot(cv[word_key], mode, i, v, active_slots=active_slots),
             full_check=lambda cap: self.check_adjective_test(cv[word_key], cap, mode),
+        )
+
+    def pronoun_paradigm_drill_form(
+        self,
+        get_words, set_words,
+        get_hist, set_hist,
+        get_msg, set_msg,
+        get_cap, set_cap,
+        get_entered, set_entered,
+        get_sub_cnt, set_sub_cnt,
+        get_prev_cnt, set_prev_cnt,
+        get_nxt_cnt, set_nxt_cnt,
+        get_entercnt, set_entercnt,
+        get_restart_cnt, set_restart_cnt,
+        cv: "dict | None", form: Any, check_btn: Any, prev_btn: Any, nxt_btn: Any, restart_btn: Any,
+        *,
+        vocab: list,
+        pron_meta: Any,
+        mode: str = "simple",
+        word_key: str = "form",
+        meaning_key: str = "meaning",
+        meaning_label: str = "Meaning",
+        title: str = "",
+        done_message: str = "Done — every pronoun drilled!",
+    ) -> Any:
+        """Unified pronoun-paradigm drill — sibling of :meth:`adjective_paradigm_drill_form`
+        (see its docstring for the shared design). Uses ``check_pronoun_slot``/
+        ``check_pronoun_test`` instead. Gendered pronouns only -- ``vocab``
+        should already be filtered to PRONOUN_LEMMAS_GENDERED lemmas, same
+        as :meth:`create_pronoun_test_ui`.
+
+        ``pron_meta`` (from :meth:`pronoun_drill_meta`, also set on the form
+        :meth:`create_pronoun_test_ui` returns) supplies ``active_slots`` --
+        e.g. κανένας has no plural at all, so those 3 fields must not be
+        shown, not just fail with "?" once checked.
+        """
+        active_slots = getattr(pron_meta, "active_slots", None) or self._pronoun_slot_list(mode)
+        state = self._pack_paradigm_state(
+            get_words, set_words, get_hist, set_hist, get_msg, set_msg,
+            get_cap, set_cap, get_entered, set_entered,
+            get_sub_cnt, set_sub_cnt, get_prev_cnt, set_prev_cnt,
+            get_nxt_cnt, set_nxt_cnt, get_entercnt, set_entercnt,
+            get_restart_cnt, set_restart_cnt,
+        )
+        return self._paradigm_drill_form(
+            state, cv, form, check_btn, prev_btn, nxt_btn, restart_btn,
+            vocab=vocab, word_key=word_key, meaning_key=meaning_key,
+            meaning_label=meaning_label, title=title, done_message=done_message,
+            cap_word_attr="pron_word",
+            make_cap=lambda live: (
+                SimpleNamespace(pron_word=cv[word_key], pron_mode=mode, active_slots=active_slots, value=live)
+                if cv else None),
+            slot_ok=lambda i, v: bool(cv) and self.check_pronoun_slot(cv[word_key], mode, i, v, active_slots=active_slots),
+            full_check=lambda cap: self.check_pronoun_test(cv[word_key], cap, mode),
         )
 
     def _handle_prev(self, cv, restore_entry, history, future, score,
@@ -5670,6 +5893,7 @@ def build_modern_paradigm_table(el_backend: Any, *, lang: str = "ru") -> Any:
     import functools
     import html as _html
     import eee_project as _eee
+    from modern_greek_inflexion_eee import PRONOUN_LEMMAS_INDECLINABLE
 
     @functools.lru_cache(maxsize=None)
     def _el_slots(pos):
@@ -5702,13 +5926,18 @@ def build_modern_paradigm_table(el_backend: Any, *, lang: str = "ru") -> Any:
             cell = "/ ".join(_html.escape(f) for f in sorted(forms)) if forms else chr(8212)
             return f'<td style="{_GRC_HL if hl else _GRC_TD}">{cell}</td>'
 
-        if pos in ("noun", "adjective"):
+        def _case_num_table(pos_str):
+            """Case x Number table, genders unioned per cell -- shared shape
+            for noun/adjective/pronoun(gendered): all three resolve through
+            _gendered_case_num_rows() on the backend side (Case x Number x
+            Gender), so the same 3-gender union loop applies unchanged.
+            """
             rows = {}
             for c in _EL_CASES:
                 for nl, n in (("S", "Sing"), ("P", "Plur")):
                     fs = set()
                     for g in ("Masc", "Fem", "Neut"):
-                        fs |= _forms({"Case": c, "Number": n, "Gender": g}, pos)
+                        fs |= _forms({"Case": c, "Number": n, "Gender": g}, pos_str)
                     rows[(c, nl)] = fs
             if not any(rows.values()):
                 return None
@@ -5721,7 +5950,35 @@ def build_modern_paradigm_table(el_backend: Any, *, lang: str = "ru") -> Any:
             for c in _EL_CASES:
                 tbl += f'<tr><td style="{_GRC_ROW}">{_GRC_CL.get(c, c)}</td>'
                 tbl += _td(rows[(c, "S")]) + _td(rows[(c, "P")]) + "</tr>"
-            result = tbl + "</table>"
+            return tbl + "</table>"
+
+        if pos in ("noun", "adjective"):
+            result = _case_num_table(pos)
+            if result is None:
+                return None
+
+        elif pos == "pronoun":
+            # Only the "gendered" pronoun family (κανένας, ίδιος, αυτός, ...
+            # -- Case x Number x Gender, same shape as noun/adjective) has a
+            # sensible table here. Personal (εγώ/εσύ) also resolves
+            # correctly through the same path -- mg_pron_path("personal",
+            # ...) ignores the Gender key entirely and reads Case+Number,
+            # verified empirically (backend.inflect('εγώ', {Case, Number,
+            # Gender}, 'pronoun') returns the real per-case/number forms).
+            # Indeclinable (πού/πότε) does NOT: mg_pron_path("indeclinable",
+            # ...) ignores Case/Number/Gender entirely and always returns
+            # the same single cell, so every table cell would render the
+            # identical invariant word -- confirmed empirically
+            # (backend.inflect('πού', ...) returns {'πού'} for all 8
+            # case/number combinations) -- which misrepresents a word that
+            # doesn't decline at all as if it does. Skip those; matches
+            # this function's existing "no table" behavior for unsupported
+            # pos values elsewhere.
+            if lemma in PRONOUN_LEMMAS_INDECLINABLE:
+                return None
+            result = _case_num_table(pos)
+            if result is None:
+                return None
 
         elif pos == "verb":
             _PS = [("1", "Sing", "1S"), ("2", "Sing", "2S"), ("3", "Sing", "3S"),

@@ -34,9 +34,11 @@ class AmbiguousPOSError(Exception):
 
 
 class PosNotSupportedError(Exception):
-    def __init__(self, pos: str) -> None:
+    def __init__(self, pos: str, language: str | None = None) -> None:
         self.pos = pos
-        super().__init__(f"POS '{pos}' is not supported by the UniMorph translator.")
+        self.language = language
+        where = f" for language '{language}'" if language else ""
+        super().__init__(f"POS '{pos}' is not supported{where}.")
 
 
 class FeatureNotSupportedError(Exception):
