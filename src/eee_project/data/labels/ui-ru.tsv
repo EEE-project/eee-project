@@ -2,18 +2,22 @@ Key	label
 test1_heading	## Тест 1: Существительные
 test2_heading	## Тест 2: Глаголы
 test3_heading	## Тест 3: Прилагательные
+test4_heading	## Тест 4: Местоимения
 select_nouns	### Выберите существительные для практики
 select_verbs	### Выберите глаголы для практики
 select_adjs	### Выберите прилагательные для практики
+select_pron	### Выберите местоимения для практики
 translation_label	Перевод:
 simple_noun_heading	**Простой тест по существительным**
 article_noun_heading	**Тест по существительным с артиклями**
 verb_heading	**Тест по глаголам**
 adj_heading	**Тест по прилагательным**
+pron_heading	**Тест по местоимениям**
 noun_empty	_Выберите существительные из таблицы выше, чтобы начать._
 verb_empty	_Выберите глаголы из таблицы выше, чтобы начать._
 verb_no_tense	_Выберите время выше._
 adj_empty	_Выберите прилагательные из таблицы выше, чтобы начать._
+pron_empty	_Выберите местоимения из таблицы выше, чтобы начать._
 tense_label	Выбрать время:
 mode_label	Режим теста:
 indefinite_label	Также с неопределённым артиклем
@@ -23,10 +27,12 @@ indef_prefix	Неопр.
 nouns_not_found	_nouns.tsv не найден — загрузите файл._
 verbs_not_found	_verbs.tsv не найден — загрузите файл._
 adjs_not_found	_adjectives.tsv не найден — загрузите файл._
+pron_not_found	_pronouns.tsv не найден — загрузите файл._
 translation_presence_not_found	_translation_presence.tsv не найден и не удалось загрузить с сервера._
 test1_done	Все существительные пройдены за эту сессию!
 test2_done	Все глаголы пройдены за эту сессию!
 test3_done	Все прилагательные пройдены за эту сессию!
+test4_done	Все местоимения пройдены за эту сессию!
 poem_section_heading	## Текст поэмы с параллельными переводами
 vocabulary_heading	## ПОЛЕЗНЫЕ СЛОВА
 test_label	Тест

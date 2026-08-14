@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.7.1 - 2026-08-14
+- Add `test4_heading`/`test4_done`/`pron_heading`/`select_pron`/
+  `pron_not_found`/`pron_empty` UI labels (en/ru/el) — a 4th
+  chapter-test-section slot alongside the existing `test1_heading`..
+  `test3_heading`/`test1_done`..`test3_done` (nouns/verbs/adjectives), a
+  drill-section title (`pron_heading`, matching `adj_heading`'s
+  `**X test**` pattern), and the matching `select_*`/`*_not_found`/
+  `*_empty` triple (mirroring `select_adjs`/`adjs_not_found`/`adj_empty`)
+  for notebooks adding a dedicated pronoun test section. Distinct from the
+  existing `pron_test_topic`/`pron_done` keys, which serve the generic
+  `pos_selector`-driven example notebook.
+
 ## 1.7.0 - 2026-08-14
 - `PosNotSupportedError` (previously raised only from the internal UniMorph
   tag-translation layer) is now raised by the top-level `inflect_slot()`

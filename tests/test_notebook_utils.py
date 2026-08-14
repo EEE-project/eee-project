@@ -805,19 +805,19 @@ class TestUiLabel:
         gu = GreekUtils(mo_module=_StubMo())
         assert gu.ui_label('not_a_real_key', 'en') == 'not_a_real_key'
 
-    def test_all_44_keys_present_in_all_3_languages(self):
+    def test_all_50_keys_present_in_all_3_languages(self):
         # regression: guards against a TSV row silently dropped for one
         # language during a future edit -- every key must resolve in en/ru/el.
         gu = GreekUtils(mo_module=_StubMo())
         keys = [
-            'test1_heading', 'test2_heading', 'test3_heading',
-            'select_nouns', 'select_verbs', 'select_adjs', 'translation_label',
-            'simple_noun_heading', 'article_noun_heading', 'verb_heading', 'adj_heading',
-            'noun_empty', 'verb_empty', 'verb_no_tense', 'adj_empty',
+            'test1_heading', 'test2_heading', 'test3_heading', 'test4_heading',
+            'select_nouns', 'select_verbs', 'select_adjs', 'select_pron', 'translation_label',
+            'simple_noun_heading', 'article_noun_heading', 'verb_heading', 'adj_heading', 'pron_heading',
+            'noun_empty', 'verb_empty', 'verb_no_tense', 'adj_empty', 'pron_empty',
             'tense_label', 'mode_label', 'indefinite_label', 'check_label',
             'def_prefix', 'indef_prefix',
-            'nouns_not_found', 'verbs_not_found', 'adjs_not_found',
-            'test1_done', 'test2_done', 'test3_done',
+            'nouns_not_found', 'verbs_not_found', 'adjs_not_found', 'pron_not_found',
+            'test1_done', 'test2_done', 'test3_done', 'test4_done',
             'poem_section_heading', 'vocabulary_heading',
             'test_label', 'presence_test_topic', 'noun_test_topic', 'verb_test_topic', 'adj_test_topic',
             'drill_title', 'drill_description', 'pos_label', 'load_tsv_label',
