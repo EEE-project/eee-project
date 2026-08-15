@@ -3656,9 +3656,16 @@ Translation: **{translation}**
         """
         return _random.sample(items, min(n, len(items)))
 
+    def _shuffle(self, items: list) -> list:
+        """A fresh random ordering of *items* — shared by every "start a
+        session/drill in random order" call site, so the shuffle strategy
+        only needs to change in one place.
+        """
+        return _random.sample(items, len(items))
+
     def _shuffle_start(self, vocab: list, set_cv, set_remaining) -> None:
         """Shuffle *vocab* and set the first word as current with the rest as remaining."""
-        _shuf = _random.sample(vocab, len(vocab))
+        _shuf = self._shuffle(vocab)
         set_cv(_shuf[0])
         set_remaining(_shuf[1:])
 
@@ -3741,8 +3748,12 @@ Translation: **{translation}**
         "start over" button. (The per-Enter watermark resets itself, in the
         cell that recreates the paradigm-form widget, once the word queue
         changes.)
+
+        Re-shuffles ``vocab`` via :meth:`_shuffle`, matching
+        :meth:`make_paradigm_drill_state`'s initial order -- resetting to
+        *vocab*'s raw order here was a real regression (see CHANGELOG 1.7.3).
         """
-        set_words(list(vocab))
+        set_words(self._shuffle(vocab))
         set_hist([])
         set_msg("")
         set_cap(None)
@@ -4003,7 +4014,7 @@ Translation: **{translation}**
         cv: "dict | None", form: Any, check_btn: Any, prev_btn: Any, nxt_btn: Any, restart_btn: Any,
         *,
         vocab: list,
-        verb_meta: Any,
+        verb_meta: Any = None,
         tense: str = "present",
         word_key: str = "form",
         meaning_key: str = "meaning",
@@ -4023,7 +4034,11 @@ Translation: **{translation}**
         ``verb_meta`` (from :meth:`verb_drill_meta`, also set on the form
         :meth:`create_verb_test_ui` returns) supplies ``active_slots`` — a
         verb's testable slots vary by verb *and* tense, unlike a noun's
-        purely per-word ``active_cases``.
+        purely per-word ``active_cases``. Optional: omitting it (or a
+        caller passing an object without a real ``active_slots``) falls
+        back to ``config.verb_slots`` (every slot shown, unfiltered) rather
+        than raising — a caller that forgets to compute it gets a working,
+        just less-precise, drill instead of a crash.
         """
         active_slots = getattr(verb_meta, "active_slots", None) or self._cfg.verb_slots
         state = self._pack_paradigm_state(
@@ -4060,7 +4075,7 @@ Translation: **{translation}**
         cv: "dict | None", form: Any, check_btn: Any, prev_btn: Any, nxt_btn: Any, restart_btn: Any,
         *,
         vocab: list,
-        noun_meta: Any,
+        noun_meta: Any = None,
         article: bool = True,
         indefinite: bool = False,
         word_key: str = "form",
@@ -4070,12 +4085,14 @@ Translation: **{translation}**
         done_message: str = "Done — every noun drilled!",
     ) -> Any:
         """Unified noun-paradigm drill — sibling of :meth:`verb_paradigm_drill_form`
-        (see its docstring for the shared design). Uses ``check_noun_slot``/
-        ``check_noun_test`` instead, and needs ``noun_meta`` (from
+        (see its docstring for the shared design, including the "meta is
+        optional" fallback behavior). Uses ``check_noun_slot``/
+        ``check_noun_test`` instead, and takes ``noun_meta`` (from
         :meth:`noun_drill_meta`, also the 3rd return value of
         :meth:`create_noun_test_ui`) for its ``active_cases``/
         ``is_pluralia_tantum`` — nouns' active cases vary per word (pluralia
-        tantum), unlike a verb's fixed slot list.
+        tantum), unlike a verb's fixed slot list. Omitting it falls back to
+        ``config.noun_cells`` (every case shown, not pluralia-tantum-aware).
 
         ``article``: ``True`` (default) requires the definite article in
         each slot's answer (e.g. Ancient Greek drills always want this).
@@ -4095,7 +4112,7 @@ Translation: **{translation}**
         pass unconditionally from a notebook that doesn't check the config
         itself.
         """
-        active_cases = getattr(noun_meta, "active_cases", [])
+        active_cases = getattr(noun_meta, "active_cases", None) or self._cfg.noun_cells
         state = self._pack_paradigm_state(
             get_words, set_words, get_hist, set_hist, get_msg, set_msg,
             get_cap, set_cap, get_entered, set_entered,
@@ -4115,9 +4132,9 @@ Translation: **{translation}**
                     active_cases=active_cases,
                     value=live,
                 )
-                if cv is not None and noun_meta is not None and live else None),
+                if cv is not None and live else None),
             slot_ok=lambda i, v: (
-                cv is not None and noun_meta is not None
+                cv is not None
                 and self.check_noun_slot(cv[word_key], i, v, article=article,
                                           active_cases=active_cases, indefinite=indefinite)),
             full_check=lambda cap: self.check_noun_test(cv[word_key], cap, article=article, indefinite=indefinite),
@@ -4138,7 +4155,7 @@ Translation: **{translation}**
         cv: "dict | None", form: Any, check_btn: Any, prev_btn: Any, nxt_btn: Any, restart_btn: Any,
         *,
         vocab: list,
-        adj_meta: Any,
+        adj_meta: Any = None,
         mode: str = "simple",
         word_key: str = "form",
         meaning_key: str = "meaning",
@@ -4147,7 +4164,8 @@ Translation: **{translation}**
         done_message: str = "Done — every adjective drilled!",
     ) -> Any:
         """Unified adjective-paradigm drill — sibling of :meth:`verb_paradigm_drill_form`
-        (see its docstring for the shared design). Uses ``check_adjective_slot``/
+        (see its docstring for the shared design, including the "meta is
+        optional" fallback behavior). Uses ``check_adjective_slot``/
         ``check_adjective_test`` instead; ``mode`` picks the slot set
         (``"simple"`` = nominative only, 6 slots; anything else = every
         case in ``config.adj_cases``), matching :meth:`adjective_slot_labels`'s
@@ -4158,7 +4176,9 @@ Translation: **{translation}**
         a word tested here can be genuinely defective the same way a noun or
         verb can (e.g. a singular-only or plural-only word), so the fields
         actually shown must be filtered the same way, not just the full
-        static per-mode list.
+        static per-mode list. Omitting it falls back to the unfiltered
+        per-mode list from :meth:`adjective_slot_labels` (every slot shown,
+        including any defective for this word).
         """
         active_slots = getattr(adj_meta, "active_slots", None) or self._adj_slot_list(mode)
         state = self._pack_paradigm_state(
@@ -4195,7 +4215,7 @@ Translation: **{translation}**
         cv: "dict | None", form: Any, check_btn: Any, prev_btn: Any, nxt_btn: Any, restart_btn: Any,
         *,
         vocab: list,
-        pron_meta: Any,
+        pron_meta: Any = None,
         mode: str = "simple",
         word_key: str = "form",
         meaning_key: str = "meaning",
@@ -4204,7 +4224,8 @@ Translation: **{translation}**
         done_message: str = "Done — every pronoun drilled!",
     ) -> Any:
         """Unified pronoun-paradigm drill — sibling of :meth:`adjective_paradigm_drill_form`
-        (see its docstring for the shared design). Uses ``check_pronoun_slot``/
+        (see its docstring for the shared design, including the "meta is
+        optional" fallback behavior). Uses ``check_pronoun_slot``/
         ``check_pronoun_test`` instead. Gendered pronouns only -- ``vocab``
         should already be filtered to PRONOUN_LEMMAS_GENDERED lemmas, same
         as :meth:`create_pronoun_test_ui`.
@@ -4212,7 +4233,8 @@ Translation: **{translation}**
         ``pron_meta`` (from :meth:`pronoun_drill_meta`, also set on the form
         :meth:`create_pronoun_test_ui` returns) supplies ``active_slots`` --
         e.g. κανένας has no plural at all, so those 3 fields must not be
-        shown, not just fail with "?" once checked.
+        shown, not just fail with "?" once checked. Omitting it falls back
+        to the unfiltered per-mode list (every slot shown).
         """
         active_slots = getattr(pron_meta, "active_slots", None) or self._pronoun_slot_list(mode)
         state = self._pack_paradigm_state(

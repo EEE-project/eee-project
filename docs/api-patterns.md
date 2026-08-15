@@ -900,11 +900,17 @@ with no possible correct answer at all, not just a rarely-empty one.
 
 `noun_slot_labels`/`adjective_slot_labels`/`pronoun_slot_labels` all take
 `lang: str = "en"` — routes through `get_slot_templates(..., terms_lang=lang)`,
-backed by `data/labels/{noun,adj,pronoun}-{lang}.tsv` (no bundled
-`pronoun-{lang}.tsv` yet — falls back to the English quiz-label dicts
-regardless of `lang` until one is added). Pass the notebook's own
-`language_selector.value`; never hand-roll per-language label text in the
-notebook itself.
+backed by `data/labels/{noun,adj,pronoun}-{lang}.tsv`. Pass the notebook's
+own `language_selector.value`; never hand-roll per-language label text in
+the notebook itself.
+
+`verb_meta`/`noun_meta`/`adj_meta`/`pron_meta` are optional (`= None`) as
+of 1.7.3 — a caller that omits one gets the full, unfiltered slot/case list
+for that word (`config.verb_slots`/`config.noun_cells`/the unfiltered
+per-mode list) instead of `TypeError`. Still always compute and pass the
+real one shown above: the fallback exists so a caller that *forgets*
+degrades to a working-but-less-precise drill instead of crashing, not as a
+sanctioned way to skip computing it.
 
 For a verb-tense **selector** (which of present/imperfect/aorist/future/...
 to test — distinct from `verb_slot_labels()`'s pronoun slot labels above),

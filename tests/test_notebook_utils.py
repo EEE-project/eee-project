@@ -3508,7 +3508,9 @@ class TestResetParadigmDrillState:
             tracker("words"), tracker("hist"), tracker("msg"), tracker("cap"),
             tracker("entered"), tracker("sub"), tracker("prev"), tracker("nxt"),
         )
-        assert calls["words"] == vocab
+        # words is a *shuffled* copy -- same elements, not necessarily vocab's
+        # own order (see test_reshuffles_on_restart for the exact mechanism).
+        assert sorted(calls["words"], key=lambda d: d["Word"]) == sorted(vocab, key=lambda d: d["Word"])
         assert calls["words"] is not vocab  # a fresh copy, not the same list object
         assert calls["hist"] == []
         assert calls["msg"] == ""
@@ -3517,6 +3519,29 @@ class TestResetParadigmDrillState:
         assert calls["sub"] == 0
         assert calls["prev"] == 0
         assert calls["nxt"] == 0
+
+    def test_reshuffles_on_restart(self, gu):
+        # REGRESSION: "start over" used to call set_words(list(vocab))
+        # directly -- resetting the queue to vocab's own (e.g. table) order
+        # instead of a fresh random order, unlike the initial
+        # make_paradigm_drill_state() call which wraps it in random.sample.
+        # Real reported bug: a verb test always showed words in table order
+        # after switching tense and pressing restart.
+        calls = {}
+
+        def tracker(name):
+            return lambda v: calls.__setitem__(name, v)
+
+        vocab = [{"Word": w} for w in "abcdefghijklmnopqrst"]
+        shuffled = list(reversed(vocab))
+        with patch("eee_project.notebook_utils._random.sample", return_value=shuffled) as mock_sample:
+            gu.reset_paradigm_drill_state(
+                vocab,
+                tracker("words"), tracker("hist"), tracker("msg"), tracker("cap"),
+                tracker("entered"), tracker("sub"), tracker("prev"), tracker("nxt"),
+            )
+        mock_sample.assert_called_once_with(vocab, len(vocab))
+        assert calls["words"] == shuffled
 
 
 # ────────────────────────────────────────── dirty_check_button ──
@@ -3726,6 +3751,12 @@ class _ParadigmDrillFormBase:
             **kwargs,
         )
 
+    def _assert_same_words(self, actual: list, expected: list) -> None:
+        """A restarted queue is shuffled (see TestResetParadigmDrillState.
+        test_reshuffles_on_restart), so check same elements, not same order.
+        """
+        assert sorted(actual, key=lambda d: d["form"]) == sorted(expected, key=lambda d: d["form"])
+
 
 class TestVerbParadigmDrillForm(_ParadigmDrillFormBase):
     _VOCAB = [{"form": "λύω", "meaning": "I loose"}, {"form": "ἄγω", "meaning": "I lead"}]
@@ -3752,7 +3783,7 @@ class TestVerbParadigmDrillForm(_ParadigmDrillFormBase):
         )
         result = self._call(gu, state, self._VOCAB[0], _pdform([""]), self._meta(), restart_v=1)
         assert result == "*...*"
-        assert state["words"][2][0] == self._VOCAB
+        self._assert_same_words(state["words"][2][0], self._VOCAB)
         assert state["hist"][2][0] == []
         assert state["entered"][2][0] == {}
 
@@ -3783,6 +3814,19 @@ class TestVerbParadigmDrillForm(_ParadigmDrillFormBase):
              patch.object(gu, "check_verb_test", return_value=(False, "")):
             self._call(gu, state, cv, form, self._meta())
         assert form.widget.focus_request == {"request_id": 1, "advance_to": 1}
+
+    def test_verb_meta_omitted_falls_back_to_full_slots(self, gu):
+        # REGRESSION: verb_meta used to be a required kwarg -- any caller
+        # that forgot to compute/pass it crashed with TypeError the moment
+        # a student picked a word. Omitting it now degrades to the full,
+        # unfiltered config.verb_slots list instead.
+        cv = self._VOCAB[0]
+        state = self._state()
+        form = _pdform(["λύω", ""], submit_count=1, enter_field_index=0)
+        with patch.object(gu, "check_verb_slot", return_value=True) as mock_slot, \
+             patch.object(gu, "check_verb_test", return_value=(False, "")):
+            self._call_form(gu.verb_paradigm_drill_form, state, cv, form, tense="present")
+        mock_slot.assert_called_with(cv["form"], "present", 0, "λύω", active_slots=gu._cfg.verb_slots)
 
     def test_enter_on_correct_last_slot_has_no_advance_target(self, gu):
         # No field beyond the last one to advance to, but the JS side still
@@ -3861,7 +3905,7 @@ class TestNounParadigmDrillForm(_ParadigmDrillFormBase):
         )
         result = self._call(gu, state, self._VOCAB[0], _pdform([""]), self._meta(), restart_v=1)
         assert result == "*...*"
-        assert state["words"][2][0] == self._VOCAB
+        self._assert_same_words(state["words"][2][0], self._VOCAB)
         assert state["hist"][2][0] == []
         assert state["entered"][2][0] == {}
 
@@ -3894,6 +3938,24 @@ class TestNounParadigmDrillForm(_ParadigmDrillFormBase):
         assert form.widget.focus_request == {"request_id": 1, "advance_to": 1}
         mock_slot.assert_called_once_with(
             "ὁ ἀγρός", 0, "ἀγρός", article=True, active_cases=meta.active_cases, indefinite=False,
+        )
+
+    def test_noun_meta_omitted_falls_back_to_full_cases(self, gu):
+        # REGRESSION: noun_meta used to be a required kwarg (and make_cap/
+        # slot_ok used to additionally gate on `noun_meta is not None`,
+        # unlike the sibling POS types) -- any caller that forgot to
+        # compute/pass it crashed with TypeError. Omitting it now degrades
+        # to the full, unfiltered config.noun_cells list instead, and
+        # checking still works (not silently disabled).
+        cv = self._VOCAB[0]
+        state = self._state()
+        form = _pdform(["ἀγρός", ""], submit_count=1, enter_field_index=0)
+        with patch.object(gu, "check_noun_slot", return_value=True) as mock_slot, \
+             patch.object(gu, "check_noun_test", return_value=(False, "")):
+            self._call_form(gu.noun_paradigm_drill_form, state, cv, form)
+        assert form.widget.focus_request == {"request_id": 1, "advance_to": 1}
+        mock_slot.assert_called_once_with(
+            "ὁ ἀγρός", 0, "ἀγρός", article=True, active_cases=gu._cfg.noun_cells, indefinite=False,
         )
 
     def test_article_false_passed_to_check_noun_slot(self, gu):
@@ -5454,7 +5516,7 @@ class TestAdjectiveParadigmDrillForm(_ParadigmDrillFormBase):
         )
         result = self._call(gu, state, self._VOCAB[0], _pdform([""]), restart_v=1)
         assert result == "*...*"
-        assert state["words"][2][0] == self._VOCAB
+        self._assert_same_words(state["words"][2][0], self._VOCAB)
         assert state["hist"][2][0] == []
         assert state["entered"][2][0] == {}
 
@@ -5485,6 +5547,20 @@ class TestAdjectiveParadigmDrillForm(_ParadigmDrillFormBase):
             self._call(gu, state, cv, form)
         assert form.widget.focus_request == {"request_id": 1, "advance_to": 1}
 
+    def test_adj_meta_omitted_falls_back_to_full_slots(self, gu):
+        # REGRESSION: adj_meta used to be a required kwarg -- any caller
+        # that forgot to compute/pass it crashed with TypeError the moment
+        # a student picked a word. Omitting it now degrades to the full,
+        # unfiltered per-mode slot list instead.
+        cv = self._VOCAB[0]
+        state = self._state()
+        form = _pdform(["καλός"] + [""] * 5, submit_count=1, enter_field_index=0)
+        with patch.object(gu, "check_adjective_slot", return_value=True) as mock_slot, \
+             patch.object(gu, "check_adjective_test", return_value=(False, "")):
+            self._call_form(gu.adjective_paradigm_drill_form, state, cv, form)
+        assert form.widget.focus_request == {"request_id": 1, "advance_to": 1}
+        mock_slot.assert_called_with(cv["form"], "simple", 0, "καλός", active_slots=gu._adj_slot_list("simple"))
+
     def test_next_button_persists_and_advances_regardless_of_correctness(self, gu):
         cv = self._VOCAB[0]
         state = self._state()
@@ -5503,6 +5579,31 @@ class TestAdjectiveParadigmDrillForm(_ParadigmDrillFormBase):
         assert result == "*...*"
         assert state["words"][2][0][0] == prev_word
         assert state["hist"][2][0] == []
+
+
+# ──────────────────────────────── pronoun_paradigm_drill_form ──
+
+class TestPronounParadigmDrillForm(_ParadigmDrillFormBase):
+    """Minimal coverage for the pron_meta=None fallback specifically --
+    the full Enter/check/next/prev/restart behavior is exercised in depth
+    by the verb/noun/adjective siblings above (all four share the same
+    _paradigm_drill_form engine); no need to re-duplicate that here.
+    """
+    _VOCAB = [{"form": "κανένας", "meaning": "no one"}, {"form": "ίδιος", "meaning": "same"}]
+
+    def test_pron_meta_omitted_falls_back_to_full_slots(self, gu):
+        # REGRESSION: pron_meta used to be a required kwarg -- any caller
+        # that forgot to compute/pass it crashed with TypeError the moment
+        # a student picked a word. Omitting it now degrades to the full,
+        # unfiltered per-mode slot list instead.
+        cv = self._VOCAB[0]
+        state = self._state()
+        form = _pdform(["κανένας"] + [""] * 5, submit_count=1, enter_field_index=0)
+        with patch.object(gu, "check_pronoun_slot", return_value=True) as mock_slot, \
+             patch.object(gu, "check_pronoun_test", return_value=(False, "")):
+            self._call_form(gu.pronoun_paradigm_drill_form, state, cv, form)
+        assert form.widget.focus_request == {"request_id": 1, "advance_to": 1}
+        mock_slot.assert_called_with(cv["form"], "simple", 0, "κανένας", active_slots=gu._pronoun_slot_list("simple"))
 
 
 # ──────────────────────────────── make_item_drill_rows use_diacritics ──

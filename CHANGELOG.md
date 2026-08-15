@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.7.3 - 2026-08-15
+- `verb_meta`/`noun_meta`/`adj_meta`/`pron_meta` (`*_paradigm_drill_form`)
+  are now optional (default `None`) instead of required keyword-only
+  arguments. A caller that omits one now gets the full, unfiltered slot/case
+  list for that word instead of `TypeError: missing 1 required keyword-only
+  argument`. This closed a real gap: the parameter has been required since
+  1.7.0, but a bug this same day showed 14 separate notebooks across 3
+  courses had been written (or copy-pasted from an older template) without
+  ever computing and passing it, crashing on first use. Reuses the existing
+  `getattr(X_meta, "...", None) or <full list>` fallback already used by
+  verb/adjective/pronoun. Adds one `*_meta_omitted_falls_back_to_full_*`
+  regression test per POS type (`TestPronounParadigmDrillForm` is new --
+  the other three already existed).
+- Fix a latent noun-only gap in the same fallback machinery: `noun_meta`'s
+  own fallback was `[]` (renders nothing) instead of `config.noun_cells`
+  (full list, matching the other three POS types), and noun's `make_cap`/
+  `slot_ok` additionally required `noun_meta is not None` to function at
+  all -- unlike its siblings, this silently disabled answer-checking
+  entirely whenever `noun_meta` was omitted, worse than a crash. Both fixed
+  to match verb/adjective/pronoun's existing behavior.
+- Fix `reset_paradigm_drill_state()` ("start over" button, shared by the
+  noun/verb/adjective/pronoun paradigm-drill tests) resetting the word queue
+  to its raw, unshuffled `vocab` order instead of a fresh `random.sample()`
+  shuffle like the initial load does. Reported live: a verb test always
+  showed words in table order after switching tense and pressing restart.
+  Adds `TestResetParadigmDrillState.test_reshuffles_on_restart`. Extracted
+  the shared `_shuffle()` helper (also used by the pre-existing
+  `_shuffle_start`) instead of inlining `random.sample(vocab, len(vocab))`
+  a second time.
+
 ## 1.7.2 - 2026-08-15
 - Add `pronoun-{en,ru,el}.tsv` slot-name label files (24 rows each: Case x
   Number x Gender for Nom/Gen/Acc/Voc x Sing/Plur x Masc/Fem/Neut), reusing
