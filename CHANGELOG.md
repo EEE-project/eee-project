@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.7.2 - 2026-08-15
+- Add `pronoun-{en,ru,el}.tsv` slot-name label files (24 rows each: Case x
+  Number x Gender for Nom/Gen/Acc/Voc x Sing/Plur x Masc/Fem/Neut), reusing
+  `adj-*.tsv`'s own verified label text for the matching grammatical
+  combinations. `get_slot_templates(..., pos="pronoun")` has always routed
+  through the same `pronoun-{lang}.tsv` lookup as every other pos, but the
+  file itself never existed -- every lookup silently fell through to the
+  English-only `_QUIZ_ADJ_GENDER`/`_QUIZ_ADJ_NUM` fallback, so
+  `pronoun_slot_labels()` showed identical unlocalized labels ("Neut Sg:")
+  in en/ru/el alike. Caught live in `ellinika_b/chapter_03`'s pronoun
+  drill. Adds `TestPronounSlotLabelsLang` (mirrors the existing
+  `TestAdjectiveSlotLabelsLang`) to cover en/ru/el localization plus the
+  no-`eee_module`/raw-tag-backend fallback cases.
+- Add an `all_forms_label` UI label (en/ru/el) and collapse
+  `_gendered_slot_names()` to it whenever `active_slots` narrows to exactly
+  one slot — an indeclinable word like κάτι/τίποτα has its entire tested
+  paradigm in a single neuter-singular cell, so labeling that one field
+  with its specific case/gender ("Nom. Sg. n.:") implied a fuller paradigm
+  existed just off-screen. Adds `test_single_active_slot_collapses_to_
+  all_forms_label`/`test_multiple_active_slots_unaffected` to
+  `TestPronounSlotLabelsLang`.
+
 ## 1.7.1 - 2026-08-14
 - Add `test4_heading`/`test4_done`/`pron_heading`/`select_pron`/
   `pron_not_found`/`pron_empty` UI labels (en/ru/el) — a 4th

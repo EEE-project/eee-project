@@ -8,6 +8,7 @@ select_verbs	### Select verbs to practice
 select_adjs	### Select adjectives to practice
 select_pron	### Select pronouns to practice
 translation_label	Translation:
+all_forms_label	All forms
 simple_noun_heading	**Simple noun test**
 article_noun_heading	**Noun test with articles**
 verb_heading	**Verb test**

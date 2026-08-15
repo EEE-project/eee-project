@@ -1,0 +1,25 @@
+Case	Number	Gender	label
+Nom	Sing	Masc	Ονομ. εν. αρ.
+Nom	Sing	Fem	Ονομ. εν. θηλ.
+Nom	Sing	Neut	Ονομ. εν. ουδ.
+Nom	Plur	Masc	Ονομ. πλ. αρ.
+Nom	Plur	Fem	Ονομ. πλ. θηλ.
+Nom	Plur	Neut	Ονομ. πλ. ουδ.
+Gen	Sing	Masc	Γεν. εν. αρ.
+Gen	Sing	Fem	Γεν. εν. θηλ.
+Gen	Sing	Neut	Γεν. εν. ουδ.
+Gen	Plur	Masc	Γεν. πλ. αρ.
+Gen	Plur	Fem	Γεν. πλ. θηλ.
+Gen	Plur	Neut	Γεν. πλ. ουδ.
+Acc	Sing	Masc	Αιτ. εν. αρ.
+Acc	Sing	Fem	Αιτ. εν. θηλ.
+Acc	Sing	Neut	Αιτ. εν. ουδ.
+Acc	Plur	Masc	Αιτ. πλ. αρ.
+Acc	Plur	Fem	Αιτ. πλ. θηλ.
+Acc	Plur	Neut	Αιτ. πλ. ουδ.
+Voc	Sing	Masc	Κλητ. εν. αρ.
+Voc	Sing	Fem	Κλητ. εν. θηλ.
+Voc	Sing	Neut	Κλητ. εν. ουδ.
+Voc	Plur	Masc	Κλητ. πλ. αρ.
+Voc	Plur	Fem	Κλητ. πλ. θηλ.
+Voc	Plur	Neut	Κλητ. πλ. ουδ.

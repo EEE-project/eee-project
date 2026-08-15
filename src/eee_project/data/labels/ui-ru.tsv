@@ -8,6 +8,7 @@ select_verbs	### Выберите глаголы для практики
 select_adjs	### Выберите прилагательные для практики
 select_pron	### Выберите местоимения для практики
 translation_label	Перевод:
+all_forms_label	Все формы
 simple_noun_heading	**Простой тест по существительным**
 article_noun_heading	**Тест по существительным с артиклями**
 verb_heading	**Тест по глаголам**

@@ -3159,9 +3159,18 @@ Translation: **{translation}**
         to the English quiz-label dicts for any slot the template doesn't
         cover. ``active_slots`` restricts the names to that subset, in that
         order — omit for the full, mode-derived list.
+
+        When ``active_slots`` narrows to exactly one slot (e.g. an
+        indeclinable word like κάτι/τίποτα, whose entire tested paradigm
+        is a single neuter-singular cell), labeling it with that one
+        specific case/gender/number implies a fuller paradigm exists just
+        off-screen, which isn't true -- returns the localized
+        ``all_forms_label`` instead in that case.
         """
-        cm = {c: c.title() for c in full_cases}
         fk = active_slots if active_slots is not None else self._gendered_slot_list(mode, full_cases)
+        if len(fk) == 1:
+            return [self.ui_label("all_forms_label", lang)]
+        cm = {c: c.title() for c in full_cases}
         by_feats = self._slot_label_index(pos, lang)
         names = []
         for g, n, c in fk:

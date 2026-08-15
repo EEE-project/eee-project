@@ -5347,6 +5347,86 @@ class TestPronounSlotLabels:
         assert len(labels) == len(slots)
 
 
+class TestPronounSlotLabelsLang:
+    """lang= localization specifically -- see TestAdjectiveSlotLabelsLang
+    above for the identical adjective-side pattern this mirrors.
+
+    REGRESSION: pronoun-{en,ru,el}.tsv did not exist at all until this
+    class was added -- adj-*.tsv/noun-*.tsv/verb-*.tsv/tense-*.tsv/ui-*.tsv
+    were all present, but pronoun's own label file was simply never
+    created, so every _slot_label_index("pronoun", lang) lookup missed
+    for every language (including "en") and silently fell through to
+    eee-project's own English-only _QUIZ_ADJ_GENDER/_QUIZ_ADJ_NUM dict --
+    identical labels in all three languages, caught live in the
+    ellinika_b/chapter_03 pronoun drill.
+    """
+
+    def _gu(self):
+        from modern_greek_backend_eee import ModernGreekBackend
+        be = ModernGreekBackend()
+        # eee_module=_eee (the eee_project module), not eee_module=be (the
+        # raw backend): get_slot_templates() -- all this class needed until
+        # the two active-slots tests below -- resolves on either, but
+        # _eee_forms()'s self._eee.inflect_slot(...) call only exists on
+        # the module. With eee_module=be that call raised AttributeError on
+        # every slot (caught, cached as an empty set), which pronoun_drill_
+        # meta's "no data at all" fallback then silently read as "every
+        # slot is real" -- always the full 6-slot static list regardless of
+        # word, masking the very narrowing test_single_active_slot_
+        # collapses_to_all_forms_label / test_multiple_active_slots_
+        # unaffected exist to check.
+        return GreekUtils(be, mo_module=_StubMo(), eee_module=_eee, config=MODERN_GREEK)
+
+    def test_simple_mode_lang_en(self):
+        gu = self._gu()
+        labels = gu.pronoun_slot_labels("simple")
+        assert labels[0] == "Nom. Sg. m.:"
+        assert labels[3] == "Nom. Pl. m.:"
+
+    def test_simple_mode_lang_ru(self):
+        gu = self._gu()
+        labels = gu.pronoun_slot_labels("simple", lang="ru")
+        assert labels[0] == "Именит. ед. м.:"
+
+    def test_simple_mode_lang_el(self):
+        gu = self._gu()
+        labels = gu.pronoun_slot_labels("simple", lang="el")
+        assert labels[0] == "Ονομ. εν. αρ.:"
+
+    def test_no_eee_module_falls_back_unchanged(self):
+        gu = GreekUtils(mo_module=_StubMo())
+        assert gu.pronoun_slot_labels("simple")[0] == "Masc Sg:"
+
+    def test_backend_without_real_labels_falls_back_not_raw_tag(self):
+        from ancient_greek_backend_eee import AncientGreekBackend
+        be = AncientGreekBackend()
+        gu = GreekUtils(be, mo_module=_StubMo(), eee_module=be, config=ANCIENT_GREEK)
+        labels = gu.pronoun_slot_labels("simple")
+        assert labels[0] == "Masc Sg:"
+        assert not any(lbl.startswith(".") for lbl in labels)
+
+    def test_single_active_slot_collapses_to_all_forms_label(self):
+        # κάτι/τίποτα-shaped indeclinables reduce to exactly one active
+        # slot (neut/sg/nom) -- labeling that one field with its specific
+        # case/gender implies a fuller paradigm exists just off-screen,
+        # which isn't true for a word with only ever one form. All three
+        # languages should show the generic all_forms_label instead.
+        gu = self._gu()
+        meta = gu.pronoun_drill_meta("κάτι", "simple")
+        assert meta.active_slots == [("neut", "sg", "nom")]
+        assert gu.pronoun_slot_labels("simple", lang="en", active_slots=meta.active_slots) == ["All forms:"]
+        assert gu.pronoun_slot_labels("simple", lang="ru", active_slots=meta.active_slots) == ["Все формы:"]
+        assert gu.pronoun_slot_labels("simple", lang="el", active_slots=meta.active_slots) == ["Όλοι οι τύποι:"]
+
+    def test_multiple_active_slots_unaffected(self):
+        # κανένας has 3 genuinely distinct forms (masc/fem/neut) -- must
+        # keep showing per-slot labels, not collapse.
+        gu = self._gu()
+        meta = gu.pronoun_drill_meta("κανένας", "simple")
+        labels = gu.pronoun_slot_labels("simple", lang="en", active_slots=meta.active_slots)
+        assert labels == ["Nom. Sg. m.:", "Nom. Sg. f.:", "Nom. Sg. n.:"]
+
+
 # ──────────────────────────────── adjective_paradigm_drill_form ──
 
 class TestAdjectiveParadigmDrillForm(_ParadigmDrillFormBase):

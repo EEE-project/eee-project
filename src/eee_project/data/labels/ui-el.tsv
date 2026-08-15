@@ -8,6 +8,7 @@ select_verbs	### Επιλογή ρημάτων για εξάσκηση
 select_adjs	### Επιλογή επιθέτων για εξάσκηση
 select_pron	### Επιλογή αντωνυμιών για εξάσκηση
 translation_label	Μετάφραση:
+all_forms_label	Όλοι οι τύποι
 simple_noun_heading	**Απλό τεστ ουσιαστικών**
 article_noun_heading	**Τεστ ουσιαστικών με άρθρα**
 verb_heading	**Τεστ ρημάτων**
