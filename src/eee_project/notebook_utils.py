@@ -2629,6 +2629,30 @@ class GreekUtils:
             )
         return None
 
+    def vocab_table(self, df, *, select_state=None, initial_selection=None):
+        """Build a full-page (``page_size=len(df)``, no pagination) multi-select
+        vocab table, or ``None`` if *df* is ``None``.
+
+        ``select_state``: an optional 0-arg getter (e.g. a state getter from
+        :meth:`make_paradigm_drill_state` or a hand-rolled ``mo.state()``
+        pair) returning the persisted selection, or ``None`` if nothing
+        persisted yet — in which case every row starts selected. Computes
+        ``len(df)`` once and reuses it for both ``page_size`` and the
+        select-all fallback, rather than each call site doing its own
+        ``list(range(len(df)))``.
+
+        ``initial_selection``: a plain pass-through for callers that don't
+        need persistence (e.g. leave both unset for nothing pre-selected).
+        Mutually exclusive with ``select_state``.
+        """
+        if df is None:
+            return None
+        n = len(df)
+        if select_state is not None:
+            sel = select_state()
+            initial_selection = sel if sel is not None else list(range(n))
+        return self._mo.ui.table(df, selection="multi", page_size=n, initial_selection=initial_selection)
+
     def get_words(self, table) -> list[dict]:
         if table is None:
             return []
@@ -5568,6 +5592,49 @@ Translation: **{translation}**
             meaning = str(r.get("Translation", "")).strip()
             result.append({"form": word, "meaning": meaning})
         return result
+
+    def load_vocab_table(
+        self, filename: str, *, nb_dir: Any, remote_base: "str | None" = None,
+        file_upload: Any = None, ru_variant: bool = False, language: "str | None" = None,
+    ) -> "Any | None":
+        """Load *filename* (a Word/Translation TSV) as a DataFrame for
+        :meth:`vocab_table`/``mo.ui.table`` selection — the sibling of
+        :meth:`load_vocab_tsv` for callers that need a raw DataFrame (table
+        display) rather than ``form``/``meaning`` word dicts (quiz
+        consumption); the two return shapes aren't interchangeable, hence
+        the separate method rather than a shared one.
+
+        Returns ``None`` (never raises) if no candidate file can be found
+        locally or fetched from *remote_base* — the contract every call site
+        already expected before this existed, so callers can show a
+        friendly "not found" message instead of crashing.
+
+        ``file_upload``: an optional ``mo.ui.file()`` widget — when its
+        ``.value`` is set, the uploaded file wins over the bundled one
+        entirely.
+
+        ``ru_variant``: when ``True`` and ``language == 'ru'``, try
+        ``"<stem>_ru.<ext>"`` first, falling back to *filename* if that
+        variant doesn't exist.
+        """
+        if file_upload is not None and file_upload.value:
+            return self.load_data(file_upload)
+
+        import pandas as _pd
+
+        candidates = [filename]
+        if ru_variant and language == 'ru':
+            stem, _, ext = filename.rpartition('.')
+            if stem:
+                candidates.insert(0, f'{stem}_ru.{ext}')
+
+        for candidate in candidates:
+            try:
+                path = self._resolve_tsv_path(candidate, nb_dir=nb_dir, remote_base=remote_base)
+            except FileNotFoundError:
+                continue
+            return _pd.read_csv(path, sep='\t')
+        return None
 
     def load_inflected_vocab_tsv(self, *filenames: str, nb_dir: Any, remote_base: "str | None" = None) -> "list[dict]":
         """Load one or more inflected-text vocab TSVs and return word dicts.

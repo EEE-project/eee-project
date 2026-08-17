@@ -5881,6 +5881,97 @@ class TestLoadVocabTsv:
         assert len(result) == 1
 
 
+# ──────────────────────────────────────── vocab_table ──
+
+class TestVocabTable:
+    def test_none_df_returns_none(self, gu_marimo):
+        assert gu_marimo.vocab_table(None) is None
+
+    def test_page_size_matches_row_count(self, gu_marimo):
+        import pandas as pd
+        df = pd.DataFrame({"Word": ["a", "b", "c"], "Translation": ["x", "y", "z"]})
+        table = gu_marimo.vocab_table(df)
+        assert table._component_args["page-size"] == 3
+
+    def test_no_select_state_no_initial_selection_selects_nothing(self, gu_marimo):
+        import pandas as pd
+        df = pd.DataFrame({"Word": ["a", "b"], "Translation": ["x", "y"]})
+        table = gu_marimo.vocab_table(df)
+        assert table.value.empty
+
+    def test_select_state_returning_none_selects_every_row(self, gu_marimo):
+        import pandas as pd
+        df = pd.DataFrame({"Word": ["a", "b", "c"], "Translation": ["x", "y", "z"]})
+        table = gu_marimo.vocab_table(df, select_state=lambda: None)
+        assert len(table.value) == 3
+
+    def test_select_state_returning_a_selection_is_used_as_is(self, gu_marimo):
+        import pandas as pd
+        df = pd.DataFrame({"Word": ["a", "b", "c"], "Translation": ["x", "y", "z"]})
+        table = gu_marimo.vocab_table(df, select_state=lambda: [1])
+        assert list(table.value["Word"]) == ["b"]
+
+    def test_initial_selection_passthrough_when_no_select_state(self, gu_marimo):
+        import pandas as pd
+        df = pd.DataFrame({"Word": ["a", "b", "c"], "Translation": ["x", "y", "z"]})
+        table = gu_marimo.vocab_table(df, initial_selection=[0, 2])
+        assert list(table.value["Word"]) == ["a", "c"]
+
+
+# ──────────────────────────────────── load_vocab_table ──
+
+class TestLoadVocabTable:
+    def test_basic_load(self, gu_marimo, tmp_path):
+        (tmp_path / "nouns.tsv").write_text("Word\tTranslation\nλύω\tloosen\n", encoding="utf-8")
+        df = gu_marimo.load_vocab_table("nouns.tsv", nb_dir=tmp_path)
+        assert list(df["Word"]) == ["λύω"]
+
+    def test_missing_no_remote_returns_none(self, gu_marimo, tmp_path):
+        assert gu_marimo.load_vocab_table("missing.tsv", nb_dir=tmp_path) is None
+
+    def test_missing_remote_fetch_fails_returns_none(self, gu_marimo, tmp_path):
+        with patch("urllib.request.urlopen", side_effect=Exception("net")):
+            result = gu_marimo.load_vocab_table("missing.tsv", nb_dir=tmp_path,
+                                                 remote_base="https://example.com")
+        assert result is None
+
+    def test_ru_variant_prefers_ru_file_when_language_ru(self, gu_marimo, tmp_path):
+        (tmp_path / "nouns.tsv").write_text("Word\tTranslation\nλύω\tloosen\n", encoding="utf-8")
+        (tmp_path / "nouns_ru.tsv").write_text("Word\tTranslation\nслово\tслово-en\n", encoding="utf-8")
+        df = gu_marimo.load_vocab_table("nouns.tsv", nb_dir=tmp_path, ru_variant=True, language="ru")
+        assert list(df["Word"]) == ["слово"]
+
+    def test_ru_variant_ignored_when_language_not_ru(self, gu_marimo, tmp_path):
+        (tmp_path / "nouns.tsv").write_text("Word\tTranslation\nλύω\tloosen\n", encoding="utf-8")
+        (tmp_path / "nouns_ru.tsv").write_text("Word\tTranslation\nслово\tслово-en\n", encoding="utf-8")
+        df = gu_marimo.load_vocab_table("nouns.tsv", nb_dir=tmp_path, ru_variant=True, language="en")
+        assert list(df["Word"]) == ["λύω"]
+
+    def test_ru_variant_falls_back_to_plain_when_ru_file_absent(self, gu_marimo, tmp_path):
+        (tmp_path / "nouns.tsv").write_text("Word\tTranslation\nλύω\tloosen\n", encoding="utf-8")
+        df = gu_marimo.load_vocab_table("nouns.tsv", nb_dir=tmp_path, ru_variant=True, language="ru")
+        assert list(df["Word"]) == ["λύω"]
+
+    def test_file_upload_overrides_bundled_file(self, tmp_path):
+        # load_data (called on the upload path) needs pd_module set, unlike
+        # the bundled-file path which imports pandas locally -- gu_marimo
+        # doesn't pass one, so this test builds its own instance.
+        import pandas as pd
+        gu = GreekUtils(mo_module=mo, pd_module=pd, config=ANCIENT_GREEK)
+        (tmp_path / "nouns.tsv").write_text("Word\tTranslation\nλύω\tloosen\n", encoding="utf-8")
+        upload = MagicMock()
+        upload.value = [MagicMock(contents="Word\tTranslation\nθεός\tgod\n".encode("utf-8"))]
+        df = gu.load_vocab_table("nouns.tsv", nb_dir=tmp_path, file_upload=upload)
+        assert list(df["Word"]) == ["θεός"]
+
+    def test_no_file_upload_value_uses_bundled_file(self, gu_marimo, tmp_path):
+        (tmp_path / "nouns.tsv").write_text("Word\tTranslation\nλύω\tloosen\n", encoding="utf-8")
+        upload = MagicMock()
+        upload.value = None
+        df = gu_marimo.load_vocab_table("nouns.tsv", nb_dir=tmp_path, file_upload=upload)
+        assert list(df["Word"]) == ["λύω"]
+
+
 # ──────────────────────────────── load_inflected_vocab_tsv ──
 
 class TestLoadInflectedVocabTsv:

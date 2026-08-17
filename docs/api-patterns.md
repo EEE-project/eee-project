@@ -587,6 +587,47 @@ and `word_quiz_feedback` shows a "form → lemma" arrow in that case instead of
 just the bare form. Don't "simplify" the vocab dict shape by dropping
 `lemma`/`context` from the contract — inflected-text vocab needs them.
 
+### Vocab selection table (`load_vocab_table` + `vocab_table`)
+
+For notebooks that show a vocab table the student **selects rows from**
+(paradigm-drill courses like ellinika_b — pick which nouns/verbs/adjectives
+to practice), rather than the flat word-quiz/word-drill flow above, use this
+pair instead — it works with a DataFrame, not the `form`/`meaning` dict
+shape:
+
+```python
+# load cell
+df_noun = gu.load_vocab_table(
+    "nouns.tsv", nb_dir=notebook_dir, remote_base=RAW_BASE,
+    ru_variant=True, language=language_selector.value,   # omit both for no ru variant
+)
+
+# table cell
+table_noun = gu.vocab_table(df_noun)
+```
+
+`load_vocab_table` is the DataFrame sibling of `load_vocab_tsv` — same
+`ensure_file`/local-then-remote resolution under the hood, but returns a raw
+DataFrame (or `None` if no candidate file can be found, never raising) for
+`mo.ui.table` display instead of `form`/`meaning` dicts. Pass `file_upload=`
+(an `mo.ui.file()` widget) if the notebook lets a student override the
+bundled TSV entirely; leave it unset for a fixed vocab table nothing can
+override. `ru_variant=True` with `language="ru"` tries
+`"<stem>_ru.<ext>"` first, falling back to *filename* when no such variant
+exists.
+
+`vocab_table` wraps `mo.ui.table(df, selection="multi", page_size=len(df),
+...)` — every row on one scrollable page, no pagination controls, since
+these tables are meant to be scanned/selected from as a whole, not paged
+through. Returns `None` when `df` is `None` (mirror the `nouns_not_found`-
+style fallback message pattern other tables use). Pass `select_state=` (a
+0-arg getter returning a persisted selection, or `None` if nothing's
+persisted yet) for a table whose selection should survive reactive re-runs
+— when the getter returns `None`, every row starts selected; when it
+returns a list, that list is used as-is. Leave `select_state` unset and
+pass `initial_selection=` directly for a plain pass-through (e.g. `None`
+for nothing pre-selected).
+
 **Vocab entry schema** (plain reference, not a `TypedDict` — see the note
 above for why `lemma`/`context` are optional rather than a design flaw):
 

@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.8.0 - 2026-08-17
+- Added `GreekUtils.vocab_table(df, *, select_state=None, initial_selection=None)`
+  — builds a full-page (`page_size=len(df)`, no pagination) multi-select
+  `mo.ui.table`, or `None` if `df` is `None`. `select_state` accepts an
+  optional 0-arg getter for a persisted selection (defaulting to every row
+  selected when nothing's persisted yet) and computes `len(df)` once,
+  reusing it for both `page_size` and the select-all fallback, instead of a
+  call site computing it twice. Extracted from `created_with_eee`, where
+  `page_size=len(df)` had been hand-inserted at 191 near-identical call
+  sites across every course notebook with no shared helper to call instead.
+- Added `GreekUtils.load_vocab_table(filename, *, nb_dir, remote_base=None,
+  file_upload=None, ru_variant=False, language=None)` — the DataFrame
+  sibling of `load_vocab_tsv` (which returns `form`/`meaning` word dicts for
+  quiz consumption, not a table-selection shape). Loads a bundled
+  Word/Translation TSV via the existing `ensure_file`/`_resolve_tsv_path`
+  local-then-remote resolution, with an optional `mo.ui.file()` upload
+  override and an optional `<stem>_ru.<ext>`-vs-plain-filename switch for
+  interfaces with a Russian variant. Returns `None` (never raises) when no
+  candidate can be found, matching the contract every `created_with_eee`
+  call site already hand-rolled around `ensure_file`/`pd.read_csv`.
+
 ## 1.7.3 - 2026-08-15
 - `verb_meta`/`noun_meta`/`adj_meta`/`pron_meta` (`*_paradigm_drill_form`)
   are now optional (default `None`) instead of required keyword-only
