@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.8.1 - 2026-08-18
+- Fixed pluralia-tantum noun checking (`check_noun_test`/`check_noun_slot`/
+  `noun_drill_meta`): a word stored in vocab TSVs as its own plural surface
+  form (e.g. `τα σκουπίδια` — the only sensible way to write a plural-only
+  noun) was being fed into the inflection backend as if that surface form
+  were the nominative-singular lemma needing inflection, for its own
+  `(pl, nom)` check. The backend has no way to know the input isn't a real
+  lemma and can match its ending against an unrelated declension pattern —
+  `σκουπίδια`'s `-ία` matched a `κυρία -> κυρίες`-style feminine paradigm,
+  fabricating `σκουπίδιες` as the "correct" plural and rejecting the
+  actually-correct `σκουπίδια` a student typed. Fixed by using the given
+  surface form directly for a pluralia-tantum noun's own `(pl, nom)` cell
+  instead of re-deriving it through the backend.
+  Also restored Accusative/Genitive Plural for **neuter** pluralia-tantum
+  nouns (article `τα`) instead of dropping them: Accusative is Nominative
+  verbatim (Modern Greek neuter nouns always have Nom = Acc = Voc, a
+  grammatical certainty, not a guess); Genitive is recovered via a
+  candidate singular lemma (stripping the plural's final vowel — the
+  `-ι/-ια` and `-ί/-ιά` classes both singularize this way) that's only
+  trusted once it round-trips (re-inflecting it for `(pl, nom)` must
+  reproduce the given surface form exactly) — confirmed safe against every
+  neuter pluralia-tantum word actually in a course TSV as of this fix
+  (`σκουπίδια`, `ρεβίθια`, `όσπρια`, `ζυμαρικά`, `γεμιστά`, `φασολάκια`,
+  `κοινόχρηστα`, `ψώνια`, `συγχαρητήρια`, `υδραυλικά`). **Masculine/feminine**
+  pluralia-tantum nouns (article `οι`) stay Nominative-Plural-only: checked
+  and found genuinely ambiguous (`κανόνες` round-trips against both
+  `κανόνας` and `κανόνα` but they disagree on genitive plural — `κανόνων`
+  vs `κανονών` — with no way to tell which is real from round-tripping
+  alone), so nothing is guessed for that case rather than risking a second
+  fabricated "correct" answer.
+
 ## 1.8.0 - 2026-08-17
 - Added `GreekUtils.vocab_table(df, *, select_state=None, initial_selection=None)`
   — builds a full-page (`page_size=len(df)`, no pagination) multi-select

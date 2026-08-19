@@ -4116,7 +4116,20 @@ class TestCreateNounTestUi:
         _, _, form = gu.create_noun_test_ui([self._WORD])
         assert form.test_word == "ὁ ἀγρός"
 
-    def test_active_cases_attribute_set(self, gu):
+    def test_active_cases_attribute_set(self):
+        # _StubBackend (this class's shared `gu` fixture) returns {} for
+        # every word, so "ὁ ἀγρός" would look pluralia tantum via the
+        # no-singular-data fallback -- but its article "ὁ" is a SINGULAR
+        # one, not a genuine plural marker, so active_cases now correctly
+        # comes back empty rather than trusting an unverified guess (same
+        # principle as the 2026-08-18 pluralia-tantum fix). Use a backend
+        # with real singular data instead, so this test verifies what it's
+        # actually meant to: a normal, well-formed word gets a non-empty
+        # active_cases via the ordinary (non-pluralia-tantum) path.
+        class _RealSingularBackend:
+            def paradigm(self, word, pos):
+                return {"masc": {"sg": {"nom": {word}}}}
+        gu = GreekUtils(_RealSingularBackend(), _RichMo(), config=ANCIENT_GREEK)
         _, _, form = gu.create_noun_test_ui([self._WORD])
         assert isinstance(form.active_cases, list)
         assert len(form.active_cases) > 0
@@ -4174,6 +4187,18 @@ class TestNounDrillMeta:
         assert meta.is_pluralia_tantum is True
         assert all(c[0] == 'pl' for c in meta.active_cases)
 
+    def test_pluralia_tantum_via_missing_data_but_non_plural_article_gets_no_cells(self, gu):
+        # "ὁ ἀγρός" against a backend with NO data at all: is_pluralia_tantum
+        # becomes True via the "no singular data" fallback, but "ὁ" is a
+        # SINGULAR article, not a genuine plural marker -- there's no real
+        # evidence nw is even shaped like a plural, so nothing is offered
+        # rather than trusting an unverified guess (same principle as the
+        # 2026-08-18 pluralia-tantum fix: never assert an answer that
+        # wasn't actually confirmed).
+        meta = gu.noun_drill_meta("ὁ ἀγρός")
+        assert meta.is_pluralia_tantum is True
+        assert meta.active_cases == []
+
     def test_excludes_cell_when_backend_form_is_blank(self):
         # A backend can return {''} for a cell it has no data for (a real,
         # deliberate sentinel -- e.g. modern-greek-inflexion-eee's
@@ -4188,6 +4213,132 @@ class TestNounDrillMeta:
         assert ('pl', 'gen') not in meta.active_cases
         assert ('pl', 'nom') in meta.active_cases
         assert meta.is_pluralia_tantum is False
+
+
+class TestPluraliaTantumNomPlUsesSurfaceForm:
+    """REGRESSION (2026-08-18): a pluralia-tantum noun's own (pl, nom)
+    check must use its TSV-given surface form directly, not re-derive it
+    through the backend as if that surface form were a lemma.
+    """
+
+    @pytest.fixture
+    def gu(self):
+        # 'σκουπίδι' -> the real paradigm. 'σκουπίδια' -> what the real
+        # backend actually does when handed the plural surface form as if
+        # it were itself a lemma (found 2026-08-18, created_with_eee
+        # chapter_07's "τα σκουπίδια"): matches its "-ία" ending like
+        # "κυρία -> κυρίες" and "inflects" from there, fabricating a wrong
+        # "plural of that".
+        backend = _FakeParadigmBackend({
+            ('σκουπίδι', 'noun'): {"neut": {"sg": {"nom": {"σκουπίδι"}},
+                                             "pl": {"nom": {"σκουπίδια"}, "acc": {"σκουπίδια"}, "gen": {"σκουπιδιών"}}}},
+            ('σκουπίδια', 'noun'): {"fem": {"sg": {"nom": {"σκουπίδια"}},
+                                             "pl": {"nom": {"σκουπίδιες"}, "acc": {"σκουπίδιες"}, "gen": {"σκουπιδιών"}}}},
+        })
+        return GreekUtils(backend, _RichMo(), config=MODERN_GREEK)
+
+    def test_active_cases_includes_neuter_acc_and_gen_plural(self, gu):
+        # Nom is always answerable (nw itself). Acc joins for free (Modern
+        # Greek neuter Nom = Acc = Voc always). Gen joins too because the
+        # stub's "σκουπίδι" candidate round-trips AND has real gen-plural
+        # data ("σκουπιδιών") -- see _noun_pt_genitive_plural.
+        _, _, form = gu.create_noun_test_ui([{"Word": "τα σκουπίδια", "Translation": "garbage"}])
+        assert form.is_pluralia_tantum is True
+        assert form.active_cases == [('pl', 'nom'), ('pl', 'acc'), ('pl', 'gen')]
+
+    def test_check_noun_test_accepts_all_three_correct_forms(self, gu):
+        word = "τα σκουπίδια"
+        _, _, form = gu.create_noun_test_ui([{"Word": word, "Translation": "garbage"}])
+        nom, acc, gen = list(form)
+        nom.value, acc.value, gen.value = "σκουπίδια", "σκουπίδια", "σκουπιδιών"
+        ok, feedback = gu.check_noun_test(word, form)
+        assert ok is True, feedback
+
+    def test_check_noun_test_rejects_the_backends_fabricated_nom(self, gu):
+        # Without the fix, "σκουπίδιες" (the backend's wrong guess) is what
+        # gets accepted instead -- assert the corrected checker no longer
+        # takes it, i.e. the real fabricated bug output is rejected too.
+        # Acc/Gen filled in correctly so only the Nom slot is under test.
+        word = "τα σκουπίδια"
+        _, _, form = gu.create_noun_test_ui([{"Word": word, "Translation": "garbage"}])
+        nom, acc, gen = list(form)
+        nom.value, acc.value, gen.value = "σκουπίδιες", "σκουπίδια", "σκουπιδιών"
+        ok, feedback = gu.check_noun_test(word, form)
+        assert ok is False
+        assert "must be **σκουπίδια**" in feedback  # states the real correct answer
+
+    def test_check_noun_slot_accepts_the_correct_surface_form(self, gu):
+        word = "τα σκουπίδια"
+        active_cases = [('pl', 'nom'), ('pl', 'acc'), ('pl', 'gen')]
+        assert gu.check_noun_slot(word, 0, "σκουπίδια", active_cases=active_cases) is True
+        assert gu.check_noun_slot(word, 1, "σκουπίδια", active_cases=active_cases) is True
+        assert gu.check_noun_slot(word, 2, "σκουπιδιών", active_cases=active_cases) is True
+
+    def test_check_noun_slot_rejects_the_backends_fabricated_form(self, gu):
+        word = "τα σκουπίδια"
+        active_cases = [('pl', 'nom'), ('pl', 'acc'), ('pl', 'gen')]
+        assert gu.check_noun_slot(word, 0, "σκουπίδιες", active_cases=active_cases) is False
+
+
+class TestPluraliaTantumMascFemNoGuessing:
+    """A masculine/feminine pluralia-tantum noun (article "οι") must stay
+    Nom-Pl-only -- its singular can't be safely recovered from the plural
+    the way a neuter one's can (see _noun_pt_genitive_plural's docstring).
+    """
+
+    @pytest.fixture
+    def gu(self):
+        # "κανόνες" round-trips against both a masculine ("κανόνας") and a
+        # feminine-shaped ("κανόνα") candidate singular, but the two
+        # disagree on genitive plural -- exactly the real case (2026-08-18)
+        # that rules out guessing a singular lemma for masculine/feminine
+        # pluralia-tantum nouns, unlike neuter ones.
+        backend = _FakeParadigmBackend({
+            ('κανόνας', 'noun'): {"masc": {"sg": {"nom": {"κανόνας"}},
+                                            "pl": {"nom": {"κανόνες"}, "acc": {"κανόνες"}, "gen": {"κανόνων"}}}},
+            ('κανόνα', 'noun'): {"fem": {"sg": {"nom": {"κανόνα"}},
+                                          "pl": {"nom": {"κανόνες"}, "acc": {"κανόνες"}, "gen": {"κανονών"}}}},
+        })
+        return GreekUtils(backend, _RichMo(), config=MODERN_GREEK)
+
+    def test_active_cases_stays_nom_only(self, gu):
+        _, _, form = gu.create_noun_test_ui([{"Word": "οι κανόνες", "Translation": "rules"}])
+        assert form.is_pluralia_tantum is True
+        assert form.active_cases == [('pl', 'nom')]
+
+
+class TestPluraliaTantumNeuterAccGeneralizesToAncientGreek:
+    """The (pl, acc) = (pl, nom) rule for neuter pluralia-tantum nouns
+    isn't Modern-Greek-specific -- Nom = Acc = Voc holds for any Greek
+    neuter noun, and _AG_ARTS's neuter table has the same article ("τά")
+    for both nom and acc. The genitive-plural candidate-lemma guess
+    (stripping a trailing vowel) IS Modern-Greek-shaped though, and
+    correctly does NOT fire here -- "ὅπλα" strips to "ὅπλ", not the real
+    singular "ὅπλον", so the round-trip check in _noun_pt_genitive_plural
+    fails and genitive plural is correctly left untested rather than
+    guessed wrong.
+    """
+
+    @pytest.fixture
+    def gu(self):
+        backend = _FakeParadigmBackend({
+            ('ὅπλον', 'noun'): {"neut": {"sg": {"nom": {"ὅπλον"}},
+                                          "pl": {"nom": {"ὅπλα"}, "acc": {"ὅπλα"}, "gen": {"ὅπλων"}}}},
+        })
+        return GreekUtils(backend, _RichMo(), config=ANCIENT_GREEK)
+
+    def test_active_cases_includes_acc_but_not_gen(self, gu):
+        _, _, form = gu.create_noun_test_ui([{"Word": "τά ὅπλα", "Translation": "weapons"}])
+        assert form.is_pluralia_tantum is True
+        assert form.active_cases == [('pl', 'nom'), ('pl', 'acc')]
+
+    def test_check_noun_test_accepts_the_correct_surface_form_for_both(self, gu):
+        word = "τά ὅπλα"
+        _, _, form = gu.create_noun_test_ui([{"Word": word, "Translation": "weapons"}])
+        nom, acc = list(form)
+        nom.value, acc.value = "ὅπλα", "ὅπλα"
+        ok, feedback = gu.check_noun_test(word, form)
+        assert ok is True, feedback
 
 
 class TestNounSlotLabels:

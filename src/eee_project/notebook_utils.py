@@ -2465,6 +2465,123 @@ class GreekUtils:
             result |= p.get(g, {}).get(num, {}).get(case, set())
         return result
 
+    def _noun_pt_gender(self, na: "str | None") -> "str | None":
+        """Gender of a pluralia-tantum noun's own plural article *na*
+        (e.g. "τα" -> "neut"), or ``None`` if *na* isn't a configured
+        plural article at all. Unlike :meth:`_noun_gender_from_article`
+        (which matches SINGULAR article tables, for a normal noun's own
+        lemma-with-article), this matches PLURAL tables -- pluralia-tantum
+        entries are stored as ``ARTICLE PLURAL-FORM``, never singular.
+        """
+        if na is None:
+            return None
+        for g, g_arts in (self._cfg.articles or {}).items():
+            if na in g_arts.get('pl', {}).get('nom', set()):
+                return g
+        return None
+
+    def _noun_pt_candidate_lemma(self, nw: str) -> "str | None":
+        """A candidate true singular lemma for a neuter pluralia-tantum
+        noun's own plural surface form, by stripping its final vowel --
+        the -ι/-ια and -ί/-ιά declension classes both singularize this
+        way (e.g. "σκουπίδια" -> "σκουπίδι", "γυαλιά" -> "γυαλί"). This is
+        a GUESS, never trusted on its own -- see
+        :meth:`_noun_pt_genitive_plural`, the only caller, which requires
+        it to round-trip before using it for anything.
+        """
+        if len(nw) > 1 and nw[-1] in ('α', 'ά'):
+            return nw[:-1]
+        return None
+
+    def _noun_pt_genitive_plural(self, nw: str) -> set:
+        """Genitive plural for a neuter pluralia-tantum noun, recovered
+        via its candidate singular lemma (:meth:`_noun_pt_candidate_lemma`)
+        -- but ONLY trusted once validated: re-inflecting the candidate
+        for (pl, nom) must reproduce nw exactly, confirmed against the
+        real backend for every neuter pluralia-tantum word actually in
+        use (2026-08-18) before shipping this. Masculine/feminine
+        pluralia-tantum nouns never reach this path (see
+        :meth:`_noun_pt_active_cases`) -- checked separately and found
+        genuinely ambiguous: "κανόνες" round-trips against both "κανόνας"
+        (masc) and "κανόνα" (fem-shaped) equally, but the two disagree on
+        genitive plural (κανόνων vs κανονών), so a round-trip check alone
+        can't tell which is real for that gender.
+        Returns an empty set (never a guess) when the candidate can't be
+        validated, or the backend has no genitive-plural data for it
+        (the same "no data for this cell" signal any other noun gets).
+        """
+        candidate = self._noun_pt_candidate_lemma(nw)
+        if candidate is None or nw not in self._noun_forms(candidate, 'pl', 'nom'):
+            return set()
+        return self._noun_forms(candidate, 'pl', 'gen')
+
+    def _noun_pt_cell_values(self, parts: "list[str]", nw: str) -> dict:
+        """Which plural cells a pluralia-tantum noun's own plural surface
+        form can safely answer, and the answer for each -- single source of
+        truth for both :meth:`_noun_pt_active_cases` (which cells to offer
+        a student) and :meth:`_noun_correct_answer` (what to accept for
+        one), so the two can never drift out of sync with each other.
+
+        (pl, nom) always -- nw IS that answer verbatim. (pl, acc) too when
+        neuter: Nom = Acc = Voc always holds for a neuter noun, a
+        grammatical certainty rather than a guess -- true in both
+        MODERN_GREEK's and ANCIENT_GREEK's article config (`_AG_ARTS`'s
+        neuter table has the same "τά" for both nom and acc), so this isn't
+        Modern-Greek-specific despite every pluralia-tantum noun tested so
+        far being Modern Greek. (pl, gen) too when neuter AND a validated
+        singular-lemma candidate has real genitive-plural data (see
+        :meth:`_noun_pt_genitive_plural`). Masculine/feminine
+        pluralia-tantum nouns (article "οι") get only (pl, nom): their
+        singular can't be safely recovered from the plural alone (see
+        :meth:`_noun_pt_genitive_plural`'s "κανόνες" docstring example).
+        Empty when *parts[0]* isn't a configured plural article at all --
+        nw is only trustworthy as a verbatim answer for a word actually
+        marked plural by its own article; a regular noun's plural cells
+        (queried the normal way, via the config's singular lemma) must
+        fall through to :meth:`_noun_forms` instead, same as before this
+        method existed.
+        """
+        na = parts[0].strip() if len(parts) > 1 else None
+        gender = self._noun_pt_gender(na)
+        if gender is None:
+            return {}
+        cells = {('pl', 'nom'): {nw}}
+        if gender == 'neut':
+            cells[('pl', 'acc')] = {nw}
+            gen = self._noun_pt_genitive_plural(nw)
+            if any(gen):
+                cells[('pl', 'gen')] = gen
+        return cells
+
+    def _noun_pt_active_cases(self, parts: "list[str]", nw: str) -> list:
+        """Which plural cells to offer a student for a pluralia-tantum
+        noun -- see :meth:`_noun_pt_cell_values`."""
+        return list(self._noun_pt_cell_values(parts, nw).keys())
+
+    def _noun_correct_answer(self, parts: "list[str]", nw: str, num: str, case: str) -> set:
+        """Correct-answer set for one noun-form slot.
+
+        For a pluralia-tantum entry (the TSV stores the word as its own
+        plural surface form, e.g. "τα σκουπίδια" -- the only sensible way
+        to write a plural-only noun), feeding nw into the backend as if it
+        needed inflecting from a lemma misclassifies its ending against an
+        unrelated paradigm instead -- confirmed 2026-08-18: "σκουπίδια"'s
+        "-ία" ending matched a "κυρία -> κυρίες"-style feminine pattern,
+        fabricating "σκουπίδιες" as the "correct" plural and rejecting the
+        actually-correct "σκουπίδια" a student typed. :meth:`_noun_pt_cell_values`
+        gives the safe answer for the handful of cells a pluralia-tantum
+        noun can answer about itself; this method answers whichever cell
+        it's asked about regardless of what a caller's active_cases says,
+        so it stays correct even if that fell out of sync. Every other
+        cell (non-pluralia-tantum, or pl/acc & pl/gen for a masc/fem
+        pluralia-tantum noun) falls through to the normal backend lookup.
+        """
+        if num == 'pl' and len(parts) > 1:
+            value = self._noun_pt_cell_values(parts, nw).get((num, case))
+            if value is not None:
+                return value
+        return self._noun_forms(nw, num, case)
+
     def _noun_forms_gender(self, word: str, num: str, case: str, gender: str) -> set:
         forms = self._eee_forms(word, "noun", {
             "Case": _CASE[case], "Number": _NUM[num], "Gender": _GENDER[gender]})
@@ -2756,14 +2873,20 @@ class GreekUtils:
         nw = parts[1].strip() if len(parts) > 1 else word.strip()
         na = parts[0].strip() if len(parts) > 1 else None
         noun_cells = self._cfg.noun_cells
-        pl_cells = [c for c in noun_cells if c[0] == 'pl']
         _sg_nom_forms = self._noun_forms(nw, 'sg', 'nom')
         is_pt = (
             (na is not None and na in self._plural_articles()) or
             not any(_sg_nom_forms)
         )
         active_cases = (
-            pl_cells if is_pt else
+            # See _noun_pt_active_cases: always (pl, nom); (pl, acc) too
+            # when neuter (Nom = Acc = Voc always, not a guess); (pl, gen)
+            # too when neuter AND a validated singular-lemma candidate has
+            # real data. Never guessed blind (bug found 2026-08-18 —
+            # feeding nw itself into the backend for these cells
+            # misclassifies its ending against an unrelated paradigm
+            # instead, e.g. "σκουπίδια" -> "σκουπίδιες").
+            self._noun_pt_active_cases(parts, nw) if is_pt else
             # noun_cells[0] is always ('sg', 'nom') — reuse _sg_nom_forms
             # instead of re-querying it (it's truthy here, since is_pt is False)
             [noun_cells[0]] + [c for c in noun_cells[1:] if any(self._noun_forms(nw, c[0], c[1]))]
@@ -2898,8 +3021,7 @@ class GreekUtils:
         ac = getattr(noun_form, 'active_cases', None)
         noun_cells = self._cfg.noun_cells
         if not isinstance(ac, list):
-            pl_cells = [list(c) for c in noun_cells if c[0] == 'pl']
-            ac = pl_cells if is_pt else [list(c) for c in noun_cells]
+            ac = [list(c) for c in self._noun_pt_active_cases(parts, nw)] if is_pt else [list(c) for c in noun_cells]
         arts = self._cfg.articles
         indef_arts = self._cfg.indef_articles
         _detected_genders = self._noun_gender_from_article(parts)
@@ -2912,7 +3034,7 @@ class GreekUtils:
                 return False, []
             ws = val.split()
             uw, ua = ws[-1].strip(), (ws[0].strip() if len(ws) > 1 else None)
-            correct = self._noun_forms(nw, num, case)
+            correct = self._noun_correct_answer(parts, nw, num, case)
             correct_arts: set = set()
             if art_table is not None:
                 for g in _genders_at(num, case):
@@ -2968,7 +3090,7 @@ class GreekUtils:
             return False
         ws = val.split()
         uw, ua = ws[-1].strip(), (ws[0].strip() if len(ws) > 1 else None)
-        if not self._ci(uw, self._noun_forms(nw, num, case)):
+        if not self._ci(uw, self._noun_correct_answer(parts, nw, num, case)):
             return False
         if not require_art or not art_table:
             return True
