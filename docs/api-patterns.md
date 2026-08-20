@@ -975,6 +975,69 @@ Enter comes back (correct → advance focus to the next field; wrong or last
 field → just unlocks) — this recipe implements the reply side of that
 protocol correctly, unlike Pattern C's raw `make_paradigm_form` recipe.
 
+#### Retry-mistakes mode (optional, all POS, 1.9.0+)
+
+Opt-in per-word wrong-answer tracking plus a button that restarts the round
+over just the words missed. One more state call, one more (own) cell, and
+four more kwargs on the Cell 3 call — everything above is unchanged if you
+don't wire this in.
+
+```python
+# Cell 1b — alongside make_paradigm_drill_state, same cell or a new one
+errors, set_errors, retry_cnt, set_retry_cnt = gu.make_error_tracking_state()
+```
+
+```python
+# New cell, placed after check_btn's cell — own cell for the same reason
+# check_btn is: errors() changes on every wrong attempt, and bundling this
+# into the form-building cell would rebuild form from scratch (losing
+# whatever the student just typed) on every mistake.
+retry_btn = gu.retry_mistakes_button(errors(), lang=lang)
+```
+
+```python
+# Cell 3 — same call as above, four more kwargs
+gu.verb_paradigm_drill_form(
+    words, set_words, hist, set_hist, msg, set_msg, cap, set_cap,
+    entered, set_entered, sub_cnt, set_sub_cnt, prev_cnt, set_prev_cnt,
+    nxt_cnt, set_nxt_cnt, entercnt, set_entercnt, restart_cnt, set_restart_cnt,
+    cv, form, check_btn, prev_btn, nxt_btn, restart_btn,
+    vocab=VERBS, verb_meta=verb_meta, tense=tense, title="## Упражнение 5",
+    get_errors=errors, set_errors=set_errors,
+    get_retry_cnt=retry_cnt, set_retry_cnt=set_retry_cnt, retry_btn=retry_btn,
+)
+```
+
+A wrong attempt — a wrong Check click or a wrong per-field Enter — increments
+that word's count in `errors` (a `{word: count}` dict); an empty attempt
+never counts. Scoped to "this round": the whole dict clears when a new round
+starts (restart or retry-click) but not mid-round, so a mistake later
+self-corrected within the same round still counts and stays retry-eligible.
+`retry_mistakes_button` disables itself when `errors` is empty. Clicking it
+starts a fresh round over exactly the words with a nonzero count — same
+shuffling/history/progress machinery as a normal restart, just over a
+smaller vocab. An error-count indicator (`❌ N`) appears next to the
+progress line once nonzero, and as `❌ words-with-a-mistake /
+this-round's-size` on the done screen, next to the retry button.
+
+`get_errors`/`set_errors`/`get_retry_cnt`/`set_retry_cnt`/`retry_btn` are all
+`None` by default — omit all five and the drill behaves exactly as it did
+before 1.9.0. Noun/adjective/pronoun take the identical five kwargs on their
+own `*_paradigm_drill_form` calls.
+
+#### `lang` on the Cell 3 call (1.9.0+)
+
+All four `*_paradigm_drill_form` calls also take `lang: str = "ru"` — pass
+the notebook's own `language_selector.value`. It only affects the wrong-
+answer feedback text built by `check_verb_test`/`check_noun_test`/
+`check_adjective_test`/`check_pronoun_test` ("entered ..., must be ...", the
+noun checker's "article missing"/"noun ..." variants, etc.) — it does
+*not* touch `meaning_label`/`title`/`done_message`, which stay caller-
+supplied per-call the same as before. Before 1.9.0 this text was always
+English regardless of the notebook's language; omitting `lang` now degrades
+to Russian (matching this library's own default elsewhere), not English —
+pass it explicitly for an EN/EL notebook.
+
 ---
 
 ### Ancient Greek paradigm tables (Odyssey-style)

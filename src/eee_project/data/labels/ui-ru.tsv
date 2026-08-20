@@ -23,6 +23,34 @@ tense_label	Выбрать время:
 mode_label	Режим теста:
 indefinite_label	Также с неопределённым артиклем
 check_label	Проверить
+next_label	Следующее
+prev_label	Предыдущее
+restart_label	Начать заново
+retry_label	Ошибки
+footer_label	Исходный код:
+quiz_form_label	Форма в тексте:
+quiz_done_message	🎉 Все слова пройдены! Нажмите «{btn}» для повтора.
+quiz_correct_label	Верно:
+quiz_progress_correct	правильно
+quiz_pos_noun	сущ.
+quiz_pos_verb	глаг.
+quiz_pos_adj	прил.
+quiz_pos_adv	нар.
+quiz_right_mark	✓ Верно!
+quiz_wrong_mark	✗ Нет. Правильно:
+quiz_incorrect_label	✗ Неверно. Правильно:
+write_placeholder	греческое слово…
+nav_next_label	Следующий
+nav_again_label	Пройти снова
+nav_prev_label	Предыдущий
+stanza_match_grc_to_tr	Выберите перевод, соответствующий этой строфе:
+stanza_match_tr_to_grc	Выберите строфу на греческом, соответствующую этому переводу:
+yes_label	да
+no_label	нет
+presence_label	Отражено ли это слово в переводе?
+presence_empty_label	Пока нет проверенных пар «слово × перевод» — заполните столбец `reflected` (yes/no) в translation_presence.tsv.
+presence_source_label	оригинал
+presence_switch_label	Показать оригинал вместо перевода
 def_prefix	Опр.
 indef_prefix	Неопр.
 nouns_not_found	_nouns.tsv не найден — загрузите файл._
@@ -53,3 +81,41 @@ noun_done	Готово — все существительные отработ�
 adj_done	Готово — все прилагательные отработаны!
 pron_done	Готово — все местоимения отработаны!
 word_label	Слово
+renew_label	↺ Новый набор
+ictus_note_label	Икты (ударные слоги) каждой стопы выделены {color_html}.
+homer_lexicon_note	Слова из гомеровского лексикона, для которых движок EEE строит таблицы словоформ по разным периодам греческого языка.
+eee_engine_accordion_label	О морфологическом движке EEE
+gloss_panel_empty	*Выберите слово в тексте, чтобы увидеть перевод и формы слов из гомеровскго лексикона…*
+gloss_panel_era_caption	*Формы слова по эпохам — только простейшее морфологическое соответствие по леммам, смысл может меняться*
+word_missing_in_paradigm	{word} — отсутствует в парадигме {lemma}
+card_list_soon	скоро
+card_list_load_error	Не удалось загрузить файл: {url}<br><br>Проверьте, что он доступен по этой ссылке.
+word_list_empty_for	Список слов для «{title}» пуст.
+check_entered_must_be	введено **"{value}"**, должно быть **{expected}**
+verb_check_write_with	Пишите с **"{prefix}"**
+noun_check_article_missing	отсутствует артикль, должен быть **{expected}**
+noun_check_article_wrong	артикль **"{value}"**, должен быть **{expected}**
+noun_check_wrong	существительное **"{value}"**, должно быть **{expected}**
+gendered_check_empty	Заполните хотя бы одну форму рода
+adjective_test_title	Тест: Склонение прилагательного
+adjective_test_empty	Список слов для теста прилагательных пуст.
+unknown_tense_error	Неизвестное время «{tense}»
+unknown_label	неизвестно
+grc_tense_pai	Наст.
+grc_tense_iai	Имп.
+grc_tense_aai	Аор.
+grc_tense_ami	Аор. М.
+grc_tense_api	Аор. П.
+grc_tense_xai	Перф.
+grc_tense_yai	Плюскв.
+grc_default_caption	древнегреческий
+el_verb_col_pres	Наст.
+el_verb_col_impf	Имперф.
+el_verb_col_aor	Аор.
+el_verb_col_fut	Буд.
+el_verb_col_fut_cont	Буд. дл.
+el_verb_col_subj	Сосл.
+el_verb_col_imp	Повел.
+el_voice_cap_act	действ.
+el_voice_cap_pass	страд.
+el_default_caption	новогреческий

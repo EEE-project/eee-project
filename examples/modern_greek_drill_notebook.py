@@ -391,6 +391,7 @@ def _(
             tense=tense_selector.value,
             meaning_label=_meaning_label,
             done_message=t_ui("verb_done", _lang),
+            lang=_lang,
         )
     elif pos_selector.value == "noun":
         out = gu.noun_paradigm_drill_form(
@@ -406,6 +407,7 @@ def _(
             indefinite=indefinite_toggle.value,
             meaning_label=_meaning_label,
             done_message=t_ui("noun_done", _lang),
+            lang=_lang,
         )
     elif pos_selector.value == "adjective":
         out = gu.adjective_paradigm_drill_form(
@@ -420,6 +422,7 @@ def _(
             mode=adj_mode,
             meaning_label=_meaning_label,
             done_message=t_ui("adj_done", _lang),
+            lang=_lang,
         )
     elif pos_selector.value == "pronoun":
         out = gu.pronoun_paradigm_drill_form(
@@ -434,6 +437,7 @@ def _(
             mode=adj_mode,
             meaning_label=_meaning_label,
             done_message=t_ui("pron_done", _lang),
+            lang=_lang,
         )
     out
     return

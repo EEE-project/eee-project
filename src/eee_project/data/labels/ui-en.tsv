@@ -23,6 +23,34 @@ tense_label	Select tense:
 mode_label	Test mode:
 indefinite_label	Also test indefinite article
 check_label	Check
+next_label	Next ▸
+prev_label	◂ Prev
+restart_label	↺ Start over
+retry_label	Errors
+footer_label	Source:
+quiz_form_label	Form in text:
+quiz_done_message	🎉 All words done! Press «{btn}» to repeat.
+quiz_correct_label	Correct:
+quiz_progress_correct	correct
+quiz_pos_noun	n.
+quiz_pos_verb	v.
+quiz_pos_adj	adj.
+quiz_pos_adv	adv.
+quiz_right_mark	✓ Correct!
+quiz_wrong_mark	✗ No. Correct form:
+quiz_incorrect_label	✗ Incorrect. Correct answer:
+write_placeholder	Greek word…
+nav_next_label	Next
+nav_again_label	Again
+nav_prev_label	Prev
+stanza_match_grc_to_tr	Choose the translation matching this stanza:
+stanza_match_tr_to_grc	Choose the Greek stanza matching this translation:
+yes_label	yes
+no_label	no
+presence_label	Is the word reflected in this translation?
+presence_empty_label	No reviewed word × translation pairs yet — fill in the `reflected` (yes/no) column in translation_presence.tsv.
+presence_source_label	original
+presence_switch_label	Show the original instead of the translation
 def_prefix	Def.
 indef_prefix	Ind.
 nouns_not_found	_nouns.tsv not found — upload a file to begin._
@@ -53,3 +81,41 @@ noun_done	Done — every noun drilled!
 adj_done	Done — every adjective drilled!
 pron_done	Done — every pronoun drilled!
 word_label	Word
+renew_label	↺ New set
+ictus_note_label	Ictus (stressed syllables) of each foot are highlighted in {color_html}.
+homer_lexicon_note	Words from the Homeric lexicon, for which the EEE engine builds word-form tables across different periods of the Greek language.
+eee_engine_accordion_label	About the EEE morphological engine
+gloss_panel_empty	*Select a word in the text to see its translation and word forms from the Homeric lexicon…*
+gloss_panel_era_caption	*Word forms by era — only the simplest morphological correspondence by lemma, meaning may vary*
+word_missing_in_paradigm	{word} — missing in the paradigm of {lemma}
+card_list_soon	coming soon
+card_list_load_error	Couldn't load file: {url}<br><br>Check that it's accessible at that link.
+word_list_empty_for	The word list for {title} is empty.
+check_entered_must_be	entered **"{value}"**, must be **{expected}**
+verb_check_write_with	Write with **"{prefix}"**
+noun_check_article_missing	article missing, must be **{expected}**
+noun_check_article_wrong	article **"{value}"**, must be **{expected}**
+noun_check_wrong	noun **"{value}"**, must be **{expected}**
+gendered_check_empty	Please fill in at least one gender form
+adjective_test_title	Test: Adjective Declension
+adjective_test_empty	The word list for adjective test is empty.
+unknown_tense_error	Unknown tense '{tense}'
+unknown_label	unknown
+grc_tense_pai	Pres.
+grc_tense_iai	Impf.
+grc_tense_aai	Aor.
+grc_tense_ami	Aor. Mid.
+grc_tense_api	Aor. Pass.
+grc_tense_xai	Perf.
+grc_tense_yai	Pqp.
+grc_default_caption	ancient-greek
+el_verb_col_pres	Pres.
+el_verb_col_impf	Impf.
+el_verb_col_aor	Aor.
+el_verb_col_fut	Fut.
+el_verb_col_fut_cont	Fut. cont.
+el_verb_col_subj	Subj.
+el_verb_col_imp	Imp.
+el_voice_cap_act	act.
+el_voice_cap_pass	pass.
+el_default_caption	modern-greek

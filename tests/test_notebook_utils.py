@@ -50,6 +50,12 @@ from eee_project.notebook_utils import (
     _cors_safe_raw_url,
     _fetch_url_bytes,
     _fetch_url_bytes_async,
+    _UI_LABELS,
+    _UI_LANGS,
+    _load_ui_labels,
+    _GRC_TCOL,
+    _EL_VERB_COL_LBL,
+    _EL_VOICE_CAP,
 )
 from conftest import StubMo as _StubMo, StubBackend as _StubBackend, StubMoLayout as _StubMoLayout
 
@@ -210,6 +216,34 @@ class TestModernParadigmTable:
         # than a table repeating the same word 8 times.
         html = self._bt()({"lemma": "πού", "form": "πού", "pos": "pronoun"})
         assert html is None
+
+    def test_noun_case_labels_lang_en(self):
+        # lang used to be accepted and silently ignored -- table labels
+        # were hardcoded Russian regardless of what was passed.
+        html = self._bt()({"lemma": "ἄνθρωπος", "form": "ἄνθρωπος", "pos": "noun"}, lang="en")
+        assert html and "Nom." in html and "Gen." in html
+        assert "Им." not in html and "Род." not in html
+
+    def test_verb_voice_caption_lang_en(self):
+        html = self._bt()({"lemma": "γράφω", "form": "γράφω", "pos": "verb"}, lang="en")
+        assert html and "act." in html and "pass." in html
+        assert "действ." not in html and "страд." not in html
+        assert "θα γράψω" in html  # particle/form content itself is language-independent
+
+    def test_verb_tense_column_labels_lang_el(self):
+        html = self._bt()({"lemma": "γράφω", "form": "γράφω", "pos": "verb"}, lang="el")
+        assert html and "Ενεστ." in html  # present
+        assert "Наст." not in html
+
+    def test_default_caption_is_localized_not_fixed_english(self):
+        # Companion to the grc-side test of the same name: the fallback
+        # table caption (no _cap passed) must vary with lang, not stay
+        # fixed at one language regardless of what's requested.
+        bt = self._bt()
+        html_ru = bt({"lemma": "ἄνθρωπος", "form": "ἄνθρωπος", "pos": "noun"})
+        html_en = bt({"lemma": "ἄνθρωπος", "form": "ἄνθρωπος", "pos": "noun"}, lang="en")
+        assert html_ru and "новогреческий" in html_ru and "modern-greek" not in html_ru
+        assert html_en and "modern-greek" in html_en
 
 
 # ──────────────────────────── Modern rung in build_grc_lexicon_tabs ──
@@ -805,26 +839,36 @@ class TestUiLabel:
         gu = GreekUtils(mo_module=_StubMo())
         assert gu.ui_label('not_a_real_key', 'en') == 'not_a_real_key'
 
-    def test_all_50_keys_present_in_all_3_languages(self):
+    def test_load_ui_labels_discovers_languages_by_filename(self):
+        # _load_ui_labels globs data/labels/ui-*.tsv rather than a fixed
+        # ("en", "ru", "el") tuple -- a new language needs only a new file.
+        labels = _load_ui_labels()
+        assert {lang for entry in labels.values() for lang in entry} == {'en', 'ru', 'el'}
+
+    def test_grc_el_compound_dicts_track_ui_langs_not_a_fixed_literal(self):
+        # _GRC_TCOL/_EL_VERB_COL_LBL/_EL_VOICE_CAP (built via the shared
+        # _lang_map() helper) iterate _UI_LANGS (itself derived from
+        # whichever ui-*.tsv files exist -- see the test above), not a
+        # hardcoded ("en", "ru", "el") tuple. So dropping in ui-fr.tsv with
+        # their same keys would add "fr" to all three with no source
+        # change -- proven here by construction, not by re-importing the
+        # module with a 4th file on disk. The sibling default-caption
+        # strings (grc_default_caption/el_default_caption) have the same
+        # property for free -- they're plain _ui_label() calls, not a
+        # cached dict, so there's no separate structure to check here.
+        assert _UI_LANGS == sorted(_UI_LANGS)  # base assumption the dicts below rely on
+        for name, d in (("_GRC_TCOL", _GRC_TCOL), ("_EL_VERB_COL_LBL", _EL_VERB_COL_LBL),
+                        ("_EL_VOICE_CAP", _EL_VOICE_CAP)):
+            assert set(d.keys()) == set(_UI_LANGS), f"{name} has a fixed language set, not derived from _UI_LANGS"
+
+    def test_every_known_key_present_in_all_3_languages(self):
         # regression: guards against a TSV row silently dropped for one
         # language during a future edit -- every key must resolve in en/ru/el.
+        # Iterates _UI_LABELS itself (not a hand-copied key list) so a newly
+        # added key is covered automatically, with nothing to keep in sync.
         gu = GreekUtils(mo_module=_StubMo())
-        keys = [
-            'test1_heading', 'test2_heading', 'test3_heading', 'test4_heading',
-            'select_nouns', 'select_verbs', 'select_adjs', 'select_pron', 'translation_label',
-            'simple_noun_heading', 'article_noun_heading', 'verb_heading', 'adj_heading', 'pron_heading',
-            'noun_empty', 'verb_empty', 'verb_no_tense', 'adj_empty', 'pron_empty',
-            'tense_label', 'mode_label', 'indefinite_label', 'check_label',
-            'def_prefix', 'indef_prefix',
-            'nouns_not_found', 'verbs_not_found', 'adjs_not_found', 'pron_not_found',
-            'test1_done', 'test2_done', 'test3_done', 'test4_done',
-            'poem_section_heading', 'vocabulary_heading',
-            'test_label', 'presence_test_topic', 'noun_test_topic', 'verb_test_topic', 'adj_test_topic',
-            'drill_title', 'drill_description', 'pos_label', 'load_tsv_label',
-            'require_article_label', 'full_paradigm_label',
-            'verb_done', 'noun_done', 'adj_done', 'word_label',
-        ]
-        for key in keys:
+        assert len(_UI_LABELS) >= 80  # sanity: catches a broken loader returning {}
+        for key in _UI_LABELS:
             for lang in ('en', 'ru', 'el'):
                 label = gu.ui_label(key, lang)
                 assert label != key, f"{key!r} missing a real {lang} label (echoed the key back)"
@@ -2169,6 +2213,14 @@ class TestMakeRenewButton:
         btn = gu_form.make_renew_button()
         assert btn.label == "↺ Новый набор"
 
+    def test_lang_en(self, gu_form):
+        btn = gu_form.make_renew_button(lang="en")
+        assert btn.label == "↺ New set"
+
+    def test_lang_el(self, gu_form):
+        btn = gu_form.make_renew_button(lang="el")
+        assert btn.label == "↺ Νέα επιλογή"
+
 
 class TestIctusTogglePanel:
     def test_wires_switches_and_ictus_color(self, gu_form):
@@ -2190,6 +2242,15 @@ class TestIctusTogglePanel:
         )
         assert panel[2] == {"О морфологическом движке EEE": "the note text"}
 
+    def test_lang_en_translates_note_text_but_keeps_caller_color_name(self, gu_form):
+        panel = gu_form.ictus_toggle_panel(
+            object(), object(), "the note text",
+            ictus_color="green", ictus_color_name="green", lang="en",
+        )
+        assert "Ictus (stressed syllables)" in panel[0][1]
+        assert "Homeric lexicon" in panel[1][1]
+        assert panel[2] == {"About the EEE morphological engine": "the note text"}
+
 
 class TestRenderGlossPanel:
     def test_no_selection_shows_placeholder(self, gu_form):
@@ -2197,6 +2258,13 @@ class TestRenderGlossPanel:
             [{"form": "x", "lemma": "x"}], "not-there", lambda w: "",
         )
         assert "Выберите слово" in panel
+
+    def test_no_selection_shows_placeholder_lang_en(self, gu_form):
+        panel = gu_form.render_gloss_panel(
+            [{"form": "x", "lemma": "x"}], "not-there", lambda w: "", lang="en",
+        )
+        assert "Select a word" in panel
+        assert "Выберите" not in panel
 
     def test_selected_word_without_lexicon_tables(self, gu_form):
         words = [{"form": "λόγος", "lemma": "λόγος", "context": "word", "meaning": "word/reason"}]
@@ -2534,6 +2602,17 @@ class TestWordQuizForm:
         assert "ἔγνω" in text
         assert "отсутствует в парадигме" in text
         assert "γιγνώσκω" in text
+
+    def test_correct_answer_no_table_data_fallback_is_localized(self, gu_form):
+        w = {"meaning": "knew", "form": "ἔγνω", "lemma": "γιγνώσκω", "context": ""}
+        state = self._state(cv=w, rem=[])
+        result = self._call(
+            gu_form, state, radio=_FakeRadio(value=w["form"]),
+            build_paradigm_table=lambda word, lang: None, lang="en",
+        )
+        text = str(result)
+        assert "missing in the paradigm of" in text
+        assert "отсутствует" not in text
 
     def test_wrong_answer_never_calls_build_paradigm_table(self, gu_form):
         w = _WQ_VOCAB[0]
@@ -3141,7 +3220,7 @@ class TestCheckNounTest:
             return {"masc": {"sg": {"nom": {"ἀγρός"}}}}
         gu = GreekUtils(_StubBackend(_paradigm_fn), _StubMo(), config=ANCIENT_GREEK)
         form = self._form(["ἡ ΛΑΘΟΣ"], test_word="ὁ ἀγρός", ac=[["sg", "nom"]])
-        ok, fb = gu.check_noun_test("ὁ ἀγρός", form, article=True)
+        ok, fb = gu.check_noun_test("ὁ ἀγρός", form, article=True, lang="en")
         assert ok is False
         assert "article" in fb and "noun" in fb
         assert fb.index("article") < fb.index("noun")
@@ -3178,7 +3257,7 @@ class TestCheckNounTest:
 
     def test_indefinite_true_wrong_indef_article_reported(self, gu_mg):
         form = self._form(["ο λόγος", "μία λόγος"], test_word="ο λόγος", ac=[["sg", "nom"]])
-        ok, fb = gu_mg.check_noun_test("ο λόγος", form, article=True, indefinite=True)
+        ok, fb = gu_mg.check_noun_test("ο λόγος", form, article=True, indefinite=True, lang="en")
         assert ok is False
         assert "article" in fb
 
@@ -3806,6 +3885,24 @@ class TestVerbParadigmDrillForm(_ParadigmDrillFormBase):
         assert "❌ wrong" in str(result)
         assert cv in state["words"][2][0]
 
+    def test_lang_reaches_check_verb_test(self, gu):
+        # Regression: verb_paradigm_drill_form used to have no lang param at
+        # all -- check_verb_test's wrong-answer feedback text ("entered ...,
+        # must be ...") was always hardcoded English no matter what language
+        # the notebook was using. Confirm lang now actually threads through.
+        cv = self._VOCAB[0]
+        state = self._state()
+        with patch.object(gu, "check_verb_test", return_value=(False, "")) as m:
+            self._call(gu, state, cv, _pdform(["asd"]), self._meta(), check_v=1, lang="el")
+        assert m.call_args.kwargs.get("lang") == "el"
+
+    def test_lang_defaults_to_ru(self, gu):
+        cv = self._VOCAB[0]
+        state = self._state()
+        with patch.object(gu, "check_verb_test", return_value=(False, "")) as m:
+            self._call(gu, state, cv, _pdform(["asd"]), self._meta(), check_v=1)
+        assert m.call_args.kwargs.get("lang") == "ru"
+
     def test_enter_on_correct_slot_advances_focus(self, gu):
         cv = self._VOCAB[0]
         state = self._state()
@@ -3879,6 +3976,283 @@ class TestVerbParadigmDrillForm(_ParadigmDrillFormBase):
         assert result == "*...*"
         assert state["entered"][2][0].get("λύω") == ["λύω"]
 
+    # ─────────────────────────────────────── retry-mistakes (error tracking) ──
+
+    def test_wrong_full_check_increments_error_count(self, gu):
+        cv = self._VOCAB[0]
+        state = self._state()
+        get_errors, set_errors, errors_box = _pair({})
+        get_retry_cnt, set_retry_cnt, _ = _pair(0)
+        with patch.object(gu, "check_verb_test", return_value=(False, "❌ wrong")):
+            self._call(gu, state, cv, _pdform(["asd"]), self._meta(), check_v=1,
+                      get_errors=get_errors, set_errors=set_errors,
+                      get_retry_cnt=get_retry_cnt, set_retry_cnt=set_retry_cnt)
+        assert errors_box[0] == {"λύω": 1}
+
+    def test_wrong_full_check_twice_increments_to_two(self, gu):
+        # Reuses one state dict across two calls -- get_sub_cnt()'s watermark
+        # must carry over for the second check_v=2 click to register as new,
+        # same as a real reactive re-render would.
+        cv = self._VOCAB[0]
+        state = self._state()
+        get_errors, set_errors, errors_box = _pair({})
+        get_retry_cnt, set_retry_cnt, _ = _pair(0)
+        with patch.object(gu, "check_verb_test", return_value=(False, "❌ wrong")):
+            self._call(gu, state, cv, _pdform(["asd"]), self._meta(), check_v=1,
+                      get_errors=get_errors, set_errors=set_errors,
+                      get_retry_cnt=get_retry_cnt, set_retry_cnt=set_retry_cnt)
+            self._call(gu, state, cv, _pdform(["def"]), self._meta(), check_v=2,
+                      get_errors=get_errors, set_errors=set_errors,
+                      get_retry_cnt=get_retry_cnt, set_retry_cnt=set_retry_cnt)
+        assert errors_box[0] == {"λύω": 2}
+
+    def test_progress_line_shows_error_total_mid_session(self, gu):
+        cv = self._VOCAB[0]
+        state = self._state()
+        get_errors, set_errors, _ = _pair({"λύω": 2, "ἄγω": 1})
+        get_retry_cnt, set_retry_cnt, _ = _pair(0)
+        with patch.object(gu, "check_verb_test", return_value=(False, "")):
+            result = self._call(gu, state, cv, _pdform(["asd"] * 6), self._meta(),
+                                get_errors=get_errors, set_errors=set_errors,
+                                get_retry_cnt=get_retry_cnt, set_retry_cnt=set_retry_cnt)
+        assert "❌ 3" in result[0]
+
+    def test_progress_line_omits_error_count_when_none_recorded(self, gu):
+        cv = self._VOCAB[0]
+        state = self._state()
+        get_errors, set_errors, _ = _pair({})
+        get_retry_cnt, set_retry_cnt, _ = _pair(0)
+        with patch.object(gu, "check_verb_test", return_value=(False, "")):
+            result = self._call(gu, state, cv, _pdform(["asd"] * 6), self._meta(),
+                                get_errors=get_errors, set_errors=set_errors,
+                                get_retry_cnt=get_retry_cnt, set_retry_cnt=set_retry_cnt)
+        assert "❌" not in result[0]
+
+    def test_correct_full_check_does_not_touch_errors(self, gu):
+        cv = self._VOCAB[0]
+        state = self._state()
+        get_errors, set_errors, errors_box = _pair({})
+        get_retry_cnt, set_retry_cnt, _ = _pair(0)
+        with patch.object(gu, "check_verb_test", return_value=(True, "")):
+            self._call(gu, state, cv, _pdform(["λύω"]), self._meta(), check_v=1,
+                      get_errors=get_errors, set_errors=set_errors,
+                      get_retry_cnt=get_retry_cnt, set_retry_cnt=set_retry_cnt)
+        assert errors_box[0] == {}
+
+    def test_correct_full_check_does_not_clear_this_words_existing_error_count(self, gu):
+        # REGRESSION (confirmed live): a mistake typed and immediately
+        # self-corrected within one attempt -- before that same word's own
+        # final correct submission -- must still count. Clearing per-word
+        # the instant it's next answered correctly was tried and reverted:
+        # it made a live-reported mistake vanish from the tally before the
+        # round even ended. Mistake counts only reset at a round boundary
+        # (restart/retry), not mid-round on a correct answer -- see
+        # test_retry_button_clears_errors_when_starting_new_round below.
+        cv = self._VOCAB[0]
+        state = self._state()
+        get_errors, set_errors, errors_box = _pair({"λύω": 3, "ἄγω": 2})
+        get_retry_cnt, set_retry_cnt, _ = _pair(0)
+        with patch.object(gu, "check_verb_test", return_value=(True, "")):
+            self._call(gu, state, cv, _pdform(["λύω"]), self._meta(), check_v=1,
+                      get_errors=get_errors, set_errors=set_errors,
+                      get_retry_cnt=get_retry_cnt, set_retry_cnt=set_retry_cnt)
+        assert errors_box[0] == {"λύω": 3, "ἄγω": 2}
+
+    def test_empty_check_click_does_not_count_as_error(self, gu):
+        # A Check click with nothing typed yet (e.g. an accidental/premature
+        # click) must not inflate the mistake count -- same has_input guard
+        # dirty_check_button already uses.
+        cv = self._VOCAB[0]
+        state = self._state()
+        get_errors, set_errors, errors_box = _pair({})
+        get_retry_cnt, set_retry_cnt, _ = _pair(0)
+        with patch.object(gu, "check_verb_test", return_value=(False, "")):
+            self._call(gu, state, cv, _pdform([""] * 6), self._meta(), check_v=1,
+                      get_errors=get_errors, set_errors=set_errors,
+                      get_retry_cnt=get_retry_cnt, set_retry_cnt=set_retry_cnt)
+        assert errors_box[0] == {}
+
+    def test_wrong_enter_on_field_increments_error_count(self, gu):
+        # REGRESSION: per-field Enter-navigation is this drill's primary
+        # interaction (not a secondary path to the Check button) -- a
+        # student who types-and-Enters through every field, getting one
+        # wrong along the way, must still have it counted even though
+        # they never clicked Check.
+        cv = self._VOCAB[0]
+        state = self._state()
+        get_errors, set_errors, errors_box = _pair({})
+        get_retry_cnt, set_retry_cnt, _ = _pair(0)
+        form = _pdform(["asd", ""], submit_count=1, enter_field_index=0)
+        with patch.object(gu, "check_verb_slot", return_value=False), \
+             patch.object(gu, "check_verb_test", return_value=(False, "")):
+            self._call(gu, state, cv, form, self._meta(),
+                      get_errors=get_errors, set_errors=set_errors,
+                      get_retry_cnt=get_retry_cnt, set_retry_cnt=set_retry_cnt)
+        assert errors_box[0] == {"λύω": 1}
+
+    def test_correct_enter_on_field_does_not_increment_error_count(self, gu):
+        cv = self._VOCAB[0]
+        state = self._state()
+        get_errors, set_errors, errors_box = _pair({})
+        get_retry_cnt, set_retry_cnt, _ = _pair(0)
+        form = _pdform(["λύω", ""], submit_count=1, enter_field_index=0)
+        with patch.object(gu, "check_verb_slot", return_value=True), \
+             patch.object(gu, "check_verb_test", return_value=(False, "")):
+            self._call(gu, state, cv, form, self._meta(),
+                      get_errors=get_errors, set_errors=set_errors,
+                      get_retry_cnt=get_retry_cnt, set_retry_cnt=set_retry_cnt)
+        assert errors_box[0] == {}
+
+    def test_empty_enter_on_field_does_not_count_as_error(self, gu):
+        cv = self._VOCAB[0]
+        state = self._state()
+        get_errors, set_errors, errors_box = _pair({})
+        get_retry_cnt, set_retry_cnt, _ = _pair(0)
+        form = _pdform(["", ""], submit_count=1, enter_field_index=0)
+        with patch.object(gu, "check_verb_slot", return_value=False), \
+             patch.object(gu, "check_verb_test", return_value=(False, "")):
+            self._call(gu, state, cv, form, self._meta(),
+                      get_errors=get_errors, set_errors=set_errors,
+                      get_retry_cnt=get_retry_cnt, set_retry_cnt=set_retry_cnt)
+        assert errors_box[0] == {}
+
+    def test_without_error_tracking_wrong_check_is_unaffected(self, gu):
+        # REGRESSION: get_errors/set_errors/get_retry_cnt/set_retry_cnt/
+        # retry_btn are all optional, defaulting to None -- every
+        # pre-existing call site (none of them pass these) must behave
+        # exactly as before.
+        cv = self._VOCAB[0]
+        state = self._state()
+        with patch.object(gu, "check_verb_test", return_value=(False, "❌ wrong")):
+            result = self._call(gu, state, cv, _pdform(["asd"]), self._meta(), check_v=1)
+        assert "❌ wrong" in str(result)
+
+    def test_retry_button_starts_round_with_only_error_words(self, gu):
+        get_errors, set_errors, _ = _pair({"ἄγω": 2})
+        get_retry_cnt, set_retry_cnt, retry_cnt_box = _pair(0)
+        state = self._state(words=[])  # done with the full pass
+        result = self._call(gu, state, None, _pdform([]), self._meta(),
+                            get_errors=get_errors, set_errors=set_errors,
+                            get_retry_cnt=get_retry_cnt, set_retry_cnt=set_retry_cnt,
+                            retry_btn=_FakeBtn(1))
+        assert result == "*...*"
+        assert state["words"][2][0] == [self._VOCAB[1]]  # only ἄγω, the one with a recorded error
+        assert retry_cnt_box[0] == 1
+
+    def test_retry_button_clears_errors_when_starting_new_round(self, gu):
+        # REGRESSION (confirmed live): with errors kept forever, a word
+        # fixed in an earlier retry round kept resurfacing in every later
+        # "retry mistakes" click, since nothing ever cleared it. Starting a
+        # new round (retry, same as restart) clears the whole dict --
+        # confirmed separately (test below) that the mistake *list* is
+        # still read correctly before this clear happens.
+        get_errors, set_errors, errors_box = _pair({"ἄγω": 2})
+        get_retry_cnt, set_retry_cnt, _ = _pair(0)
+        state = self._state(words=[])
+        self._call(gu, state, None, _pdform([]), self._meta(),
+                  get_errors=get_errors, set_errors=set_errors,
+                  get_retry_cnt=get_retry_cnt, set_retry_cnt=set_retry_cnt,
+                  retry_btn=_FakeBtn(1))
+        assert errors_box[0] == {}
+
+    def test_retry_button_reads_mistake_list_before_clearing_it(self, gu):
+        get_errors, set_errors, _ = _pair({"ἄγω": 2})
+        get_retry_cnt, set_retry_cnt, retry_cnt_box = _pair(0)
+        state = self._state(words=[])
+        result = self._call(gu, state, None, _pdform([]), self._meta(),
+                            get_errors=get_errors, set_errors=set_errors,
+                            get_retry_cnt=get_retry_cnt, set_retry_cnt=set_retry_cnt,
+                            retry_btn=_FakeBtn(1))
+        assert result == "*...*"
+        assert [w["form"] for w in state["words"][2][0]] == ["ἄγω"]
+        assert retry_cnt_box[0] == 1
+
+    def test_progress_line_reflects_retry_round_size_not_full_vocab(self, gu):
+        # REGRESSION (confirmed live): retrying 1 mistake out of a 2-word
+        # vocab still showed "2 / 2" (len(vocab)) instead of "1 / 1" (this
+        # round's actual size).
+        get_errors, set_errors, _ = _pair({"ἄγω": 2})
+        get_retry_cnt, set_retry_cnt, _ = _pair(0)
+        state = self._state(words=[])
+        self._call(gu, state, None, _pdform([]), self._meta(),
+                  get_errors=get_errors, set_errors=set_errors,
+                  get_retry_cnt=get_retry_cnt, set_retry_cnt=set_retry_cnt,
+                  retry_btn=_FakeBtn(1))
+        cv = state["words"][2][0][0]  # the retry round's only word
+        with patch.object(gu, "check_verb_test", return_value=(False, "")):
+            result = self._call(gu, state, cv, _pdform([""]), self._meta(),
+                                get_errors=get_errors, set_errors=set_errors,
+                                get_retry_cnt=get_retry_cnt, set_retry_cnt=set_retry_cnt)
+        assert "**1** / 1" in result[0]
+
+    def test_word_fixed_in_retry_round_does_not_resurface_in_next_retry(self, gu):
+        # End-to-end version of the live bug report: retry -> answer the
+        # retried word correctly -> a second retry click must find nothing
+        # left to retry (errors was cleared at this round's start, and a
+        # correct answer never adds anything back).
+        get_errors, set_errors, errors_box = _pair({"ἄγω": 2})
+        get_retry_cnt, set_retry_cnt, _ = _pair(0)
+        state = self._state(words=[])
+        self._call(gu, state, None, _pdform([]), self._meta(),
+                  get_errors=get_errors, set_errors=set_errors,
+                  get_retry_cnt=get_retry_cnt, set_retry_cnt=set_retry_cnt,
+                  retry_btn=_FakeBtn(1))
+        assert [w["form"] for w in state["words"][2][0]] == ["ἄγω"]
+        assert errors_box[0] == {}
+        with patch.object(gu, "check_verb_test", return_value=(True, "")):
+            self._call(gu, state, self._VOCAB[1], _pdform(["ἄγω"]), self._meta(), check_v=1,
+                      get_errors=get_errors, set_errors=set_errors,
+                      get_retry_cnt=get_retry_cnt, set_retry_cnt=set_retry_cnt)
+        assert errors_box[0] == {}
+
+    def test_restart_clears_errors_when_error_tracking_provided(self, gu):
+        get_errors, set_errors, errors_box = _pair({"λύω": 3})
+        get_retry_cnt, set_retry_cnt, _ = _pair(0)
+        state = self._state(words=[self._VOCAB[0]])
+        self._call(gu, state, self._VOCAB[0], _pdform([""]), self._meta(), restart_v=1,
+                  get_errors=get_errors, set_errors=set_errors,
+                  get_retry_cnt=get_retry_cnt, set_retry_cnt=set_retry_cnt)
+        assert errors_box[0] == {}
+
+    def test_done_state_shows_retry_button_when_errors_exist(self, gu):
+        get_errors, set_errors, _ = _pair({"λύω": 1})
+        get_retry_cnt, set_retry_cnt, _ = _pair(0)
+        state = self._state(words=[], hist=[self._VOCAB[0]])
+        retry_btn = _FakeBtn(None, label="Retry mistakes")
+        result = self._call(gu, state, None, _pdform([]), self._meta(),
+                            get_errors=get_errors, set_errors=set_errors,
+                            get_retry_cnt=get_retry_cnt, set_retry_cnt=set_retry_cnt,
+                            retry_btn=retry_btn)
+        assert result[1] == "❌ 1 / 1"  # 1 word had a mistake, out of 1 word this round
+        assert retry_btn in result[2]
+
+    def test_done_state_error_indicator_is_words_with_mistakes_over_round_size(self, gu):
+        # REGRESSION: previously showed "total mistake count / word count"
+        # (e.g. "5 / 2" for 5 attempts across 2 words) -- a ratio that can
+        # exceed 1 and reads as broken. "words with a mistake / round size"
+        # is a normal fraction, and (like the progress line) must use this
+        # round's own size, not len(vocab), so it stays correct in a retry
+        # round over a smaller subset too.
+        get_errors, set_errors, _ = _pair({"λύω": 3})  # only λύω had mistakes
+        get_retry_cnt, set_retry_cnt, _ = _pair(0)
+        state = self._state(words=[], hist=list(self._VOCAB))  # both words done this round
+        result = self._call(gu, state, None, _pdform([]), self._meta(),
+                            get_errors=get_errors, set_errors=set_errors,
+                            get_retry_cnt=get_retry_cnt, set_retry_cnt=set_retry_cnt,
+                            retry_btn=_FakeBtn(None))
+        assert result[1] == "❌ 1 / 2"  # 1 of the round's 2 words had a mistake
+
+    def test_done_state_omits_retry_button_when_no_errors(self, gu):
+        get_errors, set_errors, _ = _pair({})
+        get_retry_cnt, set_retry_cnt, _ = _pair(0)
+        state = self._state(words=[])
+        retry_btn = _FakeBtn(None, label="Retry mistakes")
+        result = self._call(gu, state, None, _pdform([]), self._meta(),
+                            get_errors=get_errors, set_errors=set_errors,
+                            get_retry_cnt=get_retry_cnt, set_retry_cnt=set_retry_cnt,
+                            retry_btn=retry_btn)
+        assert retry_btn not in result
+
 
 class TestNounParadigmDrillForm(_ParadigmDrillFormBase):
     _VOCAB = [{"form": "ὁ ἀγρός", "meaning": "field"}, {"form": "ἡ γυνή", "meaning": "woman"}]
@@ -3926,6 +4300,15 @@ class TestNounParadigmDrillForm(_ParadigmDrillFormBase):
             result = self._call(gu, state, cv, _pdform(["asd", ""]), self._meta(), check_v=1)
         assert "❌ wrong" in str(result)
         assert cv in state["words"][2][0]
+
+    def test_lang_reaches_check_noun_test(self, gu):
+        # Same regression as verb_paradigm_drill_form -- noun_paradigm_drill_form
+        # had no lang param at all before.
+        cv = self._VOCAB[0]
+        state = self._state()
+        with patch.object(gu, "check_noun_test", return_value=(False, "")) as m:
+            self._call(gu, state, cv, _pdform(["asd", ""]), self._meta(), check_v=1, lang="el")
+        assert m.call_args.kwargs.get("lang") == "el"
 
     def test_enter_on_correct_slot_advances_focus_using_active_cases(self, gu):
         cv = self._VOCAB[0]
@@ -4152,7 +4535,9 @@ class TestCreateNounTestUi:
         # _StubBackend returns {} so every word looks like pluralia tantum (no sg
         # nom forms → is_pt=True → only pl cells → no Ind. labels).  Use a
         # backend stub that returns a form for sg nom so the noun is treated as
-        # regular and sg cells are included.
+        # regular and sg cells are included. lang="en" pins the prefix text this
+        # test checks -- create_noun_test_ui's own default is "ru" (see the
+        # lang_ru sibling test below), matching the rest of this file.
         class _NounBackend:
             def paradigm(self, word, pos):
                 # noun paradigm layout: {gender: {num: {case: set}}}
@@ -4160,10 +4545,26 @@ class TestCreateNounTestUi:
                                  "pl": {"nom": {word}, "acc": {word}, "gen": {word}, "dat": {word}}}}
         gu = GreekUtils(_NounBackend(), _RichMo())
         mg_word = {"Word": "λόγος", "Translation": "word"}
-        _, _, form = gu.create_noun_test_ui([mg_word], mode='full')
+        _, _, form = gu.create_noun_test_ui([mg_word], mode='full', lang="en")
         labels = [t.label for t in form]
         assert any("Def." in l for l in labels)
         assert any("Ind." in l for l in labels)
+
+    def test_mode_full_labels_default_to_ru(self):
+        # Regression: create_noun_test_ui used to hardcode "Def."/"Ind." (and
+        # noun_slot_labels' own "en" default for the case labels themselves)
+        # regardless of what language the notebook was actually using.
+        class _NounBackend:
+            def paradigm(self, word, pos):
+                return {"masc": {"sg": {"nom": {word}, "acc": {word}, "gen": {word}, "dat": {word}},
+                                 "pl": {"nom": {word}, "acc": {word}, "gen": {word}, "dat": {word}}}}
+        gu = GreekUtils(_NounBackend(), _RichMo())
+        mg_word = {"Word": "λόγος", "Translation": "word"}
+        _, _, form = gu.create_noun_test_ui([mg_word], mode='full')
+        labels = [t.label for t in form]
+        assert any("Опр." in l for l in labels)
+        assert any("Неопр." in l for l in labels)
+        assert not any("Def." in l or "Ind." in l for l in labels)
 
     def test_simple_mode_no_def_ind_prefix(self, gu):
         _, _, form = gu.create_noun_test_ui([self._WORD], mode='simple')
@@ -4263,7 +4664,7 @@ class TestPluraliaTantumNomPlUsesSurfaceForm:
         _, _, form = gu.create_noun_test_ui([{"Word": word, "Translation": "garbage"}])
         nom, acc, gen = list(form)
         nom.value, acc.value, gen.value = "σκουπίδιες", "σκουπίδια", "σκουπιδιών"
-        ok, feedback = gu.check_noun_test(word, form)
+        ok, feedback = gu.check_noun_test(word, form, lang="en")
         assert ok is False
         assert "must be **σκουπίδια**" in feedback  # states the real correct answer
 
@@ -4396,7 +4797,7 @@ class TestAdjectiveSlotLabelsLang:
 
     def test_no_eee_module_falls_back_unchanged(self):
         gu = GreekUtils(mo_module=_StubMo())
-        assert gu.adjective_slot_labels("simple")[0] == "Masc Sg:"
+        assert gu.adjective_slot_labels("simple")[0] == "m. Sg:"
 
     def test_backend_without_real_labels_falls_back_not_raw_tag(self):
         # REGRESSION: ancient_greek_backend_eee's get_slot_templates() never
@@ -4411,7 +4812,7 @@ class TestAdjectiveSlotLabelsLang:
         be = AncientGreekBackend()
         gu = GreekUtils(be, mo_module=_StubMo(), eee_module=be, config=ANCIENT_GREEK)
         labels = gu.adjective_slot_labels("simple")
-        assert labels[0] == "Masc Sg:"
+        assert labels[0] == "m. Sg:"
         assert not any(lbl.startswith(".") for lbl in labels)
 
 
@@ -4473,6 +4874,53 @@ class TestVerbDrillMeta:
         gu = GreekUtils(_StubBackend(), _StubMo(), config=ANCIENT_GREEK)  # always {}
         meta = gu.verb_drill_meta("ἄγνωστον", "present")
         assert meta.active_slots == ANCIENT_GREEK.verb_slots
+
+
+class TestVerbDrillMetaDefectiveFallback:
+    """A verb with no perfective/aorist stem at all (είμαι-class: no distinct
+    "future"/"subjunctive_simple"/"conditional_simple") must fall back to its
+    continuous-tense (present-based) forms across every person, not
+    verb_drill_meta's blind "no data anywhere -> show every slot unfiltered"
+    fallback -- that fallback produces an unanswerable test, since the
+    backend still has nothing to compare a submitted answer against. See
+    GreekConfig.defective_fallback / _MG_DEFECTIVE_FALLBACK."""
+
+    @staticmethod
+    def _eimai_paradigm_fn(word, pos):
+        if pos != "verb":
+            return {}
+        # deliberately no "conjunctive" key at all -- είμαι genuinely has none
+        return {"present": {"active": {"ind": {
+            "sg": {"pri": {"είμαι"}, "sec": {"είσαι"}, "ter": {"είναι"}},
+            "pl": {"pri": {"είμαστε"}, "sec": {"είστε", "είσαστε"}, "ter": {"είναι"}},
+        }}}}
+
+    def test_future_falls_back_to_all_persons_with_present_based_forms(self):
+        gu = GreekUtils(_StubBackend(self._eimai_paradigm_fn), _StubMo(), config=MODERN_GREEK)
+        meta = gu.verb_drill_meta("είμαι", "future")
+        assert meta.active_slots == MODERN_GREEK.verb_slots
+        assert gu._verb_forms("είμαι", "future", "pri", "sg") == {"είμαι"}
+        assert gu._verb_forms("είμαι", "future", "ter", "pl") == {"είναι"}
+
+    def test_check_verb_slot_accepts_continuous_based_answer(self):
+        gu = GreekUtils(_StubBackend(self._eimai_paradigm_fn), _StubMo(), config=MODERN_GREEK)
+        meta = gu.verb_drill_meta("είμαι", "future")
+        assert gu.check_verb_slot("είμαι", "future", 0, "θα είμαι", active_slots=meta.active_slots)
+        assert not gu.check_verb_slot("είμαι", "future", 0, "θα ήμουν", active_slots=meta.active_slots)
+
+    def test_non_defective_verb_unaffected(self):
+        """A verb WITH real conjunctive data must never hit the fallback --
+        confirms defective_fallback only engages when a tense is genuinely
+        empty, not merely because one caller asked before the other."""
+        def paradigm_fn(word, pos):
+            if pos != "verb":
+                return {}
+            return {"conjunctive": {"active": {"ind": {
+                "sg": {"pri": {"τρέξω"}, "sec": {"τρέξεις"}, "ter": {"τρέξει"}},
+                "pl": {"pri": {"τρέξουμε"}, "sec": {"τρέξετε"}, "ter": {"τρέξουν"}},
+            }}}}
+        gu = GreekUtils(_StubBackend(paradigm_fn), _StubMo(), config=MODERN_GREEK)
+        assert gu._verb_forms("τρέχω", "future", "pri", "sg") == {"τρέξω"}
 
 
 # ────────────────────────────────────────── create_verb_test_ui ──
@@ -5287,7 +5735,7 @@ class TestCreateAdjectiveTestUi:
         assert len(form_f.value) > len(form_s.value)
 
     def test_empty_words4test_shows_empty_message(self, gu):
-        form, md = gu.create_adjective_test_ui([self._WORD], [], self._WORD)
+        form, md = gu.create_adjective_test_ui([self._WORD], [], self._WORD, lang="en")
         assert form is not None
         assert "empty" in md.lower()
 
@@ -5319,7 +5767,7 @@ class TestCheckAdjectiveTest:
 
     def test_all_empty_returns_please_fill(self, gu):
         form = type("_F", (), {"value": ["", "", "", "", "", ""]})()
-        ok, fb = gu.check_adjective_test(self._WORD, form)
+        ok, fb = gu.check_adjective_test(self._WORD, form, lang="en")
         assert ok is False
         assert "fill" in fb.lower()
 
@@ -5390,52 +5838,6 @@ class TestAdjectiveSlotLabels:
         assert len(labels) == len(slots)
 
 
-# ──────────────────────────────── create_pronoun_test_ui ──
-
-class TestCreatePronounTestUi:
-    _WORD = {"Word": "κανένας", "Translation": "no one/any"}
-
-    @pytest.fixture
-    def gu(self):
-        return GreekUtils(_StubBackend(), _RichMo(), config=ANCIENT_GREEK)
-
-    def test_no_current_pron_returns_none_form(self, gu):
-        form, md = gu.create_pronoun_test_ui([], [], None)
-        assert form is None
-
-    def test_basic_form_created(self, gu):
-        form, md = gu.create_pronoun_test_ui([self._WORD], [self._WORD], self._WORD)
-        assert form is not None
-        assert form.pron_word == "κανένας"
-        assert form.pron_mode == "simple"
-
-    def test_full_mode_more_inputs(self, gu):
-        form_s, _ = gu.create_pronoun_test_ui([self._WORD], [self._WORD], self._WORD, mode="simple")
-        form_f, _ = gu.create_pronoun_test_ui([self._WORD], [self._WORD], self._WORD, mode="full")
-        assert len(form_f.value) > len(form_s.value)
-
-    def test_singular_only_word_gets_three_fields_not_six(self):
-        # The exact user-reported case: κανένας must show only its 3 real
-        # (singular) fields, not all 6 with 3 destined to fail with "?".
-        def _paradigm_fn(word, pos):
-            if pos != "pronoun":
-                return {}
-            return {"sg": {"masc": {"nom": {"κανένας"}}, "fem": {"nom": {"καμία"}}, "neut": {"nom": {"κανένα"}}}}
-        gu = GreekUtils(_StubBackend(_paradigm_fn), _RichMo(), config=ANCIENT_GREEK)
-        form, _ = gu.create_pronoun_test_ui([self._WORD], [self._WORD], self._WORD)
-        assert len(form.value) == 3
-        assert len(form.active_slots) == 3
-
-    def test_empty_words4test_shows_empty_message(self, gu):
-        form, md = gu.create_pronoun_test_ui([self._WORD], [], self._WORD)
-        assert form is not None
-        assert "empty" in md.lower()
-
-    def test_words4test_md_contains_translation(self, gu):
-        _, md = gu.create_pronoun_test_ui([self._WORD], [self._WORD], self._WORD)
-        assert "no one/any" in md
-
-
 class TestCheckPronounTest:
     _WORD = "κανένας"
 
@@ -5459,7 +5861,7 @@ class TestCheckPronounTest:
 
     def test_all_empty_returns_please_fill(self, gu):
         form = type("_F", (), {"value": ["", "", "", "", "", ""]})()
-        ok, fb = gu.check_pronoun_test(self._WORD, form)
+        ok, fb = gu.check_pronoun_test(self._WORD, form, lang="en")
         assert ok is False
         assert "fill" in fb.lower()
 
@@ -5608,14 +6010,14 @@ class TestPronounSlotLabelsLang:
 
     def test_no_eee_module_falls_back_unchanged(self):
         gu = GreekUtils(mo_module=_StubMo())
-        assert gu.pronoun_slot_labels("simple")[0] == "Masc Sg:"
+        assert gu.pronoun_slot_labels("simple")[0] == "m. Sg:"
 
     def test_backend_without_real_labels_falls_back_not_raw_tag(self):
         from ancient_greek_backend_eee import AncientGreekBackend
         be = AncientGreekBackend()
         gu = GreekUtils(be, mo_module=_StubMo(), eee_module=be, config=ANCIENT_GREEK)
         labels = gu.pronoun_slot_labels("simple")
-        assert labels[0] == "Masc Sg:"
+        assert labels[0] == "m. Sg:"
         assert not any(lbl.startswith(".") for lbl in labels)
 
     def test_single_active_slot_collapses_to_all_forms_label(self):
@@ -5689,6 +6091,15 @@ class TestAdjectiveParadigmDrillForm(_ParadigmDrillFormBase):
         assert "❌ wrong" in str(result)
         assert cv in state["words"][2][0]
 
+    def test_lang_reaches_check_adjective_test(self, gu):
+        # Same regression as verb_paradigm_drill_form -- adjective_paradigm_drill_form
+        # had no lang param at all before.
+        cv = self._VOCAB[0]
+        state = self._state()
+        with patch.object(gu, "check_adjective_test", return_value=(False, "")) as m:
+            self._call(gu, state, cv, _pdform(["asd"] * 6), check_v=1, lang="el")
+        assert m.call_args.kwargs.get("lang") == "el"
+
     def test_enter_on_correct_slot_advances_focus(self, gu):
         cv = self._VOCAB[0]
         state = self._state()
@@ -5755,6 +6166,32 @@ class TestPronounParadigmDrillForm(_ParadigmDrillFormBase):
             self._call_form(gu.pronoun_paradigm_drill_form, state, cv, form)
         assert form.widget.focus_request == {"request_id": 1, "advance_to": 1}
         mock_slot.assert_called_with(cv["form"], "simple", 0, "κανένας", active_slots=gu._pronoun_slot_list("simple"))
+
+    def test_error_tracking_wiring_reaches_pronoun(self, gu):
+        # Confirms get_errors/set_errors/get_retry_cnt/set_retry_cnt reach
+        # this sibling's own _pack_paradigm_state/_paradigm_drill_form call
+        # -- the full behavior (increment-on-wrong, retry-filters-words,
+        # restart-clears) is exercised in depth on the verb sibling above.
+        cv = self._VOCAB[0]
+        state = self._state()
+        get_errors, set_errors, errors_box = _pair({})
+        get_retry_cnt, set_retry_cnt, _ = _pair(0)
+        form = _pdform(["κανένας"] + [""] * 5)
+        with patch.object(gu, "check_pronoun_test", return_value=(False, "")):
+            self._call_form(gu.pronoun_paradigm_drill_form, state, cv, form, check_v=1,
+                            get_errors=get_errors, set_errors=set_errors,
+                            get_retry_cnt=get_retry_cnt, set_retry_cnt=set_retry_cnt)
+        assert errors_box[0] == {"κανένας": 1}
+
+    def test_lang_reaches_check_pronoun_test(self, gu):
+        # Same regression as verb_paradigm_drill_form -- pronoun_paradigm_drill_form
+        # had no lang param at all before.
+        cv = self._VOCAB[0]
+        state = self._state()
+        form = _pdform(["asd"] * 6)
+        with patch.object(gu, "check_pronoun_test", return_value=(False, "")) as m:
+            self._call_form(gu.pronoun_paradigm_drill_form, state, cv, form, check_v=1, lang="el")
+        assert m.call_args.kwargs.get("lang") == "el"
 
 
 # ──────────────────────────────── make_item_drill_rows use_diacritics ──
@@ -6526,6 +6963,102 @@ class TestBuildGrcParadigmTableWithData:
         fn = build_grc_paradigm_table(_EmptyGrcBackend(), _EmptyGrcBackend())
         result = fn({"lemma": "τις", "pos": "pronoun", "form": "τις"})
         assert result is None
+
+
+class TestBuildGrcParadigmTableMultilang:
+    """build_grc_paradigm_table's own `lang` param (the per-call override on
+    the returned closure, not the builder's) used to be accepted and
+    silently ignored -- every row/column label was hardcoded Russian
+    regardless of what was passed. These confirm passing lang="en"/"el"
+    per call now actually changes the rendered labels."""
+
+    def test_noun_case_label_lang_en(self):
+        fn = build_grc_paradigm_table(_GrcNounBackend(), _EmptyGrcBackend())
+        def fake_inflect(word, slot, pos, *, language, backend):
+            return {"θεος"} if slot.tag == ".NSM" else set()
+        with patch("eee_project.inflect_slot", side_effect=fake_inflect):
+            result = fn({"lemma": "θεος", "pos": "noun", "form": "θεος"}, lang="en")
+        assert "Nom." in result
+        assert "Им." not in result
+
+    def test_verb_tense_column_and_person_row_lang_en(self):
+        fn = build_grc_paradigm_table(_GrcVerbBackend(), _EmptyGrcBackend())
+        def fake_inflect(word, slot, pos, *, language, backend):
+            return {"λυω"} if slot.tag == "PAI.1S" else set()
+        with patch("eee_project.inflect_slot", side_effect=fake_inflect):
+            result = fn({"lemma": "λυω", "pos": "verb", "form": "λυω"}, lang="en")
+        assert "Pres." in result
+        assert "1 sg." in result
+        assert "Наст." not in result
+
+    def test_verb_infinitive_row_lang_el(self):
+        fn = build_grc_paradigm_table(_GrcVerbBackend(), _EmptyGrcBackend())
+        def fake_inflect(word, slot, pos, *, language, backend):
+            if slot.tag == "PAI.1S": return {"λυω"}
+            if slot.tag == "PAN": return {"λυειν"}
+            return set()
+        with patch("eee_project.inflect_slot", side_effect=fake_inflect):
+            result = fn({"lemma": "λυω", "pos": "verb", "form": "λυω"}, lang="el")
+        assert "Απρφ." in result
+        assert "Инф." not in result
+
+    def test_verb_imperative_row_lang_en(self):
+        fn = build_grc_paradigm_table(_GrcVerbBackend(), _EmptyGrcBackend())
+        def fake_inflect(word, slot, pos, *, language, backend):
+            if slot.tag == "PAI.1S": return {"λυω"}
+            if slot.tag == "PAD.2S": return {"λυε"}
+            return set()
+        with patch("eee_project.inflect_slot", side_effect=fake_inflect):
+            result = fn({"lemma": "λυω", "pos": "verb", "form": "λυω"}, lang="en")
+        assert "Imp. 2sg." in result
+        assert "Пов." not in result
+
+    def test_pronoun_dual_label_lang_en(self):
+        fn = build_grc_paradigm_table(_GrcPronPrsBackend(), _EmptyGrcBackend())
+        def fake_inflect(word, slot, pos, *, language, backend):
+            return {"εγω"} if slot.tag == ".NS1" else set()
+        with patch("eee_project.inflect_slot", side_effect=fake_inflect):
+            result = fn({"lemma": "ἐγώ", "pos": "pronoun", "form": "εγω"}, lang="en")
+        assert "1 du." in result
+        assert "1 дв." not in result
+
+    def test_missing_paradigm_message_lang_en(self):
+        fn = build_grc_paradigm_table(_GrcNounBackend(), _EmptyGrcBackend())
+        def fake_inflect(word, slot, pos, *, language, backend):
+            return {"θεος"} if slot.tag == ".NSM" else set()
+        with patch("eee_project.inflect_slot", side_effect=fake_inflect):
+            result = fn({"lemma": "θεος", "pos": "noun", "form": "θεον"}, lang="en")
+        assert "missing in the paradigm of" in result
+        assert "отсутствует" not in result
+
+    def test_builder_level_lang_still_works_as_default(self):
+        """The builder's own `lang="en"` (not a per-call override) must
+        still work as the default when a call doesn't pass its own lang --
+        this is the pre-existing mechanism (already used for
+        get_slot_templates); the per-call override is additive, not a
+        replacement for it."""
+        fn = build_grc_paradigm_table(_GrcNounBackend(), _EmptyGrcBackend(), lang="en")
+        def fake_inflect(word, slot, pos, *, language, backend):
+            return {"θεος"} if slot.tag == ".NSM" else set()
+        with patch("eee_project.inflect_slot", side_effect=fake_inflect):
+            result = fn({"lemma": "θεος", "pos": "noun", "form": "θεος"})
+        assert "Nom." in result
+
+    def test_default_caption_is_localized_not_fixed_english(self):
+        """Regression: the fallback table caption (shown when neither the
+        caller's own `_cap` nor the word's `lexicon_tag` is given) used to
+        be the fixed literal "ancient-greek" regardless of `lang` -- a ru
+        table would show an English caption in this one spot. Now varies
+        with lang like every other label in this table."""
+        fn = build_grc_paradigm_table(_GrcNounBackend(), _EmptyGrcBackend())
+        def fake_inflect(word, slot, pos, *, language, backend):
+            return {"θεος"} if slot.tag == ".NSM" else set()
+        with patch("eee_project.inflect_slot", side_effect=fake_inflect):
+            result_ru = fn({"lemma": "θεος", "pos": "noun", "form": "θεος"})
+            result_en = fn({"lemma": "θεος", "pos": "noun", "form": "θεος"}, lang="en")
+        assert "древнегреческий" in result_ru
+        assert "ancient-greek" not in result_ru
+        assert "ancient-greek" in result_en
 
 
 # ──────────────────────────────── build_grc_lexicon_tabs with data ──

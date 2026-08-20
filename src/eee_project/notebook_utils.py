@@ -58,7 +58,7 @@ from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any
 
-from eee_project._grammar_fmt import fmt_ud_feats, _FMT_CASE
+from eee_project._grammar_fmt import fmt_ud_feats, _FMT_CASE, _FMT_NUM, _FMT_GENDER, _FMT_VFORM, _FMT_MOOD
 from eee_project._registry import register_backend, set_chain
 from eee_project._slot_template import SlotTemplate
 
@@ -116,81 +116,6 @@ _FOOTER_CSS = """
 #eee-footer .footer-nav-spacer { display: inline-block; width: 20px; }
 </style>"""
 
-_FOOTER_LABEL = {"ru": "Исходный код:", "en": "Source:", "el": "Πηγαίος κώδικας:"}
-
-_QUIZ_FORM_LBL = {"ru": "Форма в тексте:", "en": "Form in text:", "el": "Μορφή στο κείμενο:"}
-_QUIZ_DONE     = {
-    "ru": "🎉 Все слова пройдены! Нажмите «{btn}» для повтора.",
-    "en": "🎉 All words done! Press «{btn}» to repeat.",
-    "el": "🎉 Όλες οι λέξεις! Πατήστε «{btn}» για επανάληψη.",
-}
-_QUIZ_CORR  = {"ru": "Верно:", "en": "Correct:", "el": "Σωστά:"}
-_QUIZ_PROGRESS_CORR = {"ru": "правильно", "en": "correct", "el": "σωστά"}
-_QUIZ_POS   = {
-    "ru": {"noun": "сущ.", "verb": "глаг.", "adj": "прил.", "adv": "нар."},
-    "en": {"noun": "n.",   "verb": "v.",    "adj": "adj.",  "adv": "adv."},
-    "el": {"noun": "ουσ.", "verb": "ρ.",    "adj": "επίθ.", "adv": "επίρρ."},
-}
-_QUIZ_RIGHT = {"ru": "✓ Верно!", "en": "✓ Correct!", "el": "✓ Σωστό!"}
-_QUIZ_WRONG = {"ru": "✗ Нет. Правильно:", "en": "✗ No. Correct form:", "el": "✗ Όχι. Σωστή μορφή:"}
-_WRITE_PLACEHOLDER = {"ru": "греческое слово…", "en": "Greek word…", "el": "ελληνική λέξη…"}
-_NAV_NEXT  = {"ru": "Следующий", "en": "Next", "el": "Επόμενο"}
-_NAV_AGAIN = {"ru": "Пройти снова", "en": "Again", "el": "Ξανά"}
-_NAV_PREV  = {"ru": "Предыдущий", "en": "Prev", "el": "Προηγούμενο"}
-_CHECK_LABEL = {"ru": "Проверить", "en": "Check", "el": "Έλεγχος"}
-_PARADIGM_NEXT = {"ru": "Следующее", "en": "Next ▸", "el": "Επόμενο"}
-_PARADIGM_PREV = {"ru": "Предыдущее", "en": "◂ Prev", "el": "Προηγούμενο"}
-_PARADIGM_RESTART = {"ru": "Начать заново", "en": "↺ Start over", "el": "Από την αρχή"}
-
-_STANZA_MATCH_LBL = {
-    "ru": {
-        "grc_to_tr": "Выберите перевод, соответствующий этой строфе:",
-        "tr_to_grc": "Выберите строфу на греческом, соответствующую этому переводу:",
-    },
-    "en": {
-        "grc_to_tr": "Choose the translation matching this stanza:",
-        "tr_to_grc": "Choose the Greek stanza matching this translation:",
-    },
-    "el": {
-        "grc_to_tr": "Επιλέξτε τη μετάφραση που ταιριάζει σε αυτή τη στροφή:",
-        "tr_to_grc": "Επιλέξτε την ελληνική στροφή που ταιριάζει σε αυτή τη μετάφραση:",
-    },
-}
-
-_YES_NO = {"ru": ("да", "нет"), "en": ("yes", "no"), "el": ("ναι", "όχι")}
-
-# Worded "incorrect" rather than _QUIZ_WRONG's "Нет"/"No"/"Όχι" -- needed
-# wherever a quiz's own answer options could themselves be да/нет (reusing
-# _QUIZ_WRONG there would read as restating the answer rather than judging
-# it); used elsewhere too since it reads better in general.
-_QUIZ_INCORRECT = {
-    "ru": "✗ Неверно. Правильно:",
-    "en": "✗ Incorrect. Correct answer:",
-    "el": "✗ Λάθος. Σωστή απάντηση:",
-}
-
-_PRESENCE_LBL = {
-    "ru": "Отражено ли это слово в переводе?",
-    "en": "Is the word reflected in this translation?",
-    "el": "Αποτυπώνεται η λέξη σε αυτή τη μετάφραση;",
-}
-
-_PRESENCE_EMPTY = {
-    "ru": "Пока нет проверенных пар «слово × перевод» — заполните столбец `reflected` "
-          "(yes/no) в translation_presence.tsv.",
-    "en": "No reviewed word × translation pairs yet — fill in the `reflected` "
-          "(yes/no) column in translation_presence.tsv.",
-    "el": "Δεν υπάρχουν ακόμη ελεγμένα ζεύγη λέξη × μετάφραση — συμπληρώστε τη στήλη "
-          "`reflected` (yes/no) στο translation_presence.tsv.",
-}
-
-_PRESENCE_SOURCE_LBL = {"ru": "оригинал", "en": "original", "el": "πρωτότυπο"}
-
-_PRESENCE_SWITCH_LBL = {
-    "ru": "Показать оригинал вместо перевода",
-    "en": "Show the original instead of the translation",
-    "el": "Εμφάνιση πρωτοτύπου αντί της μετάφρασης",
-}
 
 
 def load_ga_config(path=None) -> "dict | None":
@@ -777,8 +702,6 @@ _CARD_LIST_CSS = """
 </style>
 """
 
-_CARD_LIST_SOON = {"ru": "скоро", "el": "σύντομα", "en": "coming soon"}
-
 
 def eee_card_list(mo, cfg: "ConfigStore", lang: str, *, lang_fallback: str = "el", same_window: bool = False):
     """Render the EEE index-page lesson/course card list.
@@ -815,14 +738,12 @@ def eee_card_list(mo, cfg: "ConfigStore", lang: str, *, lang_fallback: str = "el
     rows = cfg.lessons()
     if not rows:
         _tsv_url = f"{cfg.raw_base}/{ConfigStore._FILENAME}"
-        _load_error = {
-            "ru": f"Не удалось загрузить файл: {_tsv_url}\n\nПроверьте, что он доступен по этой ссылке.",
-            "el": f"Δεν ήταν δυνατή η φόρτωση του αρχείου: {_tsv_url}\n\nΕλέγξτε αν είναι προσβάσιμο σε αυτόν τον σύνδεσμο.",
-            "en": f"Couldn't load file: {_tsv_url}\n\nCheck that it's accessible at that link.",
-        }
-        return mo.md(_load_error.get(lang, _load_error[lang_fallback]))
+        _err_entry = _UI_LABELS.get('card_list_load_error', {})
+        _template = _err_entry.get(lang, _err_entry.get(lang_fallback, 'card_list_load_error'))
+        return mo.md(_template.format(url=_tsv_url))
 
-    soon = _CARD_LIST_SOON.get(lang, _CARD_LIST_SOON[lang_fallback])
+    _soon_entry = _UI_LABELS.get('card_list_soon', {})
+    soon = _soon_entry.get(lang, _soon_entry.get(lang_fallback, 'card_list_soon'))
     label_key, label_fb = f'label_{lang}', f'label_{lang_fallback}'
     title_key, title_fb = f'title_{lang}', f'title_{lang_fallback}'
     desc_key, desc_fb = f'desc_{lang}', f'desc_{lang_fallback}'
@@ -904,7 +825,7 @@ def eee_footer(mo, lang: str, *, prev_url: "str | None" = None, next_url: "str |
         eee_footer(mo, lang=lang_sel.value, prev_url=_prev_url, next_url=_next_url,
                    same_window=True)
     """
-    lbl = _FOOTER_LABEL.get(lang, _FOOTER_LABEL["en"])
+    lbl = _ui_label('footer_label', lang)
     base = _source_host_base()
     label_text = base.removeprefix("https://")
     _target_attr = "" if same_window else ' target="_blank" rel="noopener"'
@@ -2136,6 +2057,7 @@ class GreekConfig:
     tense_labels: dict                  # tense_key → {"greek": ..., "label": {"en"/"ru"/"el": ...}}
     path_map: dict                      # tense_key → paradigm() key (backend fallback)
     verb_prefix: dict                   # tense_key → particle string (e.g. "θα")
+    defective_fallback: dict            # tense_key → tense_key to substitute when a verb has no forms at all for the first (e.g. aspectually defective verbs like είμαι lack "future" entirely; "future_continuous" is the genuine, textbook-correct substitute)
     verb_slots: "list[tuple[str,str]]"  # (num, person) slots per verb exercise
     verb_labels: "list[str]"            # display label per verb slot
     adj_cases: "list[str]"              # cases for full adjective paradigm
@@ -2183,11 +2105,22 @@ _GENDER = {'masc': 'Masc', 'fem': 'Fem', 'neut': 'Neut'}
 _PERSON = {'pri': '1', 'sec': '2', 'ter': '3'}
 
 # ──────────────────────────── quiz display labels (noun/adjective UI) ──
+# All four are DERIVED from _grammar_fmt.py's _FMT_CASE/_FMT_NUM/_FMT_GENDER
+# (re-keyed/re-cased to match this dict's own key format) rather than
+# re-authored, so they can't silently drift out of sync with the canonical
+# translations there. This makes _QUIZ_ADJ_GENDER's fallback text terser
+# than its pre-1.9.1 hand-authored values ("m."/"ж."/"θηλ." instead of
+# "Masc"/"Муж"/"Θηλ") -- accepted deliberately: it's the by_feats template
+# lookup's fallback, rarely hit in practice, and a second independently
+# authored gender-translation table was judged not worth keeping just to
+# preserve a fuller word there.
 
-_QUIZ_NUM_LABEL    = {'sg': 'Sg.', 'pl': 'Pl.', 'du': 'Du.'}
-_QUIZ_CASE_LABEL   = {'nom': 'Nom.', 'acc': 'Acc.', 'gen': 'Gen.', 'dat': 'Dat.', 'voc': 'Voc.'}
-_QUIZ_ADJ_GENDER   = {'masc': 'Masc', 'fem': 'Fem', 'neut': 'Neut'}
-_QUIZ_ADJ_NUM      = {'sg': 'Sg', 'pl': 'Pl'}
+_QUIZ_CASE_LABEL = {lang: {k.lower(): v for k, v in d.items()} for lang, d in _FMT_CASE.items()}
+_QUIZ_NUM_LABEL = {lang: {'sg': d['Sing'].capitalize(), 'pl': d['Plur'].capitalize(),
+                           'du': d['Dual'].capitalize()} for lang, d in _FMT_NUM.items()}
+_QUIZ_ADJ_NUM = {lang: {'sg': d['Sing'].rstrip('.').capitalize(), 'pl': d['Plur'].rstrip('.').capitalize()}
+                  for lang, d in _FMT_NUM.items()}
+_QUIZ_ADJ_GENDER = {lang: {k.lower(): v for k, v in d.items()} for lang, d in _FMT_GENDER.items()}
 
 # ────────────────────────────────────────────── tense / verb tables ──
 
@@ -2214,17 +2147,49 @@ def _load_ui_labels() -> dict:
     layer as tense/noun/adj/verb labels, never hardcoded in a notebook. Not
     Config-scoped (unlike tense_labels) since this text belongs to the shared
     paradigm-drill widget chrome, not any one course's grammar.
+
+    Discovers language files by name (``ui-*.tsv``) rather than a fixed
+    ``("en", "ru", "el")`` tuple, so adding a new language is purely a data
+    change -- drop in ``ui-{lang}.tsv`` with the same ``Key``/``label``
+    columns and it's picked up with no code change.
     """
     pkg = importlib.resources.files("eee_project.data.labels")
     labels: dict = {}
-    for lang in ("en", "ru", "el"):
-        text = (pkg / f"ui-{lang}.tsv").read_text(encoding="utf-8")
+    for entry in pkg.iterdir():
+        m = _re.fullmatch(r"ui-([a-z]{2})\.tsv", entry.name)
+        if not m:
+            continue
+        lang = m.group(1)
+        text = entry.read_text(encoding="utf-8")
         for row in csv.DictReader(text.splitlines(), delimiter="\t"):
             labels.setdefault(row["Key"], {})[lang] = row["label"]
     return labels
 
 
 _UI_LABELS = _load_ui_labels()
+# Every language _load_ui_labels() discovered -- reused by module-level dicts
+# below (_GRC_TCOL etc.) that need "all known languages" without hardcoding
+# ("ru", "en", "el") themselves, so those dicts also pick up a new language
+# with no code change, same as a plain _ui_label() call does.
+_UI_LANGS = sorted({lang for entry in _UI_LABELS.values() for lang in entry})
+
+
+def _ui_label(key: str, lang: "str | None" = None) -> str:
+    """Module-level twin of :meth:`GreekUtils.ui_label`, so module-level
+    functions (e.g. ``eee_footer``, which has no ``self``) can share the
+    same lookup instead of a separate copy."""
+    lang = lang or "en"
+    entry = _UI_LABELS.get(key, {})
+    return entry.get(lang) or entry.get("en") or key
+
+
+def _lang_map(keys, tsv_key) -> dict:
+    """Build a ``{lang: {key: label}}`` dict for a *compound* concept (a
+    tense code, a verb-tense column, a voice) that has no single matching
+    ``_grammar_fmt.py`` dict to derive from -- each ``key`` becomes its own
+    flat ``ui-{lang}.tsv`` row via ``tsv_key(key)``, so (like every other
+    ``_ui_label()`` lookup) a new language is still a data-only change."""
+    return {lang: {k: _ui_label(tsv_key(k), lang) for k in keys} for lang in _UI_LANGS}
 
 
 _MG_TENSE_FEATS = {
@@ -2258,6 +2223,16 @@ _MG_PATH_MAP = {
     'future':            'conjunctive',
     'future_continuous': 'present',
 }
+# Verbs with no perfective/aorist stem at all (είμαι, ξέρω, ανήκω, ...) have
+# no distinct "simple" tense -- θα/να/αν + the continuous (present-based)
+# forms is the standard, textbook-correct substitute, not a special case
+# specific to any one verb. Only the three periphrastic "simple" tenses map
+# here; plain aorist has no continuous counterpart to substitute.
+_MG_DEFECTIVE_FALLBACK = {
+    'future':            'future_continuous',
+    'subjunctive_simple': 'subjunctive_continuous',
+    'conditional_simple': 'conditional_continuous',
+}
 _AG_TENSE_FEATS = {
     'present':   {'VerbForm': 'Fin', 'Tense': 'Pres', 'Mood': 'Ind'},
     'imperfect': {'VerbForm': 'Fin', 'Tense': 'Past', 'Aspect': 'Imp',  'Mood': 'Ind'},
@@ -2282,6 +2257,7 @@ MODERN_GREEK = GreekConfig(
     tense_feats=_MG_TENSE_FEATS,
     tense_labels=_load_tense_labels('modern_greek'),
     path_map=_MG_PATH_MAP,
+    defective_fallback=_MG_DEFECTIVE_FALLBACK,
     verb_prefix={'future': 'θα', 'future_continuous': 'θα',
                  'subjunctive_simple': 'να', 'subjunctive_continuous': 'να',
                  'conditional_simple': 'αν', 'conditional_continuous': 'αν'},
@@ -2303,6 +2279,7 @@ ANCIENT_GREEK = GreekConfig(
     tense_feats=_AG_TENSE_FEATS,
     tense_labels=_load_tense_labels('ancient_greek'),
     path_map={},
+    defective_fallback={},
     verb_prefix={},
     verb_slots=_VERB_SLOTS,
     verb_labels=['1 sg', '2 sg', '3 sg', '1 pl', '2 pl', '3 pl'],
@@ -2330,7 +2307,7 @@ def setup_ancient_greek(backend: Any) -> None:
 # easy to conflate (a past session's stale-kernel save silently reverted one
 # while editing the other). LEXICON_TAG_POS controls which words get a
 # lexicon-coverage badge computed at all; TRANSLATION_PRESENCE_CONTENT_POS
-# controls which words are eligible for the "слово в переводе" exercise.
+# controls which words are eligible for the translation-presence exercise.
 # Changing one never implies changing the other.
 
 # POS values eligible for a "which lexicon confirms this exact attested
@@ -2393,9 +2370,7 @@ class GreekUtils:
         grammar -- assign ``t_ui = gu2.ui_label`` in a notebook to keep every
         existing ``t_ui("key", lang)`` call site unchanged.
         """
-        lang = lang or "en"
-        entry = _UI_LABELS.get(key, {})
-        return entry.get(lang) or entry.get("en") or key
+        return _ui_label(key, lang)
 
     # ------------------------------------------------------------------ utils
 
@@ -2595,15 +2570,19 @@ class GreekUtils:
             return set()
         forms = self._eee_forms(word, "verb", {
             **base, 'Voice': 'Act', 'Person': _PERSON[person], 'Number': _NUM[number]})
-        if forms is not None:
-            return forms
-        p = self._paradigm(word, 'verb')
-        tense_key = self._cfg.path_map.get(tense, tense)
-        for voice in ('active', 'passive'):
-            forms = p.get(tense_key, {}).get(voice, {}).get('ind', {}).get(number, {}).get(person, set())
-            if forms:
-                return forms
-        return set()
+        if forms is None:
+            p = self._paradigm(word, 'verb')
+            tense_key = self._cfg.path_map.get(tense, tense)
+            forms = set()
+            for voice in ('active', 'passive'):
+                forms = p.get(tense_key, {}).get(voice, {}).get('ind', {}).get(number, {}).get(person, set())
+                if forms:
+                    break
+        if not forms:
+            fallback_tense = self._cfg.defective_fallback.get(tense)
+            if fallback_tense:
+                return self._verb_forms(word, fallback_tense, person, number)
+        return forms
 
     def _adj_forms(self, word: str, num: str, gender: str, case: str) -> set:
         forms = self._eee_forms(word, "adjective", {
@@ -2919,15 +2898,18 @@ class GreekUtils:
         ``eee_project.data.labels/noun-{lang}.tsv`` backs this the same way
         it backs any other slot-template consumer (never read directly here;
         always through the routing layer, per this project's own tagging
-        rule). Falls back to the English quiz-label dicts for any (number,
-        case) pair the template doesn't cover (e.g. no ``eee_module``).
+        rule). Falls back to the ``_QUIZ_CASE_LABEL``/``_QUIZ_NUM_LABEL``
+        quiz-label dicts (also ``lang``-selected) for any (number, case)
+        pair the template doesn't cover (e.g. no ``eee_module``).
         """
         by_feats = self._slot_label_index("noun", lang)
+        _case_lbl = _QUIZ_CASE_LABEL.get(lang, _QUIZ_CASE_LABEL["en"])
+        _num_lbl = _QUIZ_NUM_LABEL.get(lang, _QUIZ_NUM_LABEL["en"])
         labels = []
         for n, c in active_cases:
             label = by_feats.get(frozenset({"Case": _CASE.get(c, c), "Number": _NUM.get(n, n)}.items()))
             if label is None:
-                label = f"{_QUIZ_CASE_LABEL.get(c, c)} {_QUIZ_NUM_LABEL.get(n, n)}"
+                label = f"{_case_lbl.get(c, c)} {_num_lbl.get(n, n)}"
             labels.append(f"{label}:")
         return labels
 
@@ -2943,7 +2925,7 @@ class GreekUtils:
         """
         return [c for c in active_cases if c[0] == 'sg'] if self._cfg.indef_articles else []
 
-    def create_noun_test_ui(self, words_list, mode='simple'):
+    def create_noun_test_ui(self, words_list, mode='simple', lang: str = "ru"):
         mo = self._mo
         word = translation = noun_form = None
         if words_list and words_list[0]:
@@ -2954,11 +2936,12 @@ class GreekUtils:
             is_pt, active_cases = meta.is_pluralia_tantum, meta.active_cases
             indef_cells = self.noun_indef_cells(active_cases)
             if mode == 'simple':
-                labels = self.noun_slot_labels(active_cases)
+                labels = self.noun_slot_labels(active_cases, lang=lang)
             else:
+                _def, _indef = self.ui_label('def_prefix', lang), self.ui_label('indef_prefix', lang)
                 labels = (
-                    [f"Def. {l}" for l in self.noun_slot_labels(active_cases)] +
-                    [f"Ind. {l}" for l in self.noun_slot_labels(indef_cells)]
+                    [f"{_def} {l}" for l in self.noun_slot_labels(active_cases, lang=lang)] +
+                    [f"{_indef} {l}" for l in self.noun_slot_labels(indef_cells, lang=lang)]
                 )
             noun_form = mo.ui.array([mo.ui.text(label=l) for l in labels])
             noun_form.test_word = word
@@ -2992,7 +2975,8 @@ class GreekUtils:
             return detected
         return [g for g in ('masc', 'fem', 'neut') if self._noun_forms_gender(nw, num, case, g)]
 
-    def check_noun_test(self, noun, noun_form, mode='simple', *, article: bool = False, indefinite: bool = False):
+    def check_noun_test(self, noun, noun_form, mode='simple', *, article: bool = False, indefinite: bool = False,
+                         lang: str = "ru"):
         """Check noun paradigm form against backend.
 
         Returns ``(ok, feedback_html)`` where ``feedback_html`` is a
@@ -3025,6 +3009,8 @@ class GreekUtils:
         arts = self._cfg.articles
         indef_arts = self._cfg.indef_articles
         _detected_genders = self._noun_gender_from_article(parts)
+        _quiz_num_lbl = _QUIZ_NUM_LABEL.get(lang, _QUIZ_NUM_LABEL["en"])
+        _quiz_case_lbl = _QUIZ_CASE_LABEL.get(lang, _QUIZ_CASE_LABEL["en"])
 
         def _genders_at(num, case):
             return self._noun_genders_at(nw, num, case, _detected_genders)
@@ -3039,17 +3025,23 @@ class GreekUtils:
             if art_table is not None:
                 for g in _genders_at(num, case):
                     correct_arts.update(art_table.get(g, {}).get(num, {}).get(case, set()))
-            _n = _QUIZ_NUM_LABEL.get(num, num)
-            _c = _QUIZ_CASE_LABEL.get(case, case)
+            _n = _quiz_num_lbl.get(num, num)
+            _c = _quiz_case_lbl.get(case, case)
             errs = []
             if art_table is not None:
                 if ua is None:
                     if require_art:
-                        errs.append(f'❌ [{_c} {_n}]: article missing, must be **{" / ".join(sorted(correct_arts))}**')
+                        _msg = self.ui_label('noun_check_article_missing', lang).format(
+                            expected=" / ".join(sorted(correct_arts)))
+                        errs.append(f'❌ [{_c} {_n}]: {_msg}')
                 elif not self._ci(ua, correct_arts):
-                    errs.append(f'❌ [{_c} {_n}]: article **"{ua}"**, must be **{" / ".join(sorted(correct_arts))}**')
+                    _msg = self.ui_label('noun_check_article_wrong', lang).format(
+                        value=ua, expected=" / ".join(sorted(correct_arts)))
+                    errs.append(f'❌ [{_c} {_n}]: {_msg}')
             if not self._ci(uw, correct):
-                errs.append(f'❌ [{_c} {_n}]: noun **"{uw}"**, must be **{" / ".join(sorted(correct)) if any(correct) else "?"}**')
+                _expected = " / ".join(sorted(correct)) if any(correct) else "?"
+                _msg = self.ui_label('noun_check_wrong', lang).format(value=uw, expected=_expected)
+                errs.append(f'❌ [{_c} {_n}]: {_msg}')
             return not errs, errs
 
         def _collect(results):
@@ -3164,10 +3156,11 @@ class GreekUtils:
         ] or self._cfg.verb_slots
         return SimpleNamespace(active_slots=active_slots)
 
-    def create_verb_test_ui(self, title, words, words4test_val, current_verb, tense):
+    def create_verb_test_ui(self, title, words, words4test_val, current_verb, tense, lang: str = "ru"):
         mo = self._mo
         form = None
-        md_view = mo.md(f'**The word list for {title} is empty.**')
+        _empty = self.ui_label('word_list_empty_for', lang).format(title=title)
+        md_view = mo.md(f'**{_empty}**')
         if current_verb:
             word = current_verb['Word']
             translation = current_verb['Translation']
@@ -3176,10 +3169,11 @@ class GreekUtils:
             form.verb_word = word
             form.active_slots = active_slots
             if words4test_val:
+                _tr_label = self.ui_label('translation_label', lang)
                 md_view = mo.md(f"""
 ### {title}
 (words: {len(words4test_val)}/{len(words)})
-Translation: **{translation}**
+{_tr_label} **{translation}**
 {form}
 """)
         return form, md_view
@@ -3209,7 +3203,7 @@ Translation: **{translation}**
         ok = any(correct) and self._ci(cv, correct)
         return ok, cv, correct, pref
 
-    def check_verb_test(self, verb_base, form_array, tense):
+    def check_verb_test(self, verb_base, form_array, tense, lang: str = "ru"):
         """Check verb paradigm form against backend.
 
         Returns ``(ok, feedback_html)`` where ``feedback_html`` is a
@@ -3224,7 +3218,7 @@ Translation: **{translation}**
         if hasattr(form_array, 'verb_word') and form_array.verb_word != verb_base:
             return False, ""
         if tense not in self._cfg.tense_feats:
-            return False, f"Unknown tense '{tense}'"
+            return False, self.ui_label('unknown_tense_error', lang).format(tense=tense)
         active_slots = getattr(form_array, 'active_slots', None) or self._cfg.verb_slots
         labels = self.verb_slot_labels(active_slots)
         ok, errs = True, []
@@ -3237,12 +3231,14 @@ Translation: **{translation}**
             if not slot_ok:
                 ok = False
                 if cv is None and pref:
-                    errs.append(f'❌ [{lbl}]: Write with **"{pref}"**')
+                    _msg = self.ui_label('verb_check_write_with', lang).format(prefix=pref)
+                    errs.append(f'❌ [{lbl}]: {_msg}')
                 else:
-                    exp = '/'.join(correct) if any(correct) else 'unknown'
+                    exp = '/'.join(correct) if any(correct) else self.ui_label('unknown_label', lang)
                     if pref:
                         exp = f"{pref} {exp}"
-                    errs.append(f'❌ [{lbl}]: entered **"{uv}"**, must be **{exp}**')
+                    _msg = self.ui_label('check_entered_must_be', lang).format(value=uv, expected=exp)
+                    errs.append(f'❌ [{lbl}]: {_msg}')
         return ok, '<br>'.join(errs)
 
     def check_verb_slot(self, verb_base, tense, slot_index, value, active_slots=None):
@@ -3302,9 +3298,10 @@ Translation: **{translation}**
         ``get_slot_templates(..., terms_lang=lang)`` — see
         :meth:`noun_slot_labels` for the mechanism (same routing layer,
         backed by ``eee_project.data.labels/{pos}-{lang}.tsv``). Falls back
-        to the English quiz-label dicts for any slot the template doesn't
-        cover. ``active_slots`` restricts the names to that subset, in that
-        order — omit for the full, mode-derived list.
+        to the ``_QUIZ_ADJ_GENDER``/``_QUIZ_ADJ_NUM``/``_QUIZ_CASE_LABEL``
+        quiz-label dicts (also ``lang``-selected) for any slot the template
+        doesn't cover. ``active_slots`` restricts the names to that subset,
+        in that order — omit for the full, mode-derived list.
 
         When ``active_slots`` narrows to exactly one slot (e.g. an
         indeclinable word like κάτι/τίποτα, whose entire tested paradigm
@@ -3316,14 +3313,16 @@ Translation: **{translation}**
         fk = active_slots if active_slots is not None else self._gendered_slot_list(mode, full_cases)
         if len(fk) == 1:
             return [self.ui_label("all_forms_label", lang)]
-        cm = {c: c.title() for c in full_cases}
+        _gender_lbl = _QUIZ_ADJ_GENDER.get(lang, _QUIZ_ADJ_GENDER["en"])
+        _num_lbl = _QUIZ_ADJ_NUM.get(lang, _QUIZ_ADJ_NUM["en"])
+        _case_lbl = _QUIZ_CASE_LABEL.get(lang, _QUIZ_CASE_LABEL["en"])
         by_feats = self._slot_label_index(pos, lang)
         names = []
         for g, n, c in fk:
             label = by_feats.get(frozenset({"Case": _CASE.get(c, c), "Number": _NUM.get(n, n), "Gender": _GENDER.get(g, g)}.items()))
             if label is None:
-                label = (f"{_QUIZ_ADJ_GENDER[g]} {_QUIZ_ADJ_NUM[n]}" if mode == 'simple'
-                          else f"{_QUIZ_ADJ_GENDER[g]} {_QUIZ_ADJ_NUM[n]} {cm.get(c, c)}")
+                label = (f"{_gender_lbl[g]} {_num_lbl[n]}" if mode == 'simple'
+                          else f"{_gender_lbl[g]} {_num_lbl[n]} {_case_lbl.get(c, c)}")
             names.append(label)
         return names
 
@@ -3360,7 +3359,7 @@ Translation: **{translation}**
         return SimpleNamespace(active_slots=active_slots)
 
     def _check_gendered_test(self, base, form_array, mode, *, word_attr: str, mode_attr: str,
-                              slot_list_fn, slot_names_fn, slot_ok_fn) -> tuple:
+                              slot_list_fn, slot_names_fn, slot_ok_fn, lang: str = "ru") -> tuple:
         """Check a full gendered-paradigm form against backend — shared body
         of check_adjective_test/check_pronoun_test.
 
@@ -3379,7 +3378,7 @@ Translation: **{translation}**
         if hasattr(form_array, mode_attr):
             mode = getattr(form_array, mode_attr)
         fk = getattr(form_array, 'active_slots', None) or slot_list_fn(mode)
-        fl = slot_names_fn(mode, active_slots=fk)
+        fl = slot_names_fn(mode, lang, active_slots=fk)
         ok, has, errs = True, False, []
         for i, ((g, n, c), label) in enumerate(zip(fk, fl)):
             uv = form_array.value[i].strip()
@@ -3390,9 +3389,11 @@ Translation: **{translation}**
             slot_ok, correct = slot_ok_fn(g, n, c, uv)
             if not slot_ok:
                 ok = False
-                errs.append(f'❌ [{label}]: entered **"{uv}"**, must be **{"/".join(sorted(correct)) if any(correct) else "?"}**')
+                expected = "/".join(sorted(correct)) if any(correct) else "?"
+                _msg = self.ui_label('check_entered_must_be', lang).format(value=uv, expected=expected)
+                errs.append(f'❌ [{label}]: {_msg}')
         if not has:
-            return False, '❌ Please fill in at least one gender form'
+            return False, f"❌ {self.ui_label('gendered_check_empty', lang)}"
         return ok, '<br>'.join(errs)
 
     def _check_gendered_slot(self, mode, slot_index, value, active_slots, *, slot_list_fn, slot_ok_fn) -> bool:
@@ -3411,8 +3412,13 @@ Translation: **{translation}**
         return ok
 
     def _create_gendered_test_ui(self, words, words4test_val, current, mode, *, word_attr: str,
-                                  mode_attr: str, drill_meta_fn, slot_labels_fn, title: str, empty_msg: str):
-        """Shared body of create_adjective_test_ui/create_pronoun_test_ui."""
+                                  mode_attr: str, drill_meta_fn, slot_labels_fn, title: str, empty_msg: str,
+                                  lang: str = "ru"):
+        """Shared body of create_adjective_test_ui. ``title``/``empty_msg``
+        are already-localized strings (the caller builds them via
+        :meth:`ui_label`) -- this method itself only localizes the
+        ``Translation:`` line and threads ``lang`` to ``slot_labels_fn``.
+        """
         mo = self._mo
         form = None
         md_view = mo.md(f'**{empty_msg}**')
@@ -3420,15 +3426,16 @@ Translation: **{translation}**
             word = current['Word']
             translation = current['Translation']
             active_slots = drill_meta_fn(word, mode).active_slots
-            labels = slot_labels_fn(mode, active_slots=active_slots)
+            labels = slot_labels_fn(mode, lang, active_slots=active_slots)
             form = mo.ui.array([mo.ui.text(label=l) for l in labels])
             setattr(form, word_attr, word)
             setattr(form, mode_attr, mode)
             form.active_slots = active_slots
             if words4test_val:
+                _tr_label = self.ui_label('translation_label', lang)
                 md_view = mo.md(f"""
 ### {title} ({len(words4test_val)}/{len(words)})
-Translation: **{translation}**
+{_tr_label} **{translation}**
 {form}
 """)
         return form, md_view
@@ -3441,12 +3448,13 @@ Translation: **{translation}**
         """
         return self._gendered_drill_meta(self._adj_slot_list(mode), lambda n, g, c: self._adj_forms(word, n, g, c))
 
-    def create_adjective_test_ui(self, words, words4test_val, current_adj, mode='simple'):
+    def create_adjective_test_ui(self, words, words4test_val, current_adj, mode='simple', lang: str = "ru"):
         return self._create_gendered_test_ui(
             words, words4test_val, current_adj, mode,
             word_attr='adj_word', mode_attr='adj_mode',
             drill_meta_fn=self.adjective_drill_meta, slot_labels_fn=self.adjective_slot_labels,
-            title='Test: Adjective Declension', empty_msg='The word list for adjective test is empty.')
+            title=self.ui_label('adjective_test_title', lang),
+            empty_msg=self.ui_label('adjective_test_empty', lang), lang=lang)
 
     def _adj_slot_list(self, mode: str) -> list:
         """(gender, number, case) tuples for check_adjective_test/check_adjective_slot/
@@ -3456,14 +3464,15 @@ Translation: **{translation}**
         """
         return self._gendered_slot_list(mode, self._cfg.adj_cases)
 
-    def check_adjective_test(self, adj_base, form_array, mode='simple'):
+    def check_adjective_test(self, adj_base, form_array, mode='simple', lang: str = "ru"):
         """Check adjective paradigm form against backend. See
         :meth:`_check_gendered_test`.
         """
         return self._check_gendered_test(
             adj_base, form_array, mode, word_attr='adj_word', mode_attr='adj_mode',
             slot_list_fn=self._adj_slot_list, slot_names_fn=self._adj_slot_names,
-            slot_ok_fn=lambda g, n, c, v: self._gendered_slot_ok(lambda n2, g2, c2: self._adj_forms(adj_base, n2, g2, c2), g, n, c, v))
+            slot_ok_fn=lambda g, n, c, v: self._gendered_slot_ok(lambda n2, g2, c2: self._adj_forms(adj_base, n2, g2, c2), g, n, c, v),
+            lang=lang)
 
     def check_adjective_slot(self, adj_base, mode, slot_index, value, active_slots=None):
         """Check a single adjective-form slot. See :meth:`_check_gendered_slot`."""
@@ -3488,23 +3497,15 @@ Translation: **{translation}**
     # ------------------------------------------------------------- pronoun test
     #
     # Gendered pronouns only (κανένας, ίδιος, αυτός, ...) -- see the shared
-    # core above. ``words`` passed to create_pronoun_test_ui/
-    # pronoun_paradigm_drill_form should be pre-filtered to gendered pronoun
-    # lemmas (PRONOUN_LEMMAS_GENDERED in modern_greek_inflexion_eee) -- see
-    # :meth:`_pronoun_forms`.
+    # core above. ``words`` passed to pronoun_paradigm_drill_form should be
+    # pre-filtered to gendered pronoun lemmas (PRONOUN_LEMMAS_GENDERED in
+    # modern_greek_inflexion_eee) -- see :meth:`_pronoun_forms`.
 
     def pronoun_drill_meta(self, word: str, mode: str) -> SimpleNamespace:
         """Active (gender, number, case) slots for one pronoun+mode.
         See :meth:`_gendered_drill_meta`.
         """
         return self._gendered_drill_meta(self._pronoun_slot_list(mode), lambda n, g, c: self._pronoun_forms(word, n, g, c))
-
-    def create_pronoun_test_ui(self, words, words4test_val, current_pron, mode='simple'):
-        return self._create_gendered_test_ui(
-            words, words4test_val, current_pron, mode,
-            word_attr='pron_word', mode_attr='pron_mode',
-            drill_meta_fn=self.pronoun_drill_meta, slot_labels_fn=self.pronoun_slot_labels,
-            title='Test: Pronoun Declension', empty_msg='The word list for pronoun test is empty.')
 
     def _pronoun_slot_list(self, mode: str) -> list:
         """(gender, number, case) tuples for check_pronoun_test/check_pronoun_slot/
@@ -3514,14 +3515,15 @@ Translation: **{translation}**
         """
         return self._gendered_slot_list(mode, ('nom', 'gen', 'acc'))
 
-    def check_pronoun_test(self, pron_base, form_array, mode='simple'):
+    def check_pronoun_test(self, pron_base, form_array, mode='simple', lang: str = "ru"):
         """Check pronoun paradigm form against backend. See
         :meth:`_check_gendered_test`.
         """
         return self._check_gendered_test(
             pron_base, form_array, mode, word_attr='pron_word', mode_attr='pron_mode',
             slot_list_fn=self._pronoun_slot_list, slot_names_fn=self._pronoun_slot_names,
-            slot_ok_fn=lambda g, n, c, v: self._gendered_slot_ok(lambda n2, g2, c2: self._pronoun_forms(pron_base, n2, g2, c2), g, n, c, v))
+            slot_ok_fn=lambda g, n, c, v: self._gendered_slot_ok(lambda n2, g2, c2: self._pronoun_forms(pron_base, n2, g2, c2), g, n, c, v),
+            lang=lang)
 
     def check_pronoun_slot(self, pron_base, mode, slot_index, value, active_slots=None):
         """Check a single pronoun-form slot. See :meth:`_check_gendered_slot`."""
@@ -3655,14 +3657,18 @@ Translation: **{translation}**
         pick, or an empty element before any answer is given.
 
         Shared by :meth:`stanza_match_form` and :meth:`translation_presence_form`,
-        whose free-text/да-нет answer options can't reuse :meth:`_feedback_md`'s
+        whose free-text/yes-no answer options can't reuse :meth:`_feedback_md`'s
         fixed "meaning → form" template.
         """
         if fb_ans is None:
             return mo.md("")
         ok = fb_ans == correct
         color = "#2d9e2d" if ok else "#d32f2f"
-        mark = _QUIZ_RIGHT.get(lang, "✓") if ok else f"{_QUIZ_INCORRECT.get(lang, '✗')} {correct}"
+        # quiz_incorrect_label ("Incorrect") rather than quiz_wrong_mark's "No" --
+        # needed wherever a quiz's own answer options could themselves be yes/no
+        # (quiz_wrong_mark there would read as restating the answer rather than
+        # judging it); used here since it reads better in general.
+        mark = self.ui_label('quiz_right_mark', lang) if ok else f"{self.ui_label('quiz_incorrect_label', lang)} {correct}"
         return mo.md(f'<span style="color:{color};font-weight:bold">{mark}</span>')
 
     def _render_table_or_error(self, build_paradigm_table, word: dict, lang: str) -> tuple:
@@ -3680,10 +3686,10 @@ Translation: **{translation}**
     def _make_nav_buttons(self, *, done: bool = False, history_len: int = 0, lang: str = "ru") -> tuple:
         """Return ``(next_btn, prev_btn)`` for word-drill / word-quiz exercises."""
         mo = self._mo
-        _next_lbl = _NAV_AGAIN.get(lang, "Again") if done else _NAV_NEXT.get(lang, "Next")
+        _next_lbl = self.ui_label('nav_again_label', lang) if done else self.ui_label('nav_next_label', lang)
         return (
             mo.ui.button(label=_next_lbl, on_click=_INC),
-            mo.ui.button(label=_NAV_PREV.get(lang, "Prev"), on_click=_INC, disabled=history_len == 0),
+            mo.ui.button(label=self.ui_label('nav_prev_label', lang), on_click=_INC, disabled=history_len == 0),
         )
 
     def _nav_row(self, *buttons: Any, justify: str = "start") -> Any:
@@ -3693,55 +3699,49 @@ Translation: **{translation}**
         :meth:`translation_presence_form`."""
         return self._mo.hstack([b for b in buttons if b is not None], justify=justify)
 
-    def make_renew_button(self) -> Any:
+    def make_renew_button(self, lang: str = "ru") -> Any:
         """``↺`` button whose value counts clicks. Notebooks put it in its own
         cell and read ``.value`` elsewhere to force a fresh session sample."""
-        return self._mo.ui.button(label="↺ Новый набор", on_click=_INC)
+        return self._mo.ui.button(label=self.ui_label('renew_label', lang), on_click=_INC)
 
     def ictus_toggle_panel(self, show_ictus: Any, show_homer: Any, eee_note: str, *,
-                            ictus_color: str, ictus_color_name: str) -> Any:
+                            ictus_color: str, ictus_color_name: str, lang: str = "ru") -> Any:
         """SHOW_ICTUS/SHOW_HOMER toggle row + EEE-engine note accordion.
 
         *show_ictus*/*show_homer* are the caller's already-built
         ``mo.ui.switch`` elements; *eee_note* is the already-resolved note
         text (loaded from ``eee_note.md`` or inline, caller's choice).
-        *ictus_color*/*ictus_color_name* are the CSS color and its Russian
-        name used in the ictus-highlighting sentence -- lessons vary this
+        *ictus_color*/*ictus_color_name* are the CSS color and its name (in
+        *lang*) used in the ictus-highlighting sentence -- lessons vary this
         (e.g. red vs. green) to match their own ``ictus.html``.
         """
+        _color_html = f"<b style='color:{ictus_color}'>{ictus_color_name}</b>"
         return self._mo.vstack(
             [
                 self._mo.hstack(
                     [show_ictus, self._mo.md(
-                        f"Икты (ударные слоги) каждой стопы выделены "
-                        f"<b style='color:{ictus_color}'>{ictus_color_name}</b>."
+                        self.ui_label('ictus_note_label', lang).format(color_html=_color_html)
                     )],
                     justify="start", align="center", gap=1.5,
                 ),
                 self._mo.hstack(
-                    [show_homer, self._mo.md(
-                        "Слова из гомеровского лексикона, для которых движок EEE строит "
-                        "таблицы словоформ по разным периодам греческого языка."
-                    )],
+                    [show_homer, self._mo.md(self.ui_label('homer_lexicon_note', lang))],
                     justify="start", align="center", gap=1.5,
                 ),
-                self._mo.accordion({"О морфологическом движке EEE": eee_note}),
+                self._mo.accordion({self.ui_label('eee_engine_accordion_label', lang): eee_note}),
             ],
             align="stretch", gap=0.5,
         )
 
     def render_gloss_panel(self, quiz_words_raw: list, selected_word: str,
-                            build_lexicon_tabs: Any) -> Any:
+                            build_lexicon_tabs: Any, lang: str = "ru") -> Any:
         """Word-click gloss panel: resolve *selected_word* against
         *quiz_words_raw*, show its translation/grammar label, and (if any
         curated lexicon attests the exact form) a per-lexicon paradigm-table
         caption via *build_lexicon_tabs*."""
         w = resolve_clicked_word(quiz_words_raw, selected_word)
         if w is None:
-            return self._mo.md(
-                "*Выберите слово в тексте, чтобы увидеть перевод и формы "
-                "слов из гомеровскго лексикона…*"
-            )
+            return self._mo.md(self.ui_label('gloss_panel_empty', lang))
         w2 = dict(w)
         add_labels([w2])
         gloss = f"**{w2.get('form', selected_word)}** — {w2['_label']}"
@@ -3751,10 +3751,7 @@ Translation: **{translation}**
         tables = build_lexicon_tabs(w2) or ""
         if not tables:
             return self._mo.md(gloss)
-        caption = self._mo.md(
-            "*Формы слова по эпохам — только простейшее морфологическое "
-            "соответствие по леммам, смысл может меняться*"
-        )
+        caption = self._mo.md(self.ui_label('gloss_panel_era_caption', lang))
         return self._mo.vstack([self._mo.md(gloss), caption, self._mo.Html(tables)])
 
     @staticmethod
@@ -3884,7 +3881,8 @@ Translation: **{translation}**
         )
 
     def reset_paradigm_drill_state(self, vocab: list, set_words, set_hist, set_msg, set_cap,
-                                    set_entered, set_sub_cnt, set_prev_cnt, set_nxt_cnt) -> None:
+                                    set_entered, set_sub_cnt, set_prev_cnt, set_nxt_cnt,
+                                    set_errors=None) -> None:
         """Reset a hand-rolled paradigm-drill exercise back to its initial state
         (a full multi-field paradigm per word via ``make_paradigm_form``, not
         the one-question-at-a-time ``word_quiz_form``/``word_drill_form``).
@@ -3898,6 +3896,13 @@ Translation: **{translation}**
         Re-shuffles ``vocab`` via :meth:`_shuffle`, matching
         :meth:`make_paradigm_drill_state`'s initial order -- resetting to
         *vocab*'s raw order here was a real regression (see CHANGELOG 1.7.3).
+
+        ``set_errors``: optional (from :meth:`make_error_tracking_state`) --
+        pass it to also clear the per-word mistake counts. Both the "start
+        over" path and the "retry mistakes" path (see
+        :meth:`_paradigm_drill_form`) pass it, since both start a fresh
+        round -- mistake counts are scoped to "this round", not the whole
+        session; see :meth:`make_error_tracking_state` for why.
         """
         set_words(self._shuffle(vocab))
         set_hist([])
@@ -3907,6 +3912,82 @@ Translation: **{translation}**
         set_sub_cnt(0)
         set_prev_cnt(0)
         set_nxt_cnt(0)
+        if set_errors is not None:
+            set_errors({})
+
+    def make_error_tracking_state(self) -> tuple:
+        """Create the 2 ``mo.state()`` pairs a paradigm-drill's "retry
+        mistakes" feature needs, as a flat 4-tuple -- unpack directly in the
+        same notebook cell as :meth:`make_paradigm_drill_state`::
+
+            (errors, set_errors, retry_cnt,
+             set_retry_cnt) = gu.make_error_tracking_state()
+
+        Separate from :meth:`make_paradigm_drill_state` rather than folded
+        into it, so existing callers unpacking that function's fixed
+        20-value tuple are unaffected -- this is purely opt-in. Safe to call
+        directly from a notebook cell for the same reason
+        :meth:`make_paradigm_drill_state` is: marimo's static reactivity
+        tracking needs the ``mo.state()`` calls to appear in the cell that
+        owns the resulting names, not routed through a dict/attribute
+        lookup from a different cell.
+
+        ``errors`` is a ``{word_key_value: count}`` dict, incremented once
+        per wrong attempt on that word -- a wrong "Check" click (the whole
+        form) or a wrong per-field Enter (that one field) both count, since
+        per-field Enter-navigation is this drill's primary interaction, not
+        a secondary path; an empty attempt (nothing typed in the field/form
+        yet) never counts. Scoped to "this round", not the whole session:
+        the whole dict is cleared whenever a fresh round starts (restart or
+        retry -- see :meth:`reset_paradigm_drill_state`'s ``set_errors``),
+        but nothing clears it *mid*-round, so a mistake later self-corrected
+        within the same round still counts and stays retry-eligible until
+        the next round starts. Two live reports shaped this: (1) without any
+        clearing, a word fixed in an earlier retry round kept resurfacing in
+        every later one; (2) clearing per-word the instant it's next
+        answered correctly over-corrected (1) -- a mistake typed and
+        immediately self-corrected within one attempt, before that same
+        word's final correct submission, silently vanished from the tally
+        the student expected to still see it in. Clearing only at round
+        boundaries satisfies both. Pass ``errors``/``set_errors`` as
+        ``get_errors``/``set_errors`` and ``retry_cnt``/``set_retry_cnt`` as
+        ``get_retry_cnt``/``set_retry_cnt`` to a ``*_paradigm_drill_form``
+        call, and build its ``retry_btn`` with :meth:`retry_mistakes_button`.
+        """
+        mo = self._mo
+        errors, set_errors = mo.state({})
+        retry_cnt, set_retry_cnt = mo.state(0)
+        return errors, set_errors, retry_cnt, set_retry_cnt
+
+    def retry_mistakes_button(self, errors: dict, *, label: "str | None" = None, lang: str = "ru") -> Any:
+        """Button for retrying only the words with a recorded mistake this
+        session (``errors`` from :meth:`make_error_tracking_state`) -- pass
+        its result as ``retry_btn`` to a ``*_paradigm_drill_form`` call.
+        Disabled when ``errors`` is empty (nothing to retry yet), the same
+        way :meth:`paradigm_drill_widgets` disables prev/next at the ends
+        of the word list.
+        """
+        if label is None:
+            label = self.ui_label('retry_label', lang)
+        return self._mo.ui.button(label=label, on_click=_INC, disabled=not errors)
+
+    @staticmethod
+    def _has_input(values: list) -> bool:
+        """Whether any field in a paradigm-form's current values has real
+        (non-whitespace) content -- shared by :meth:`dirty_check_button`
+        and the "retry mistakes" error counter in
+        :meth:`_paradigm_drill_form`, both of which need to tell an
+        accidental empty submission apart from an actual attempt."""
+        return any(v.strip() for v in values)
+
+    @staticmethod
+    def _record_mistake(get_errors, set_errors, word: str) -> None:
+        """Increment *word*'s wrong-attempt count by one -- shared by
+        :meth:`_paradigm_drill_form`'s two attempt paths (a wrong "Check"
+        click and a wrong per-field Enter), which otherwise had identical
+        bodies."""
+        errs = get_errors()
+        set_errors({**errs, word: errs.get(word, 0) + 1})
 
     def dirty_check_button(self, form, cap, cv: "dict | None", attr_name: str, *,
                             word_key: str = "form", label: str = "Check"):
@@ -3922,13 +4003,13 @@ Translation: **{translation}**
         ("verb_word" for verbs, "test_word" for nouns, "adj_word" for
         adjectives) — ``cap()``'s snapshot
         must expose that attribute plus a matching ``.value`` list. ``label``
-        defaults to English "Check"; pass e.g. ``label="Проверить"`` for a
-        localized button.
+        defaults to English "Check"; pass ``label=gu.ui_label("check_label",
+        lang)`` for a localized button.
         """
         live = list(form.widget.values)
         c = cap()
         word = cv[word_key] if cv is not None else None
-        has_input = any(v.strip() for v in live)
+        has_input = self._has_input(live)
         match = (
             c is not None
             and word is not None
@@ -3975,11 +4056,11 @@ Translation: **{translation}**
         bundled here.
         """
         if next_label is None:
-            next_label = _PARADIGM_NEXT.get(lang, "Next ▸")
+            next_label = self.ui_label('next_label', lang)
         if prev_label is None:
-            prev_label = _PARADIGM_PREV.get(lang, "◂ Prev")
+            prev_label = self.ui_label('prev_label', lang)
         if restart_label is None:
-            restart_label = _PARADIGM_RESTART.get(lang, "↺ Start over")
+            restart_label = self.ui_label('restart_label', lang)
         form = make_paradigm_form(self._mo, labels, values=values, polytonic=self._cfg.polytonic)
         prev_btn = self._mo.ui.button(label=prev_label, on_click=_INC, disabled=history_len == 0)
         nxt_btn = self._mo.ui.button(label=next_label, on_click=_INC, disabled=remaining_len <= 1)
@@ -3993,8 +4074,9 @@ Translation: **{translation}**
         get_sub_cnt, set_sub_cnt, get_prev_cnt, set_prev_cnt,
         get_nxt_cnt, set_nxt_cnt, get_entercnt, set_entercnt,
         get_restart_cnt, set_restart_cnt,
+        get_errors=None, set_errors=None, get_retry_cnt=None, set_retry_cnt=None,
     ) -> dict:
-        """Bundle the 10 ``mo.state()`` pairs a paradigm-drill exercise needs
+        """Bundle the ``mo.state()`` pairs a paradigm-drill exercise needs
         into one dict, for :meth:`_paradigm_drill_form`'s internal use only.
 
         Internal-only: never do this bundling in a notebook cell and pass
@@ -4008,14 +4090,23 @@ Translation: **{translation}**
         cell's call chain (the notebook cell → ``verb_paradigm_drill_form``
         → this → :meth:`_paradigm_drill_form`), never crossing back out to
         a different cell.
+
+        ``get_errors``/``set_errors``/``get_retry_cnt``/``set_retry_cnt``
+        (from :meth:`make_error_tracking_state`) are optional -- the
+        "errors" key is only added to the returned dict when all four are
+        given, so a caller that doesn't want "retry mistakes" support
+        (most existing ones) is unaffected.
         """
-        return {
+        state = {
             "words": (get_words, set_words), "hist": (get_hist, set_hist),
             "msg": (get_msg, set_msg), "cap": (get_cap, set_cap),
             "entered": (get_entered, set_entered), "sub_cnt": (get_sub_cnt, set_sub_cnt),
             "prev_cnt": (get_prev_cnt, set_prev_cnt), "nxt_cnt": (get_nxt_cnt, set_nxt_cnt),
             "entercnt": (get_entercnt, set_entercnt), "restart_cnt": (get_restart_cnt, set_restart_cnt),
         }
+        if None not in (get_errors, set_errors, get_retry_cnt, set_retry_cnt):
+            state["errors"] = (get_errors, set_errors, get_retry_cnt, set_retry_cnt)
+        return state
 
     def _paradigm_drill_form(
         self,
@@ -4032,6 +4123,7 @@ Translation: **{translation}**
         make_cap: Any,
         slot_ok: Any,
         full_check: Any,
+        retry_btn: Any = None,
     ) -> Any:
         """Shared engine behind the public ``*_paradigm_drill_form``
         siblings (noun/verb/adjective/pronoun), which differ only in their
@@ -4048,6 +4140,15 @@ Translation: **{translation}**
         ``state`` is the dict built by :meth:`_pack_paradigm_state` — see
         its docstring for why this bundling is only safe internally, never
         across a marimo cell boundary.
+
+        ``retry_btn``: optional (from :meth:`retry_mistakes_button`) --
+        only meaningful when ``state`` carries an "errors" entry (i.e. the
+        caller passed ``get_errors``/``set_errors``/``get_retry_cnt``/
+        ``set_retry_cnt`` through to :meth:`_pack_paradigm_state`). Starts a
+        fresh round over just the words with a recorded mistake, reading the
+        mistake list first and then clearing it the same way ``restart_btn``
+        does -- see :meth:`make_error_tracking_state` for why mistake counts
+        are scoped to "this round" rather than kept forever.
         """
         mo = self._mo
         get_words, set_words = state["words"]
@@ -4060,6 +4161,8 @@ Translation: **{translation}**
         get_nxt_cnt, set_nxt_cnt = state["nxt_cnt"]
         get_entercnt, set_entercnt = state["entercnt"]
         get_restart_cnt, set_restart_cnt = state["restart_cnt"]
+        get_errors, set_errors, get_retry_cnt, set_retry_cnt = state.get(
+            "errors", (None, None, None, None))
         words = get_words()
 
         if (restart_btn.value or 0) > get_restart_cnt():
@@ -4067,11 +4170,33 @@ Translation: **{translation}**
             self.reset_paradigm_drill_state(
                 vocab, set_words, set_hist, set_msg, set_cap,
                 set_entered, set_sub_cnt, set_prev_cnt, set_nxt_cnt,
+                set_errors=set_errors,
+            )
+            return mo.md("*...*")
+
+        if retry_btn is not None and get_errors is not None and (retry_btn.value or 0) > get_retry_cnt():
+            set_retry_cnt(retry_btn.value)
+            mistakes = [w for w in vocab if w[word_key] in get_errors()]
+            self.reset_paradigm_drill_state(
+                mistakes, set_words, set_hist, set_msg, set_cap,
+                set_entered, set_sub_cnt, set_prev_cnt, set_nxt_cnt,
+                set_errors=set_errors,
             )
             return mo.md("*...*")
 
         if not words:
-            return mo.vstack([mo.callout(mo.md(done_message), kind="success"), restart_btn])
+            items = [mo.callout(mo.md(done_message), kind="success")]
+            if retry_btn is not None and get_errors is not None and get_errors():
+                _errs = get_errors()
+                # words is empty here, so hist alone is this round's total
+                # (same round-relative fix as the mid-session progress line
+                # below -- len(vocab) would show the *original* round's size
+                # during a retry round over a smaller subset).
+                items.append(mo.md(f"❌ {len(_errs)} / {len(get_hist())}"))
+                items.append(mo.hstack([restart_btn, retry_btn], justify="start"))
+            else:
+                items.append(restart_btn)
+            return mo.vstack(items)
 
         hist = get_hist()
 
@@ -4090,8 +4215,13 @@ Translation: **{translation}**
             if _enter and not _click:
                 i = _sub_req.get("field_index", -1)
                 advance_to = None
-                if 0 <= i < len(_live) and slot_ok(i, _live[i]) and i + 1 < len(_live):
+                in_range = 0 <= i < len(_live)
+                field_ok = in_range and slot_ok(i, _live[i])
+                if field_ok and i + 1 < len(_live):
                     advance_to = i + 1
+                if (not field_ok and in_range and get_errors is not None
+                        and cv and self._has_input([_live[i]])):
+                    self._record_mistake(get_errors, set_errors, cv[word_key])
                 # Always reply, even on a wrong answer or the last field --
                 # the JS side locks the origin field the instant Enter
                 # fires and only releases it once this exact request_id
@@ -4111,6 +4241,9 @@ Translation: **{translation}**
             set_msg(f"✓ {cv[word_key]} — {cv[meaning_key]}")
             set_cap(None)
             return mo.md("*...*")
+
+        if _click and get_errors is not None and cv and self._has_input(_live):
+            self._record_mistake(get_errors, set_errors, cv[word_key])
 
         if (nxt_btn.value or 0) > get_nxt_cnt():
             set_nxt_cnt(nxt_btn.value)
@@ -4133,9 +4266,20 @@ Translation: **{translation}**
                 set_words([prev_word] + [w for w in words if w[word_key] != prev_word[word_key]])
             return mo.md("*...*")
 
-        _done_count = len(vocab) - len(words)
+        # len(words)+len(hist) is this ROUND's total, not len(vocab) -- the
+        # two only ever move a word between each other (see the ok/nxt/prev
+        # branches above), and both reset at every round boundary
+        # (reset_paradigm_drill_state), so their sum stays constant across
+        # a round regardless of whether it's the original pass or a
+        # "retry mistakes" round over a smaller subset of vocab.
+        _round_total = len(words) + len(hist)
         _pfx = f"{title}\n\n" if title else ""
-        items = [mo.md(f"{_pfx}**{_done_count + 1}** / {len(vocab)}")]
+        _progress = f"{_pfx}**{len(hist) + 1}** / {_round_total}"
+        if get_errors is not None:
+            _err_total = sum(get_errors().values())
+            if _err_total:
+                _progress += f" · ❌ {_err_total}"
+        items = [mo.md(_progress)]
         _msg = get_msg()
         if _msg:
             items.append(mo.md(_msg))
@@ -4167,6 +4311,10 @@ Translation: **{translation}**
         meaning_label: str = "Meaning",
         title: str = "",
         done_message: str = "Done — every verb drilled!",
+        get_errors: Any = None, set_errors: Any = None,
+        get_retry_cnt: Any = None, set_retry_cnt: Any = None,
+        retry_btn: Any = None,
+        lang: str = "ru",
     ) -> Any:
         """Unified verb-paradigm drill: per-field Enter-navigation, dirty-check
         snapshot, save/restore across back/next, restart, and full display,
@@ -4185,6 +4333,18 @@ Translation: **{translation}**
         back to ``config.verb_slots`` (every slot shown, unfiltered) rather
         than raising — a caller that forgets to compute it gets a working,
         just less-precise, drill instead of a crash.
+
+        ``get_errors``/``set_errors``/``get_retry_cnt``/``set_retry_cnt``
+        (from :meth:`make_error_tracking_state`) plus ``retry_btn`` (from
+        :meth:`retry_mistakes_button`) are optional and all-or-nothing --
+        opt in to "retry mistakes" by passing all five; omit all five
+        (the default) for the previous behavior, unchanged.
+
+        ``lang`` (``ru``/``en``/``el``) only affects the wrong-answer
+        feedback text built by :meth:`check_verb_test` ("entered ..., must
+        be ..."); it doesn't touch ``meaning_label``/``title``/
+        ``done_message`` (those are already caller-supplied per-call, same
+        as elsewhere in this file).
         """
         active_slots = getattr(verb_meta, "active_slots", None) or self._cfg.verb_slots
         state = self._pack_paradigm_state(
@@ -4193,6 +4353,8 @@ Translation: **{translation}**
             get_sub_cnt, set_sub_cnt, get_prev_cnt, set_prev_cnt,
             get_nxt_cnt, set_nxt_cnt, get_entercnt, set_entercnt,
             get_restart_cnt, set_restart_cnt,
+            get_errors=get_errors, set_errors=set_errors,
+            get_retry_cnt=get_retry_cnt, set_retry_cnt=set_retry_cnt,
         )
         return self._paradigm_drill_form(
             state, cv, form, check_btn, prev_btn, nxt_btn, restart_btn,
@@ -4203,7 +4365,8 @@ Translation: **{translation}**
                 SimpleNamespace(verb_word=cv[word_key], tense=tense, active_slots=active_slots, value=live)
                 if cv else None),
             slot_ok=lambda i, v: bool(cv) and self.check_verb_slot(cv[word_key], tense, i, v, active_slots=active_slots),
-            full_check=lambda cap: self.check_verb_test(cv[word_key], cap, tense),
+            full_check=lambda cap: self.check_verb_test(cv[word_key], cap, tense, lang=lang),
+            retry_btn=retry_btn,
         )
 
     def noun_paradigm_drill_form(
@@ -4229,13 +4392,17 @@ Translation: **{translation}**
         meaning_label: str = "Meaning",
         title: str = "",
         done_message: str = "Done — every noun drilled!",
+        get_errors: Any = None, set_errors: Any = None,
+        get_retry_cnt: Any = None, set_retry_cnt: Any = None,
+        retry_btn: Any = None,
+        lang: str = "ru",
     ) -> Any:
         """Unified noun-paradigm drill — sibling of :meth:`verb_paradigm_drill_form`
         (see its docstring for the shared design, including the "meta is
-        optional" fallback behavior). Uses ``check_noun_slot``/
-        ``check_noun_test`` instead, and takes ``noun_meta`` (from
-        :meth:`noun_drill_meta`, also the 3rd return value of
-        :meth:`create_noun_test_ui`) for its ``active_cases``/
+        optional" fallback behavior and the "retry mistakes" params). Uses
+        ``check_noun_slot``/``check_noun_test`` instead, and takes
+        ``noun_meta`` (from :meth:`noun_drill_meta`, also the 3rd return
+        value of :meth:`create_noun_test_ui`) for its ``active_cases``/
         ``is_pluralia_tantum`` — nouns' active cases vary per word (pluralia
         tantum), unlike a verb's fixed slot list. Omitting it falls back to
         ``config.noun_cells`` (every case shown, not pluralia-tantum-aware).
@@ -4265,6 +4432,8 @@ Translation: **{translation}**
             get_sub_cnt, set_sub_cnt, get_prev_cnt, set_prev_cnt,
             get_nxt_cnt, set_nxt_cnt, get_entercnt, set_entercnt,
             get_restart_cnt, set_restart_cnt,
+            get_errors=get_errors, set_errors=set_errors,
+            get_retry_cnt=get_retry_cnt, set_retry_cnt=set_retry_cnt,
         )
         return self._paradigm_drill_form(
             state, cv, form, check_btn, prev_btn, nxt_btn, restart_btn,
@@ -4283,7 +4452,8 @@ Translation: **{translation}**
                 cv is not None
                 and self.check_noun_slot(cv[word_key], i, v, article=article,
                                           active_cases=active_cases, indefinite=indefinite)),
-            full_check=lambda cap: self.check_noun_test(cv[word_key], cap, article=article, indefinite=indefinite),
+            full_check=lambda cap: self.check_noun_test(cv[word_key], cap, article=article, indefinite=indefinite, lang=lang),
+            retry_btn=retry_btn,
         )
 
     def adjective_paradigm_drill_form(
@@ -4308,14 +4478,18 @@ Translation: **{translation}**
         meaning_label: str = "Meaning",
         title: str = "",
         done_message: str = "Done — every adjective drilled!",
+        get_errors: Any = None, set_errors: Any = None,
+        get_retry_cnt: Any = None, set_retry_cnt: Any = None,
+        retry_btn: Any = None,
+        lang: str = "ru",
     ) -> Any:
         """Unified adjective-paradigm drill — sibling of :meth:`verb_paradigm_drill_form`
         (see its docstring for the shared design, including the "meta is
-        optional" fallback behavior). Uses ``check_adjective_slot``/
-        ``check_adjective_test`` instead; ``mode`` picks the slot set
-        (``"simple"`` = nominative only, 6 slots; anything else = every
-        case in ``config.adj_cases``), matching :meth:`adjective_slot_labels`'s
-        labels for the same mode.
+        optional" fallback behavior and the "retry mistakes" params). Uses
+        ``check_adjective_slot``/``check_adjective_test`` instead; ``mode``
+        picks the slot set (``"simple"`` = nominative only, 6 slots;
+        anything else = every case in ``config.adj_cases``), matching
+        :meth:`adjective_slot_labels`'s labels for the same mode.
 
         ``adj_meta`` (from :meth:`adjective_drill_meta`, also set on the form
         :meth:`create_adjective_test_ui` returns) supplies ``active_slots`` --
@@ -4333,6 +4507,8 @@ Translation: **{translation}**
             get_sub_cnt, set_sub_cnt, get_prev_cnt, set_prev_cnt,
             get_nxt_cnt, set_nxt_cnt, get_entercnt, set_entercnt,
             get_restart_cnt, set_restart_cnt,
+            get_errors=get_errors, set_errors=set_errors,
+            get_retry_cnt=get_retry_cnt, set_retry_cnt=set_retry_cnt,
         )
         return self._paradigm_drill_form(
             state, cv, form, check_btn, prev_btn, nxt_btn, restart_btn,
@@ -4343,7 +4519,8 @@ Translation: **{translation}**
                 SimpleNamespace(adj_word=cv[word_key], adj_mode=mode, active_slots=active_slots, value=live)
                 if cv else None),
             slot_ok=lambda i, v: bool(cv) and self.check_adjective_slot(cv[word_key], mode, i, v, active_slots=active_slots),
-            full_check=lambda cap: self.check_adjective_test(cv[word_key], cap, mode),
+            full_check=lambda cap: self.check_adjective_test(cv[word_key], cap, mode, lang=lang),
+            retry_btn=retry_btn,
         )
 
     def pronoun_paradigm_drill_form(
@@ -4368,19 +4545,23 @@ Translation: **{translation}**
         meaning_label: str = "Meaning",
         title: str = "",
         done_message: str = "Done — every pronoun drilled!",
+        get_errors: Any = None, set_errors: Any = None,
+        get_retry_cnt: Any = None, set_retry_cnt: Any = None,
+        retry_btn: Any = None,
+        lang: str = "ru",
     ) -> Any:
         """Unified pronoun-paradigm drill — sibling of :meth:`adjective_paradigm_drill_form`
         (see its docstring for the shared design, including the "meta is
-        optional" fallback behavior). Uses ``check_pronoun_slot``/
-        ``check_pronoun_test`` instead. Gendered pronouns only -- ``vocab``
-        should already be filtered to PRONOUN_LEMMAS_GENDERED lemmas, same
-        as :meth:`create_pronoun_test_ui`.
+        optional" fallback behavior and the "retry mistakes" params). Uses
+        ``check_pronoun_slot``/``check_pronoun_test`` instead. Gendered
+        pronouns only -- ``vocab`` should already be filtered to
+        PRONOUN_LEMMAS_GENDERED lemmas (see :meth:`_pronoun_forms`).
 
-        ``pron_meta`` (from :meth:`pronoun_drill_meta`, also set on the form
-        :meth:`create_pronoun_test_ui` returns) supplies ``active_slots`` --
-        e.g. κανένας has no plural at all, so those 3 fields must not be
-        shown, not just fail with "?" once checked. Omitting it falls back
-        to the unfiltered per-mode list (every slot shown).
+        ``pron_meta`` (from :meth:`pronoun_drill_meta`) supplies
+        ``active_slots`` -- e.g. κανένας has no plural at all, so those 3
+        fields must not be shown, not just fail with "?" once checked.
+        Omitting it falls back to the unfiltered per-mode list (every slot
+        shown).
         """
         active_slots = getattr(pron_meta, "active_slots", None) or self._pronoun_slot_list(mode)
         state = self._pack_paradigm_state(
@@ -4389,6 +4570,8 @@ Translation: **{translation}**
             get_sub_cnt, set_sub_cnt, get_prev_cnt, set_prev_cnt,
             get_nxt_cnt, set_nxt_cnt, get_entercnt, set_entercnt,
             get_restart_cnt, set_restart_cnt,
+            get_errors=get_errors, set_errors=set_errors,
+            get_retry_cnt=get_retry_cnt, set_retry_cnt=set_retry_cnt,
         )
         return self._paradigm_drill_form(
             state, cv, form, check_btn, prev_btn, nxt_btn, restart_btn,
@@ -4399,7 +4582,8 @@ Translation: **{translation}**
                 SimpleNamespace(pron_word=cv[word_key], pron_mode=mode, active_slots=active_slots, value=live)
                 if cv else None),
             slot_ok=lambda i, v: bool(cv) and self.check_pronoun_slot(cv[word_key], mode, i, v, active_slots=active_slots),
-            full_check=lambda cap: self.check_pronoun_test(cv[word_key], cap, mode),
+            full_check=lambda cap: self.check_pronoun_test(cv[word_key], cap, mode, lang=lang),
+            retry_btn=retry_btn,
         )
 
     def _handle_prev(self, cv, restore_entry, history, future, score,
@@ -4491,9 +4675,9 @@ Translation: **{translation}**
         """
         mo = self._mo
         if placeholder is None:
-            placeholder = _WRITE_PLACEHOLDER.get(lang, "Greek word…")
+            placeholder = self.ui_label('write_placeholder', lang)
         if label is None:
-            label = _CHECK_LABEL.get(lang, "Check")
+            label = self.ui_label('check_label', lang)
         _ans = (restore_entry.get("answer") or "") if restore_entry else ""
         write_input = self.diacritics_text(placeholder=placeholder, value=_ans)
         dia = write_input._ui
@@ -4535,9 +4719,9 @@ Translation: **{translation}**
             write_input:   Diacritics-text widget (from :meth:`diacritics_text`).
             dia_reactive:  ``write_input._ui`` — the underlying
                            ``mo.ui.anywidget`` that triggers cell re-runs.
-            check_btn:     "Проверить" button.
-            prev_btn:      "Предыдущий" button.
-            next_btn:      "Следующий" / "Пройти снова" button.
+            check_btn:     "Check" button.
+            prev_btn:      "Prev" button.
+            next_btn:      "Next" / "Again" button.
             vocab:         Full word list (for total-count display).
             title:         Markdown heading rendered above the comment.
             comment:       Optional note (use ``<br>`` for tight line breaks).
@@ -4565,7 +4749,7 @@ Translation: **{translation}**
             parts.append(mo.md(title))
         if comment:
             parts.append(mo.md(comment))
-        _corr = _QUIZ_PROGRESS_CORR.get(lang, "correct")
+        _corr = self.ui_label('quiz_progress_correct', lang)
         parts.append(mo.md(f"**{score['total'] + 1}** / {len(vocab)} — {_corr}: {score['correct']}"))
         return mo.vstack(parts + [
             fb,
@@ -4611,9 +4795,9 @@ Translation: **{translation}**
             get_future / set_future: state pair for forward-navigation stack.
             write_input: Diacritics-text widget (from :meth:`word_drill_widgets`).
             dia_reactive: ``write_input._ui`` — tracks Enter key presses.
-            check_btn: "Проверить" button.
-            prev_btn: "Предыдущий" button.
-            next_btn: "Следующий" / "Пройти снова" button.
+            check_btn: "Check" button.
+            prev_btn: "Prev" button.
+            next_btn: "Next" / "Again" button.
             vocab: Full word list; used for restart shuffle and total count.
             title: Markdown heading rendered above the exercise.
             comment: Optional note (use ``<br>`` for tight line breaks).
@@ -4693,10 +4877,10 @@ Translation: **{translation}**
         caller renders next_btn separately, so it stays out of the callout there).
         """
         mo = self._mo
-        _done_msg = _QUIZ_DONE.get(lang, "Done!").format(btn=_NAV_AGAIN.get(lang, "Again"))
+        _done_msg = self.ui_label('quiz_done_message', lang).format(btn=self.ui_label('nav_again_label', lang))
         content = [
             mo.callout(mo.md(_done_msg), kind="success"),
-            mo.md(f"{_QUIZ_CORR.get(lang, 'Correct:')} **{score_dict['correct']}** / **{score_dict['total']}**"),
+            mo.md(f"{self.ui_label('quiz_correct_label', lang)} **{score_dict['correct']}** / **{score_dict['total']}**"),
         ]
         if next_btn is not None:
             content.append(next_btn)
@@ -4738,7 +4922,7 @@ Translation: **{translation}**
         _kw = {"value": initial_value} if initial_value is not None and initial_value in choices else {}
         radio = mo.ui.radio(
             options=choices,
-            label=f"«{_meaning}»{_ctx_part}\n\n{_QUIZ_FORM_LBL.get(lang, 'Form in text:')}",
+            label=f"«{_meaning}»{_ctx_part}\n\n{self.ui_label('quiz_form_label', lang)}",
             **_kw,
         )
         return radio, word
@@ -4782,7 +4966,8 @@ Translation: **{translation}**
         if answer_value is None:
             return mo.md("")
 
-        pos_lbl   = _QUIZ_POS.get(lang, _QUIZ_POS["en"]).get(w.get("pos", ""), w.get("pos", ""))
+        _pos = w.get("pos", "")
+        pos_lbl = self.ui_label(f"quiz_pos_{_pos}", lang) if _pos in ("noun", "verb", "adj", "adv") else _pos
         gram_lbl  = w.get("grammar_label") or fmt_ud_feats(w.get("grammar", ""), lang)
         gram_line = " · ".join(filter(None, [pos_lbl, gram_lbl]))
 
@@ -4798,7 +4983,7 @@ Translation: **{translation}**
                 tbl = mo.md(f"_{err}_") if err else (mo.Html(html) if html else mo.md(""))
             return mo.callout(
                 mo.vstack([
-                    mo.md(_QUIZ_RIGHT.get(lang, "✓")),
+                    mo.md(self.ui_label('quiz_right_mark', lang)),
                     mo.md(f"{word_info} · {gram_line}"),
                     tbl,
                 ]),
@@ -4806,7 +4991,7 @@ Translation: **{translation}**
             )
         return mo.callout(
             mo.vstack([
-                mo.md(f"{_QUIZ_WRONG.get(lang, '✗')} **{form}**"),
+                mo.md(f"{self.ui_label('quiz_wrong_mark', lang)} **{form}**"),
                 mo.md(f"{word_info} · {gram_line}"),
             ]),
             kind="danger",
@@ -4868,7 +5053,7 @@ Translation: **{translation}**
         state and widget cells.
 
         Feedback appears immediately when the user selects a radio option;
-        clicking "Следующий" advances to the next word.  If "Следующий" is
+        clicking "Next" advances to the next word.  If "Next" is
         clicked before a selection is made the cell re-renders in place without
         advancing.
 
@@ -4880,8 +5065,8 @@ Translation: **{translation}**
             get_history / set_history: state pair for the answered-words stack.
             get_future / set_future: state pair for forward-navigation stack.
             answer_radio: ``mo.ui.radio`` from :meth:`word_quiz_widgets`.
-            next_btn: "Следующий" / "Пройти снова" button.
-            prev_btn: "Предыдущий" button.
+            next_btn: "Next" / "Again" button.
+            prev_btn: "Prev" button.
             vocab: Full word list; used for restart shuffle and total count.
             title: Markdown heading with optional progress line.
             meaning_key: Key in each word dict used as the radio label prompt.
@@ -4963,11 +5148,12 @@ Translation: **{translation}**
                     fb = mo.vstack([fb, mo.Html(html)])
                 else:
                     _lemma = _lemma_of(cv, cv[form_key])
-                    fb = mo.vstack([fb, mo.md(f"_{cv[form_key]} — отсутствует в парадигме {_lemma}_")])
+                    _missing = self.ui_label('word_missing_in_paradigm', lang).format(word=cv[form_key], lemma=_lemma)
+                    fb = mo.vstack([fb, mo.md(f"_{_missing}_")])
         else:
             fb = mo.md("")
         _pfx = f"{title}\n\n" if title else ""
-        _corr = _QUIZ_PROGRESS_CORR.get(lang, "correct")
+        _corr = self.ui_label('quiz_progress_correct', lang)
         progress = mo.md(f"{_pfx}**{score['total'] + 1}** / {len(vocab)} — {_corr}: {score['correct']}")
         return mo.vstack([progress, answer_radio, fb, self._nav_row(prev_btn, next_btn, renew_btn)])
 
@@ -5140,7 +5326,7 @@ Translation: **{translation}**
         _kw = {"value": initial_value} if initial_value is not None and initial_value in round_["options"] else {}
         radio = mo.ui.radio(
             options=round_["options"],
-            label=f"{round_['prompt']}\n\n{_STANZA_MATCH_LBL.get(lang, {}).get(direction, '')}",
+            label=f"{round_['prompt']}\n\n{self.ui_label(f'stanza_match_{direction}', lang) if direction in ('grc_to_tr', 'tr_to_grc') else ''}",
             **_kw,
         )
         return radio, stanza
@@ -5239,7 +5425,7 @@ Translation: **{translation}**
         _fb_ans = _ans if _ans is not None else (restore_entry["answer"] if restore_entry else None)
         fb = self._quiz_result_span(mo, _fb_ans, _correct, lang)
         _pfx = f"{title}\n\n" if title else ""
-        _corr = _QUIZ_PROGRESS_CORR.get(lang, "correct")
+        _corr = self.ui_label('quiz_progress_correct', lang)
         progress = mo.md(f"{_pfx}**{score['total'] + 1}** / {len(stanzas)} — {_corr}: {score['correct']}")
         return mo.vstack([progress, choice_radio, fb, self._nav_row(prev_btn, next_btn, renew_btn)])
 
@@ -5467,12 +5653,12 @@ Translation: **{translation}**
         attributed to a generic "original" label) instead of the translator's
         rendering (``item["passage"]``, attributed to ``item["translator"]``) —
         student toggles this to peek at the source without affecting the
-        да/нет answer, which is tracked by a separate widget.
+        yes/no answer, which is tracked by a separate widget.
         """
         _meaning = self._get_meaning(item, lang)
         if show_source:
             text = item["source"]
-            attribution = _PRESENCE_SOURCE_LBL.get(lang, _PRESENCE_SOURCE_LBL["ru"])
+            attribution = self.ui_label('presence_source_label', lang)
         else:
             text = item["passage"]
             attribution = item["translator"]
@@ -5480,10 +5666,10 @@ Translation: **{translation}**
 
     def translation_presence_question(self, item: "dict | None", lang: str, *,
                                        initial_value: "str | None" = None) -> tuple:
-        """Build a да/нет radio for one translation-presence round.
+        """Build a yes/no radio for one translation-presence round.
 
         Returns ``(radio, item)``. Calls ``mo.stop`` when *item* is None so the cell
-        halts cleanly without raising. The radio's own label is just the да/нет
+        halts cleanly without raising. The radio's own label is just the yes/no
         prompt — the passage/word text is rendered separately (see
         :meth:`_presence_passage_md`) so toggling the source/translation switch
         never has to rebuild (and so never risks resetting) this radio.
@@ -5491,10 +5677,10 @@ Translation: **{translation}**
         mo = self._mo
         if item is None:
             mo.stop(True, mo.md(""))
-        yes, no = _YES_NO.get(lang, _YES_NO["ru"])
+        yes, no = self.ui_label('yes_label', lang), self.ui_label('no_label', lang)
         _kw = {"value": initial_value} if initial_value in (yes, no) else {}
         radio = mo.ui.radio(
-            options=[yes, no], label=_PRESENCE_LBL.get(lang, _PRESENCE_LBL["ru"]), **_kw,
+            options=[yes, no], label=self.ui_label('presence_label', lang), **_kw,
         )
         return radio, item
 
@@ -5502,7 +5688,7 @@ Translation: **{translation}**
                                       items: "list[dict]",
                                       restore_entry: "dict | None" = None,
                                       history_len: int = 0, lang: str = "ru") -> tuple:
-        """Create widgets for the да/нет translation-presence exercise.
+        """Create widgets for the yes/no translation-presence exercise.
 
         Returns ``(choice_radio, next_btn, prev_btn, source_switch)``. Unpack in
         a single cell so marimo tracks ``choice_radio``/``source_switch`` and
@@ -5543,7 +5729,7 @@ Translation: **{translation}**
         lang: str = "ru",
         renew_btn: "Any | None" = None,
     ) -> Any:
-        """Standalone да/нет translation-presence quiz: initialization, navigation, display.
+        """Standalone yes/no translation-presence quiz: initialization, navigation, display.
 
         Companion to :meth:`translation_presence_widgets`. Place in the cell after the
         state and widget cells — mirrors :meth:`stanza_match_form`'s shape, with
@@ -5552,7 +5738,7 @@ Translation: **{translation}**
         — the teacher-authored answer key, never the vocab gloss or an automatic
         alignment heuristic. ``source_switch`` toggles the passage display between
         the translation and the original Greek (see :meth:`_presence_passage_md`)
-        without affecting grading or the да/нет selection. ``renew_btn``, if
+        without affecting grading or the yes/no selection. ``renew_btn``, if
         given, renders alongside prev/next (see :meth:`word_quiz_form`).
         """
         mo = self._mo
@@ -5565,13 +5751,13 @@ Translation: **{translation}**
 
         if remaining is None:
             if not items:
-                return mo.md(_PRESENCE_EMPTY.get(lang, _PRESENCE_EMPTY["ru"]))
+                return mo.md(self.ui_label('presence_empty_label', lang))
             self._shuffle_start(items, set_cv, set_remaining)
             return mo.md("*...*")
 
         _done = cv is None and len(remaining) == 0
         _ans = choice_radio.value
-        _yes, _no = _YES_NO.get(lang, _YES_NO["ru"])
+        _yes, _no = self.ui_label('yes_label', lang), self.ui_label('no_label', lang)
         _correct = (_yes if cv["reflected"] == "yes" else _no) if cv else None
 
         if next_btn.value:
@@ -5593,10 +5779,10 @@ Translation: **{translation}**
         _fb_ans = _ans if _ans is not None else (restore_entry["answer"] if restore_entry else None)
         fb = self._quiz_result_span(mo, _fb_ans, _correct, lang)
         _pfx = f"{title}\n\n" if title else ""
-        _corr = _QUIZ_PROGRESS_CORR.get(lang, "correct")
+        _corr = self.ui_label('quiz_progress_correct', lang)
         progress = mo.md(f"{_pfx}**{score['total'] + 1}** / {len(items)} — {_corr}: {score['correct']}")
         switch_row = mo.hstack(
-            [source_switch, mo.md(_PRESENCE_SWITCH_LBL.get(lang, _PRESENCE_SWITCH_LBL["ru"]))],
+            [source_switch, mo.md(self.ui_label('presence_switch_label', lang))],
             justify="start", align="center", gap=1.0,
         )
         passage_md = mo.md(self._presence_passage_md(cv, source_switch.value, lang))
@@ -5797,7 +5983,7 @@ Translation: **{translation}**
         if word is None:
             mo.stop(True, mo.md(""))
         return diacritics_text(
-            mo, placeholder=_WRITE_PLACEHOLDER.get(lang, "Greek word…"),
+            mo, placeholder=self.ui_label('write_placeholder', lang),
         )
 
     def diacritics_text(self, *, placeholder: str = "", label: str = "", value: str = "") -> Any:
@@ -5807,13 +5993,36 @@ Translation: **{translation}**
 
 # ══════════════════════════════ grc paradigm display ══
 
-_GRC_CL   = _FMT_CASE["ru"]
-_GRC_NL   = ("Ед.", "Мн.")
-_GRC_DL   = "Дв."  # dual column label -- pronoun-only; nouns/adjectives have no dual axis
-_GRC_TCOL = {"PAI": "Наст.", "IAI": "Имп.", "AAI": "Аор.", "AMI": "Аор. М.", "API": "Аор. П.", "XAI": "Перф.", "YAI": "Плюскв."}
-_GRC_PROW = {"1S": "1 ед.", "2S": "2 ед.", "3S": "3 ед.", "1D": "1 дв.", "2D": "2 дв.", "3D": "3 дв.", "1P": "1 мн.", "2P": "2 мн.", "3P": "3 мн."}
-_GRC_INF_LBL = "Инф."
-_GRC_IMP_LBL = {"2S": "Пов. 2ед.", "2D": "Пов. 2дв.", "2P": "Пов. 2мн."}
+# _GRC_NL/_GRC_DL/_GRC_PROW/_GRC_INF_LBL/_GRC_IMP_LBL are all DERIVED from
+# _grammar_fmt.py's _FMT_NUM/_FMT_VFORM/_FMT_MOOD (verified byte-identical
+# to the hand-authored values they replace) rather than re-authored, for
+# the same reason as the _QUIZ_* dicts above -- _GRC_PROW specifically
+# reuses fmt_ud_feats() itself (also verified byte-identical), since
+# "{person} {number}" is exactly what that formatter already builds.
+# _GRC_TCOL's codes (PAI/IAI/AAI/AMI/API/XAI/YAI) are Tense+Aspect+Voice
+# compounds with no matching _FMT_* dict to derive from (there's no
+# _FMT_ASPECT, and _FMT_TENSE alone can't distinguish imperfect from
+# aorist -- both "Past"), so its 7 codes are individual ui-{lang}.tsv keys
+# (grc_tense_pai etc.) via the shared _lang_map() helper instead -- same
+# as the default caption below -- rather than a hand-authored per-language
+# literal, so a new language is still a data-only change.
+
+_GRC_NL = {lang: (d['Sing'].capitalize(), d['Plur'].capitalize()) for lang, d in _FMT_NUM.items()}
+# dual column label -- pronoun-only; nouns/adjectives have no dual axis
+_GRC_DL = {lang: d['Dual'].capitalize() for lang, d in _FMT_NUM.items()}
+_GRC_TCOL = _lang_map(("PAI", "IAI", "AAI", "AMI", "API", "XAI", "YAI"),
+                       lambda code: f"grc_tense_{code.lower()}")
+_GRC_PROW = {
+    lang: {f"{p}{suf}": fmt_ud_feats(f"Person={p}|Number={full}", lang)
+           for p in "123" for suf, full in (("S", "Sing"), ("D", "Dual"), ("P", "Plur"))}
+    for lang in _UI_LANGS
+}
+_GRC_INF_LBL = {lang: d['Inf'].capitalize() for lang, d in _FMT_VFORM.items()}
+_GRC_IMP_LBL = {
+    lang: {f"2{suf}": f"{_FMT_MOOD[lang]['Imp'].capitalize()} 2{d[full].rstrip('.')}."
+           for suf, full in (("S", "Sing"), ("D", "Dual"), ("P", "Plur"))}
+    for lang, d in _FMT_NUM.items()
+}
 # Tab button label — the historical PERIOD (what the reader sees on the chooser button).
 _GRC_LEX_PERIOD = {
     "homer":    "Epic Greek · c. 800–700 BCE",
@@ -5874,6 +6083,8 @@ def build_grc_paradigm_table(
     import functools
     import eee_project as _eee
 
+    _default_lang = lang  # captured before build_paradigm_table's own `lang` param shadows this name
+
     @functools.lru_cache(maxsize=None)
     def _ag_slots(pos):
         t = ag_backend.get_slot_templates("grc", pos, lang)
@@ -5893,14 +6104,21 @@ def build_grc_paradigm_table(
         w["lemma"] is the dictionary headword the paradigm is built from;
         w["form"] is the specific (possibly inflected) form being tested
         against it. Falls back to form when lemma is absent (flat vocab, where
-        the two are the same word) — see load_vocab_tsv's docstring.
+        the two are the same word) — see load_vocab_tsv's docstring. ``lang``
+        (``ru``/``en``/``el``) picks the table's own row/column labels;
+        defaults to the builder's own ``lang`` when omitted.
         """
+        _lang = lang or _default_lang
         lemma, pos, tested = _lemma_of(w, w["form"]), w["pos"], w["form"]
         _lex = _backend or ag_backend
         tn = _norm_grc(tested)
         found = False
         any_forms = False
-        sg_lbl, pl_lbl = _GRC_NL
+        sg_lbl, pl_lbl = _GRC_NL[_lang]
+        _case_lbl = _FMT_CASE.get(_lang, _FMT_CASE["en"])
+        _prow = _GRC_PROW.get(_lang, _GRC_PROW["en"])
+        # Fallback table caption when neither _cap nor w["lexicon_tag"] is given.
+        _default_cap = _ui_label("grc_default_caption", _lang)
 
         def _td(forms):
             nonlocal found, any_forms
@@ -5939,7 +6157,7 @@ def build_grc_paradigm_table(
                 + "".join(f'<th style="{_GRC_TH}">{lbl}</th>' for lbl in labels) + '</tr>'
             )
             for c in cases:
-                tbl += f'<tr><td style="{_GRC_ROW}">{_GRC_CL.get(_GRC_CASE_KEY[c], c)}</td>'
+                tbl += f'<tr><td style="{_GRC_ROW}">{_case_lbl.get(_GRC_CASE_KEY[c], c)}</td>'
                 for n in numbers:
                     tbl += _td(ag_rows[(c, n)])
                 tbl += "</tr>"
@@ -5948,7 +6166,7 @@ def build_grc_paradigm_table(
         if pos == "noun":
             ag_rows = _collect_rows(_ag_slots("noun"), ["N", "G", "D", "A", "V"], "noun")
             _ag_has = any(ag_rows.values())
-            be_lbl = (_cap or w.get("lexicon_tag") or "ancient-greek") if _ag_has else "unimorph"
+            be_lbl = (_cap or w.get("lexicon_tag") or _default_cap) if _ag_has else "unimorph"
             if _ag_has:
                 tbl = _case_table(be_lbl, ["N", "G", "D", "A", "V"], ag_rows)
             else:
@@ -5979,31 +6197,33 @@ def build_grc_paradigm_table(
                                     if slot else set())
                 return _vcache[tag]
 
-            tenses = [(t, _GRC_TCOL.get(t, t)) for t in ["PAI", "IAI", "AAI", "AMI", "API", "XAI", "YAI"]
+            _tcol = _GRC_TCOL.get(_lang, _GRC_TCOL["en"])
+            _imp_lbl = _GRC_IMP_LBL.get(_lang, _GRC_IMP_LBL["en"])
+            tenses = [(t, _tcol.get(t, t)) for t in ["PAI", "IAI", "AAI", "AMI", "API", "XAI", "YAI"]
                       if any(_vf(f"{t}.{ps}") for ps in _PS)]
             if not tenses:
                 return None
             tbl = (
                 f'<table style="border-collapse:collapse;font-size:.95em;margin-top:8px">'
-                f'<caption style="{_GRC_CAP}">{_cap or w.get("lexicon_tag") or "ancient-greek"}</caption>'
+                f'<caption style="{_GRC_CAP}">{_cap or w.get("lexicon_tag") or _default_cap}</caption>'
                 f'<tr><th style="{_GRC_TH}"></th>'
             )
             tbl += "".join(f'<th style="{_GRC_TH}">{lbl}</th>' for _, lbl in tenses) + "</tr>"
             for ps in _PS:
-                tbl += f'<tr><td style="{_GRC_ROW}">{_GRC_PROW.get(ps, ps)}</td>'
+                tbl += f'<tr><td style="{_GRC_ROW}">{_prow.get(ps, ps)}</td>'
                 for t, _ in tenses:
                     tbl += _td(_vf(f"{t}.{ps}"))
                 tbl += "</tr>"
             _INF_MAP = {"PAI": "PAN", "IAI": "IAN", "AAI": "AAN", "AMI": "AMN", "API": "APN"}
             if any(_vf(_INF_MAP.get(t, "")) for t, _ in tenses):
-                tbl += f'<tr><td style="{_GRC_ROW}">{_GRC_INF_LBL}</td>'
+                tbl += f'<tr><td style="{_GRC_ROW}">{_GRC_INF_LBL.get(_lang, _GRC_INF_LBL["en"])}</td>'
                 for t, _ in tenses:
                     tbl += _td(_vf(_INF_MAP.get(t, "")))
                 tbl += "</tr>"
             _IMP_MAP = {"PAI": "PAD", "AAI": "AAD", "AMI": "AMD"}
             for imp_ps, imp_sfx in [("2S", ".2S"), ("2D", ".2D"), ("2P", ".2P")]:
                 if any(_vf(f"{_IMP_MAP[t]}{imp_sfx}") for t, _ in tenses if t in _IMP_MAP):
-                    tbl += f'<tr><td style="{_GRC_ROW}">{_GRC_IMP_LBL.get(imp_ps, imp_ps)}</td>'
+                    tbl += f'<tr><td style="{_GRC_ROW}">{_imp_lbl.get(imp_ps, imp_ps)}</td>'
                     for t, _ in tenses:
                         imp_t = _IMP_MAP.get(t)
                         tbl += _td(_vf(f"{imp_t}{imp_sfx}")) if imp_t else f'<td style="{_GRC_TD}">—</td>'
@@ -6014,7 +6234,7 @@ def build_grc_paradigm_table(
             ag_rows = _collect_rows(_ag_slots("adjective"), ["N", "G", "D", "A"], "adjective")
             if not any(ag_rows.values()):
                 return None
-            tbl = _case_table(_cap or w.get("lexicon_tag") or "ancient-greek", ["N", "G", "D", "A"], ag_rows)
+            tbl = _case_table(_cap or w.get("lexicon_tag") or _default_cap, ["N", "G", "D", "A"], ag_rows)
 
         elif pos == "pronoun":
             # _ag_slots("pronoun") returns one flat {tag: slot} dict
@@ -6047,8 +6267,8 @@ def build_grc_paradigm_table(
                                                if slot else set())
                 if not any(pron_rows.values()):
                     return None
-                tbl = _case_table(_cap or w.get("lexicon_tag") or "ancient-greek", ["N", "G", "D", "A"], pron_rows,
-                                   numbers=_PN_COLS, num_labels=[_GRC_PROW[pn] for pn in _PN_COLS])
+                tbl = _case_table(_cap or w.get("lexicon_tag") or _default_cap, ["N", "G", "D", "A"], pron_rows,
+                                   numbers=_PN_COLS, num_labels=[_prow[pn] for pn in _PN_COLS])
             else:
                 # Adjective-shaped families (Dem/Rel/Int/Ind/Rcp): same
                 # Case+Number+Gender tag composition as regular
@@ -6066,8 +6286,8 @@ def build_grc_paradigm_table(
                 ag_rows = _collect_rows(_ag_slots("pronoun"), ["N", "G", "D", "A"], "pronoun", numbers=("S", "P", "D"))
                 if not any(ag_rows.values()):
                     return None
-                tbl = _case_table(_cap or w.get("lexicon_tag") or "ancient-greek", ["N", "G", "D", "A"], ag_rows,
-                                   numbers=("S", "P", "D"), num_labels=(sg_lbl, pl_lbl, _GRC_DL))
+                tbl = _case_table(_cap or w.get("lexicon_tag") or _default_cap, ["N", "G", "D", "A"], ag_rows,
+                                   numbers=("S", "P", "D"), num_labels=(sg_lbl, pl_lbl, _GRC_DL.get(_lang, _GRC_DL["en"])))
 
         else:
             return None
@@ -6077,7 +6297,8 @@ def build_grc_paradigm_table(
         if not found:
             if hide_if_absent:
                 return None
-            note = f'<div style="{_GRC_NOTE}"><b>{tested}</b> — отсутствует в парадигме {lemma}</div>'
+            _missing = _ui_label('word_missing_in_paradigm', _lang).format(word=f"<b>{tested}</b>", lemma=lemma)
+            note = f'<div style="{_GRC_NOTE}">{_missing}</div>'
             return note + tbl
         return tbl
 
@@ -6086,15 +6307,22 @@ def build_grc_paradigm_table(
 
 # ── Modern-Greek (el) diachronic paradigm renderer (parallel to the grc one) ──
 _EL_CASES = ["Nom", "Gen", "Acc", "Voc"]        # Modern nouns/adj: 4 cases, no dative
-_EL_VERB_COLS = [                               # (column label, base features, particle)
-    ("Наст.",    {"Tense": "Pres", "Mood": "Ind"},                  ""),
-    ("Имперф.",  {"Tense": "Past", "Aspect": "Imp",  "Mood": "Ind"}, ""),
-    ("Аор.",     {"Tense": "Past", "Aspect": "Perf", "Mood": "Ind"}, ""),
-    ("Буд.",     {"Tense": "Fut",  "Aspect": "Perf", "Mood": "Ind"}, "θα"),
-    ("Буд. дл.", {"Tense": "Fut",  "Aspect": "Imp",  "Mood": "Ind"}, "θα"),
-    ("Сосл.",    {"Mood": "Sub",   "Aspect": "Perf"},                "να"),
-    ("Повел.",   {"Mood": "Imp",   "Aspect": "Perf"},                ""),
+_EL_VERB_COLS = [                               # (slug, base features, particle)
+    ("pres",     {"Tense": "Pres", "Mood": "Ind"},                  ""),
+    ("impf",     {"Tense": "Past", "Aspect": "Imp",  "Mood": "Ind"}, ""),
+    ("aor",      {"Tense": "Past", "Aspect": "Perf", "Mood": "Ind"}, ""),
+    ("fut",      {"Tense": "Fut",  "Aspect": "Perf", "Mood": "Ind"}, "θα"),
+    ("fut_cont", {"Tense": "Fut",  "Aspect": "Imp",  "Mood": "Ind"}, "θα"),
+    ("subj",     {"Mood": "Sub",   "Aspect": "Perf"},                "να"),
+    ("imp",      {"Mood": "Imp",   "Aspect": "Perf"},                ""),
 ]
+# Like _GRC_TCOL above: _EL_VERB_COL_LBL/_EL_VOICE_CAP are compound-keyed
+# (tense-slug / Act-Pass) with no matching _FMT_* dict, so their entries are
+# individual ui-{lang}.tsv keys (via the shared _lang_map() helper) rather
+# than a hand-authored per-language literal -- a new language is still a
+# data-only change.
+_EL_VERB_COL_LBL = _lang_map([slug for slug, _, _ in _EL_VERB_COLS], lambda slug: f"el_verb_col_{slug}")
+_EL_VOICE_CAP = _lang_map(("Act", "Pass"), lambda v: f"el_voice_cap_{v.lower()}")
 
 
 def build_modern_paradigm_table(el_backend: Any, *, lang: str = "ru") -> Any:
@@ -6115,6 +6343,8 @@ def build_modern_paradigm_table(el_backend: Any, *, lang: str = "ru") -> Any:
     import eee_project as _eee
     from modern_greek_inflexion_eee import PRONOUN_LEMMAS_INDECLINABLE
 
+    _default_lang = lang  # captured before build_paradigm_table's own `lang` param shadows this name
+
     @functools.lru_cache(maxsize=None)
     def _el_slots(pos):
         t = el_backend.get_slot_templates("el", pos, lang)
@@ -6124,12 +6354,15 @@ def build_modern_paradigm_table(el_backend: Any, *, lang: str = "ru") -> Any:
         w: dict, *, lang: "str | None" = None, _backend: Any = None,
         _cap: "str | None" = None, hide_if_absent: bool = False,
     ) -> "str | None":
+        _lang = lang or _default_lang
         lemma = poly_to_mono(_lemma_of(w, w["form"]))
         pos = w["pos"]
         tested = strip_diacritics(w["form"]).lower()
         be = _backend or el_backend
         any_forms = False
-        sg_lbl, pl_lbl = _GRC_NL
+        sg_lbl, pl_lbl = _GRC_NL[_lang]
+        _case_lbl = _FMT_CASE.get(_lang, _FMT_CASE["en"])
+        _prow = _GRC_PROW.get(_lang, _GRC_PROW["en"])
 
         def _forms(feats, pos_str, particle=""):
             slot = _el_slots(pos_str).get(frozenset(feats.items()))
@@ -6163,12 +6396,12 @@ def build_modern_paradigm_table(el_backend: Any, *, lang: str = "ru") -> Any:
                 return None
             tbl = (
                 f'<table style="border-collapse:collapse;font-size:.95em;margin-top:8px">'
-                f'<caption style="{_GRC_CAP}">{_html.escape(_cap or "новогреческий")}</caption>'
+                f'<caption style="{_GRC_CAP}">{_html.escape(_cap or _ui_label("el_default_caption", _lang))}</caption>'
                 f'<tr><th style="{_GRC_TH}"></th>'
                 f'<th style="{_GRC_TH}">{sg_lbl}</th><th style="{_GRC_TH}">{pl_lbl}</th></tr>'
             )
             for c in _EL_CASES:
-                tbl += f'<tr><td style="{_GRC_ROW}">{_GRC_CL.get(c, c)}</td>'
+                tbl += f'<tr><td style="{_GRC_ROW}">{_case_lbl.get(c, c)}</td>'
                 tbl += _td(rows[(c, "S")]) + _td(rows[(c, "P")]) + "</tr>"
             return tbl + "</table>"
 
@@ -6203,10 +6436,13 @@ def build_modern_paradigm_table(el_backend: Any, *, lang: str = "ru") -> Any:
         elif pos == "verb":
             _PS = [("1", "Sing", "1S"), ("2", "Sing", "2S"), ("3", "Sing", "3S"),
                    ("1", "Plur", "1P"), ("2", "Plur", "2P"), ("3", "Plur", "3P")]
+            _voice_cap = _EL_VOICE_CAP.get(_lang, _EL_VOICE_CAP["en"])
+            _col_lbl = _EL_VERB_COL_LBL.get(_lang, _EL_VERB_COL_LBL["en"])
             tables = []
-            for voice, vcap in (("Act", "действ."), ("Pass", "страд.")):
+            for voice, vcap in (("Act", _voice_cap["Act"]), ("Pass", _voice_cap["Pass"])):
                 grid, cols = {}, []
-                for clbl, base, part in _EL_VERB_COLS:
+                for slug, base, part in _EL_VERB_COLS:
+                    clbl = _col_lbl[slug]
                     col, has = {}, False
                     for person, num, ps in _PS:
                         f = _forms({**base, "Voice": voice, "Person": person, "Number": num}, "verb", part)
@@ -6224,7 +6460,7 @@ def build_modern_paradigm_table(el_backend: Any, *, lang: str = "ru") -> Any:
                     + "".join(f'<th style="{_GRC_TH}">{c}</th>' for c in cols) + "</tr>"
                 )
                 for person, num, ps in _PS:
-                    tbl += f'<tr><td style="{_GRC_ROW}">{_GRC_PROW.get(ps, ps)}</td>'
+                    tbl += f'<tr><td style="{_GRC_ROW}">{_prow.get(ps, ps)}</td>'
                     tbl += "".join(_td(grid[(c, ps)]) for c in cols) + "</tr>"
                 tables.append(tbl + "</table>")
             if not tables:

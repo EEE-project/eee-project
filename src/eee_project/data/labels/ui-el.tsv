@@ -23,6 +23,34 @@ tense_label	Επιλογή χρόνου:
 mode_label	Επιλογή τρόπου:
 indefinite_label	Επίσης με αόριστο άρθρο
 check_label	Έλεγχος
+next_label	Επόμενο
+prev_label	Προηγούμενο
+restart_label	Από την αρχή
+retry_label	Λάθη
+footer_label	Πηγαίος κώδικας:
+quiz_form_label	Μορφή στο κείμενο:
+quiz_done_message	🎉 Όλες οι λέξεις! Πατήστε «{btn}» για επανάληψη.
+quiz_correct_label	Σωστά:
+quiz_progress_correct	σωστά
+quiz_pos_noun	ουσ.
+quiz_pos_verb	ρ.
+quiz_pos_adj	επίθ.
+quiz_pos_adv	επίρρ.
+quiz_right_mark	✓ Σωστό!
+quiz_wrong_mark	✗ Όχι. Σωστή μορφή:
+quiz_incorrect_label	✗ Λάθος. Σωστή απάντηση:
+write_placeholder	ελληνική λέξη…
+nav_next_label	Επόμενο
+nav_again_label	Ξανά
+nav_prev_label	Προηγούμενο
+stanza_match_grc_to_tr	Επιλέξτε τη μετάφραση που ταιριάζει σε αυτή τη στροφή:
+stanza_match_tr_to_grc	Επιλέξτε την ελληνική στροφή που ταιριάζει σε αυτή τη μετάφραση:
+yes_label	ναι
+no_label	όχι
+presence_label	Αποτυπώνεται η λέξη σε αυτή τη μετάφραση;
+presence_empty_label	Δεν υπάρχουν ακόμη ελεγμένα ζεύγη λέξη × μετάφραση — συμπληρώστε τη στήλη `reflected` (yes/no) στο translation_presence.tsv.
+presence_source_label	πρωτότυπο
+presence_switch_label	Εμφάνιση πρωτοτύπου αντί της μετάφρασης
 def_prefix	Οριστ.
 indef_prefix	Αόρ.
 nouns_not_found	_Το αρχείο nouns.tsv δεν βρέθηκε — φόρτωσε αρχείο._
@@ -53,3 +81,41 @@ noun_done	Ολοκληρώθηκε — όλα τα ουσιαστικά εξασ
 adj_done	Ολοκληρώθηκε — όλα τα επίθετα εξασκήθηκαν!
 pron_done	Ολοκληρώθηκε — όλες οι αντωνυμίες εξασκήθηκαν!
 word_label	Λέξη
+renew_label	↺ Νέα επιλογή
+ictus_note_label	Οι ίκτοι (τονισμένες συλλαβές) κάθε ποδός επισημαίνονται με {color_html}.
+homer_lexicon_note	Λέξεις από το ομηρικό λεξικό, για τις οποίες η μηχανή EEE δημιουργεί πίνακες τύπων λέξεων σε διαφορετικές περιόδους της ελληνικής γλώσσας.
+eee_engine_accordion_label	Σχετικά με τη μορφολογική μηχανή EEE
+gloss_panel_empty	*Επιλέξτε μια λέξη στο κείμενο για να δείτε τη μετάφραση και τους τύπους λέξεων από το ομηρικό λεξικό…*
+gloss_panel_era_caption	*Τύποι λέξεων ανά περίοδο — μόνο η απλούστερη μορφολογική αντιστοιχία κατά λήμμα, η σημασία ενδέχεται να διαφέρει*
+word_missing_in_paradigm	{word} — απουσιάζει από την κλίση του {lemma}
+card_list_soon	σύντομα
+card_list_load_error	Δεν ήταν δυνατή η φόρτωση του αρχείου: {url}<br><br>Ελέγξτε αν είναι προσβάσιμο σε αυτόν τον σύνδεσμο.
+word_list_empty_for	Η λίστα λέξεων για {title} είναι κενή.
+check_entered_must_be	καταχωρήθηκε **"{value}"**, πρέπει να είναι **{expected}**
+verb_check_write_with	Γράψτε με **"{prefix}"**
+noun_check_article_missing	λείπει το άρθρο, πρέπει να είναι **{expected}**
+noun_check_article_wrong	άρθρο **"{value}"**, πρέπει να είναι **{expected}**
+noun_check_wrong	ουσιαστικό **"{value}"**, πρέπει να είναι **{expected}**
+gendered_check_empty	Συμπληρώστε τουλάχιστον έναν τύπο γένους
+adjective_test_title	Τεστ: Κλίση επιθέτου
+adjective_test_empty	Η λίστα λέξεων για το τεστ επιθέτων είναι κενή.
+unknown_tense_error	Άγνωστος χρόνος «{tense}»
+unknown_label	άγνωστο
+grc_tense_pai	Ενεστ.
+grc_tense_iai	Παρατ.
+grc_tense_aai	Αόρ.
+grc_tense_ami	Αόρ. Μέσ.
+grc_tense_api	Αόρ. Παθ.
+grc_tense_xai	Παρακ.
+grc_tense_yai	Υπερσ.
+grc_default_caption	αρχαία ελληνικά
+el_verb_col_pres	Ενεστ.
+el_verb_col_impf	Παρατ.
+el_verb_col_aor	Αόρ.
+el_verb_col_fut	Μέλ.
+el_verb_col_fut_cont	Μέλ. διαρκ.
+el_verb_col_subj	Υποτ.
+el_verb_col_imp	Προστ.
+el_voice_cap_act	ενεργ.
+el_voice_cap_pass	παθ.
+el_default_caption	νέα ελληνικά

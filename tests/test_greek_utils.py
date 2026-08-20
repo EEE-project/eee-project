@@ -130,7 +130,7 @@ class TestCheckNounSimple:
             test_word="η μνήμη", is_pluralia_tantum=False,
             active_cases=[["sg","nom"],["sg","acc"],["sg","gen"],["pl","nom"],["pl","acc"],["pl","gen"]],
         )
-        ok, errs = gu.check_noun_test("η μνήμη", snap, mode='simple')
+        ok, errs = gu.check_noun_test("η μνήμη", snap, mode='simple', lang="en")
         assert ok is False
         assert "must be **?**" in errs
         assert "****" not in errs
@@ -142,7 +142,7 @@ class TestCheckNounSimple:
             test_word="η μνήμη", is_pluralia_tantum=False,
             active_cases=[["sg","nom"],["sg","acc"],["sg","gen"],["pl","nom"],["pl","acc"],["pl","gen"]],
         )
-        ok, errs = gu.check_noun_test("η μνήμη", snap, mode='simple')
+        ok, errs = gu.check_noun_test("η μνήμη", snap, mode='simple', lang="en")
         assert ok is False
         assert "article" in errs
 
@@ -188,7 +188,7 @@ class TestCheckNounComplex:
             test_word="η μνήμη", is_pluralia_tantum=False,
             active_cases=[["sg","nom"],["sg","acc"],["sg","gen"],["pl","nom"],["pl","acc"],["pl","gen"]],
         )
-        ok, errs = gu.check_noun_test("η μνήμη", snap, mode='complex')
+        ok, errs = gu.check_noun_test("η μνήμη", snap, mode='complex', lang="en")
         assert ok is False
         assert "article missing" in errs
 
@@ -247,7 +247,7 @@ class TestCheckVerb:
 
     def test_unknown_tense(self, gu):
         snap = _snap(["", "", "", "", "", ""], verb_word="γράφω")
-        ok, errs = gu.check_verb_test("γράφω", snap, "subjunctive_past")
+        ok, errs = gu.check_verb_test("γράφω", snap, "subjunctive_past", lang="en")
         assert ok is False
         assert "Unknown tense" in errs
 
@@ -274,9 +274,9 @@ class TestCheckAdjective:
             ["ωραίος", "WRONG", "ωραίο", "ωραίοι", "ωραίες", "ωραία"],
             adj_word="ωραίος", adj_mode="simple",
         )
-        ok, errs = gu.check_adjective_test("ωραίος", snap, mode='simple')
+        ok, errs = gu.check_adjective_test("ωραίος", snap, mode='simple', lang="en")
         assert ok is False
-        assert "Fem" in errs
+        assert "f." in errs
 
     def test_correct_complex(self, gu):
         answers = []
@@ -296,7 +296,7 @@ class TestCheckAdjective:
 
     def test_all_empty_values(self, gu):
         snap = _snap(["", "", "", "", "", ""], adj_word="ωραίος", adj_mode="simple")
-        ok, errs = gu.check_adjective_test("ωραίος", snap, mode='simple')
+        ok, errs = gu.check_adjective_test("ωραίος", snap, mode='simple', lang="en")
         assert ok is False
         assert "fill in" in errs
 
@@ -386,7 +386,7 @@ class TestCheckNounArticleRequired:
     def test_missing_article_fails(self, gu_ag):
         snap = self._snap(["ἀγορά", "ἀγοράν", "ἀγορᾶς",
                            "ἀγοραί", "ἀγοράς", "ἀγορῶν"])
-        ok, errs = gu_ag.check_noun_test("ἀγορά", snap, article=True)
+        ok, errs = gu_ag.check_noun_test("ἀγορά", snap, article=True, lang="en")
         assert ok is False
         assert "article missing" in errs
 
@@ -394,7 +394,7 @@ class TestCheckNounArticleRequired:
         # ὁ is masc nom — wrong for fem noun
         snap = self._snap(["ὁ ἀγορά", "τὴν ἀγοράν", "τῆς ἀγορᾶς",
                            "αἱ ἀγοραί", "τὰς ἀγοράς", "τῶν ἀγορῶν"])
-        ok, errs = gu_ag.check_noun_test("ἀγορά", snap, article=True)
+        ok, errs = gu_ag.check_noun_test("ἀγορά", snap, article=True, lang="en")
         assert ok is False
         assert "article" in errs
 
