@@ -27,18 +27,6 @@ app = marimo.App(width="medium")
 
 @app.cell(hide_code=True)
 def _(mo):
-    from eee_project import eee_topbar
-    eee_topbar(
-        mo,
-        back_url="https://codeberg.org/EEE-project",
-        lang="en",
-        titles={"en": "Greek Exercise & Quiz Demo", "el": "Άσκηση & Κουίζ"},
-    )
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
     mo.md(r"""
     # Greek Exercise & Quiz Demo
 
@@ -60,7 +48,6 @@ def _(mo):
     | `gu.dirty_check_button(form, cap, cv, attr_name)` | Check button that turns orange when the form has unsaved changes |
     | `gu.noun_drill_meta(word)` | per-word noun metadata (`active_cases`, pluralia tantum) |
     | `gu.verb_slot_labels()` / `noun_slot_labels(cases)` / `adjective_slot_labels(mode)` | slot labels for the paradigm drills |
-    | `eee_topbar` / `eee_footer` | navigation chrome |
     """)
     return
 
@@ -894,13 +881,6 @@ def _(
             done_message="Done -- both adjectives drilled!",
         )
     _out_mg
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    from eee_project import eee_footer
-    eee_footer(mo, lang="en")
     return
 
 

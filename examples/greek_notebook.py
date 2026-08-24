@@ -43,7 +43,7 @@ def _():
 def _(mo):
     mo.md(r"""
     # Greek Morphology — Modern / Ancient Greek
-    **[eee](https://codeberg.org/EEE-project/eee)** — language-agnostic morphology engine for the EEE project.
+    **[eee](https://codeberg.org/EEE-project/eee-project)** — language-agnostic morphology engine for the EEE project.
 
     Select a language, enter a lemma and part of speech to see the full inflection paradigm.
     Feature keys follow [Universal Dependencies FEATS](https://universaldependencies.org/u/feat/index.html).

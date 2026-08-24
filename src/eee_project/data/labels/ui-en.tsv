@@ -23,9 +23,8 @@ tense_label	Select tense:
 mode_label	Test mode:
 indefinite_label	Also test indefinite article
 check_label	Check
-next_label	Next ▸
-prev_label	◂ Prev
-restart_label	↺ Start over
+next_label	Next
+prev_label	Prev
 retry_label	Errors
 footer_label	Source:
 quiz_form_label	Form in text:
@@ -58,10 +57,10 @@ verbs_not_found	_verbs.tsv not found — upload a file to begin._
 adjs_not_found	_adjectives.tsv not found — upload a file to begin._
 pron_not_found	_pronouns.tsv not found — upload a file to begin._
 translation_presence_not_found	_translation_presence.tsv not found and could not be fetched from the server._
-test1_done	All nouns done for this session!
-test2_done	All verbs done for this session!
-test3_done	All adjectives done for this session!
-test4_done	All pronouns done for this session!
+test1_done	🎉 All nouns done! Press «Again» to repeat.
+test2_done	🎉 All verbs done! Press «Again» to repeat.
+test3_done	🎉 All adjectives done! Press «Again» to repeat.
+test4_done	🎉 All pronouns done! Press «Again» to repeat.
 poem_section_heading	## Poem Text with Parallel Translations
 vocabulary_heading	## USEFUL VOCABULARY
 test_label	Test
@@ -76,10 +75,6 @@ pos_label	Part of speech
 load_tsv_label	Load TSV (Word + Translation columns) — optional
 require_article_label	Require article (noun)
 full_paradigm_label	Full paradigm (all cases, not just nominative)
-verb_done	Done — every verb drilled!
-noun_done	Done — every noun drilled!
-adj_done	Done — every adjective drilled!
-pron_done	Done — every pronoun drilled!
 word_label	Word
 renew_label	↺ New set
 ictus_note_label	Ictus (stressed syllables) of each foot are highlighted in {color_html}.
@@ -119,3 +114,13 @@ el_verb_col_imp	Imp.
 el_voice_cap_act	act.
 el_voice_cap_pass	pass.
 el_default_caption	modern-greek
+phrases_heading	## Useful Phrases: Quiz
+select_phrases	### Select phrases to practice
+phrases_empty	_Select phrases from the table above to begin._
+phrases_not_found	_phrases.tsv not found — upload a file to begin._
+phrases_done	All phrases done for this session!
+phrase_heading	**Phrase test**
+phrases_too_few	_Select at least 4 phrases for a real multiple-choice quiz._
+phrase_mode_label	Quiz mode:
+quiz_mode_choice	Multiple choice
+quiz_mode_type	Type the answer

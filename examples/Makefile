@@ -23,8 +23,11 @@ help:
 	@echo "make export-unimorph       export unimorph demo to dist/unimorph/"
 	@echo "make export-exercise       export exercise demo to dist/exercise/"
 	@echo "make export-all            export all 6 live demos to dist/<name>/"
-	@echo "  Each dist/<name>/ mirrors a live-demo directory on the pages branch"
-	@echo "  (docs/examples.md) -- exports whatever source is in the current"
+	@echo "  Each export-* target runs the marimo export, then wraps it in the"
+	@echo "  shared deploy shell (deploy/shell_template.html + build_shell.py) --"
+	@echo "  dist/<name>/ ends up index.html (shell) + notebook.html (app),"
+	@echo "  matching a live-demo directory on the pages branch exactly"
+	@echo "  (see examples/README.md). Exports whatever source is in the current"
 	@echo "  working tree, so pull origin/main first. Copy dist/<name>/ into the"
 	@echo "  pages-branch worktree, commit, and sync to all 3 mirrors."
 
@@ -72,21 +75,27 @@ notebook-drill:
 
 export-drill:
 	cd .. && uv run marimo export html-wasm examples/modern_greek_drill_notebook.py -o examples/dist/drill --mode run -f
+	cd .. && uv run python3 examples/deploy/build_shell.py examples/dist/drill "Paradigm Drill"
 
 export-greek:
 	cd .. && uv run marimo export html-wasm examples/greek_notebook.py -o examples/dist/greek --mode run -f
+	cd .. && uv run python3 examples/deploy/build_shell.py examples/dist/greek "Greek Morphology Explorer"
 
 export-ancient-greek:
 	cd .. && uv run marimo export html-wasm examples/ancient_greek_notebook.py -o examples/dist/ancient-greek --mode run -f
+	cd .. && uv run python3 examples/deploy/build_shell.py examples/dist/ancient-greek "Ancient Greek Morphology"
 
 export-modern-greek:
 	cd .. && uv run marimo export html-wasm examples/modern_greek_notebook.py -o examples/dist/modern-greek --mode run -f
+	cd .. && uv run python3 examples/deploy/build_shell.py examples/dist/modern-greek "Modern Greek Morphology"
 
 export-unimorph:
 	cd .. && uv run marimo export html-wasm examples/unimorph_notebook.py -o examples/dist/unimorph --mode run -f
+	cd .. && uv run python3 examples/deploy/build_shell.py examples/dist/unimorph "UniMorph Browser"
 
 export-exercise:
 	cd .. && uv run marimo export html-wasm examples/greek_exercise_notebook.py -o examples/dist/exercise --mode run -f
+	cd .. && uv run python3 examples/deploy/build_shell.py examples/dist/exercise "Exercise & Quiz Demo"
 
 export-all: export-drill export-greek export-ancient-greek export-modern-greek export-unimorph export-exercise
 	@echo "All 6 demos exported to examples/dist/ -- copy each into the pages-branch worktree and publish."

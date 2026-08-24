@@ -469,6 +469,29 @@ class TestGreekCompare:
     def test_both_flags_true_accent_fails(self):
         assert greek_compare("λεγε", "λέγε", case_sensitive=True, diacritics=True) is False
 
+    # phrase comparison: punctuation/whitespace are separators, not content
+
+    def test_trailing_punctuation_ignored(self):
+        assert greek_compare("Έχεις κανένα σχέδιο;", "Έχεις κανένα σχέδιο") is True
+
+    def test_leading_punctuation_ignored(self):
+        assert greek_compare("«Έχεις κανένα σχέδιο»", "Έχεις κανένα σχέδιο") is True
+
+    def test_multiple_internal_spaces_ignored(self):
+        assert greek_compare("Έχεις  κανένα   σχέδιο", "Έχεις κανένα σχέδιο") is True
+
+    def test_comma_and_exclamation_ignored(self):
+        assert greek_compare("Άντε, ρε!", "Άντε ρε") is True
+
+    def test_ellipsis_ignored(self):
+        assert greek_compare("Έλα τώρα...", "Έλα τώρα") is True
+
+    def test_different_word_sequence_still_fails(self):
+        assert greek_compare("Έχεις κανένα σχέδιο", "Έχεις κανένα βιβλίο") is False
+
+    def test_different_word_count_still_fails(self):
+        assert greek_compare("Έχεις κανένα σχέδιο", "Έχεις σχέδιο") is False
+
 
 # ───────────────────────────────────────── parse_stanza_text ──
 
@@ -2053,10 +2076,11 @@ class TestOdysseyPosConstants:
 # ──────────────── helpers for slot/word drill and quiz form tests ──────────
 
 class _FakeBtn:
-    def __init__(self, value=None, disabled=False, label=""):
+    def __init__(self, value=None, disabled=False, label="", kind="neutral"):
         self.value = value
         self.disabled = disabled
         self.label = label
+        self.kind = kind
 
 
 class _FakeRadio:
@@ -2077,6 +2101,15 @@ class _FakeWI:
         self._ui = _FakeDiaUI()
 
 
+def _dia(value: str = ""):
+    """A bare ``dia_reactive``-shaped stub exposing just the live-typed
+    ``"value"`` key -- for :meth:`word_drill_check_button` tests, which
+    only ever read ``dia_reactive.value.get("value")``."""
+    ui = _FakeDiaUI()
+    ui.value = {"value": value}
+    return ui
+
+
 class _FormMo(_StubMoLayout):
     """Extended marimo stub with button/radio support."""
     class Html:
@@ -2085,8 +2118,8 @@ class _FormMo(_StubMoLayout):
         def __repr__(self): return self.s
     class ui:
         @staticmethod
-        def button(label="", on_click=None, disabled=False):
-            return _FakeBtn(value=None, disabled=disabled, label=label)
+        def button(label="", on_click=None, disabled=False, kind="neutral"):
+            return _FakeBtn(value=None, disabled=disabled, label=label, kind=kind)
         @staticmethod
         def radio(options=None, value=None, label=""):
             return _FakeRadio(options, value, label)
@@ -2159,6 +2192,37 @@ class TestWordDrillDone:
         assert gu_form.word_drill_done(None, [{"form": "λύω"}]) is False
 
 
+# ────────────────────────────────────────── word_drill_check_button ──
+
+class TestWordDrillCheckButton:
+    """Unit tests for GreekUtils.word_drill_check_button — the single-field
+    analogue of TestDirtyCheckButton, for word_drill's diacritics-text input."""
+
+    def test_clean_when_no_input(self, gu_form):
+        btn = gu_form.word_drill_check_button(_dia(""), None)
+        assert btn.kind == "neutral"
+
+    def test_dirty_when_input_never_checked(self, gu_form):
+        btn = gu_form.word_drill_check_button(_dia("λέγε"), None)
+        assert btn.kind == "warn"
+
+    def test_clean_when_input_matches_last_check(self, gu_form):
+        btn = gu_form.word_drill_check_button(_dia("λέγε"), "λέγε")
+        assert btn.kind == "neutral"
+
+    def test_dirty_when_input_changed_since_last_check(self, gu_form):
+        btn = gu_form.word_drill_check_button(_dia("λέγεις"), "λέγε")
+        assert btn.kind == "warn"
+
+    def test_default_label_is_check(self, gu_form):
+        btn = gu_form.word_drill_check_button(_dia(""), None)
+        assert btn.label == "Check"
+
+    def test_label_can_be_overridden(self, gu_form):
+        btn = gu_form.word_drill_check_button(_dia(""), None, label="Проверить")
+        assert btn.label == "Проверить"
+
+
 # ────────────────────────────────────────── word_drill_widgets ──
 
 class TestWordDrillWidgets:
@@ -2205,6 +2269,25 @@ class TestWordDrillWidgets:
             _, _, _, _, next_btn = gu_form.word_drill_widgets(cv={"form": "λύω"}, remaining=[])
         assert next_btn.label == "Следующий"
 
+    def test_nav_icons_true_uses_triangle_labels(self, gu_form):
+        # Triangle decorates the localized text, doesn't replace it --
+        # arrow points in the direction of travel (before Prev, after Next).
+        wi = MagicMock(); wi._ui = MagicMock()
+        with patch.object(gu_form, "diacritics_text", return_value=wi):
+            _, _, _, prev_btn, next_btn = gu_form.word_drill_widgets(cv={}, remaining=[], nav_icons=True)
+        assert prev_btn.label == "◀ Предыдущий"
+        assert next_btn.label == "Следующий ▶"
+
+    def test_nav_icons_true_done_uses_restart_glyph(self, gu_form):
+        # cv=None, remaining=[] -> word_drill_done() is True -- the restart
+        # action must not look identical to "skip forward" (▶ next to a
+        # "press «Again»" done-screen callout would visually contradict it).
+        # Icon before text here, matching make_renew_button's own convention.
+        wi = MagicMock(); wi._ui = MagicMock()
+        with patch.object(gu_form, "diacritics_text", return_value=wi):
+            _, _, _, _, next_btn = gu_form.word_drill_widgets(cv=None, remaining=[], nav_icons=True)
+        assert next_btn.label == "↺ Пройти снова"
+
 
 # ────────────────────────────────────────── make_renew_button ──
 
@@ -2220,6 +2303,38 @@ class TestMakeRenewButton:
     def test_lang_el(self, gu_form):
         btn = gu_form.make_renew_button(lang="el")
         assert btn.label == "↺ Νέα επιλογή"
+
+
+class TestIconNavRow:
+    """Unit tests for GreekUtils._icon_nav_row -- the nav_icons=True button
+    row builder shared by word_drill_display, word_quiz_form, and
+    _paradigm_drill_form (previously three near-identical inline copies)."""
+
+    def test_prev_first_next_last_both_enabled(self, gu_form):
+        prev, mid, next_ = object(), object(), object()
+        row = gu_form._icon_nav_row(prev, next_, mid, prev_disabled=False)
+        assert row == [prev, mid, next_]
+
+    def test_prev_hidden_when_disabled(self, gu_form):
+        prev, mid, next_ = object(), object(), object()
+        row = gu_form._icon_nav_row(prev, next_, mid, prev_disabled=True)
+        assert row == [mid, next_]
+
+    def test_multiple_middle_widgets_all_kept_in_order(self, gu_form):
+        prev, next_, m1, m2 = object(), object(), object(), object()
+        row = gu_form._icon_nav_row(prev, next_, m1, m2, prev_disabled=False)
+        assert row == [prev, m1, m2, next_]
+
+    def test_none_middle_widget_dropped(self, gu_form):
+        # e.g. word_quiz_form passing an unused renew_btn=None straight through
+        prev, next_ = object(), object()
+        row = gu_form._icon_nav_row(prev, next_, None, prev_disabled=False)
+        assert row == [prev, next_]
+
+    def test_no_middle_widgets(self, gu_form):
+        prev, next_ = object(), object()
+        row = gu_form._icon_nav_row(prev, next_, prev_disabled=False)
+        assert row == [prev, next_]
 
 
 class TestIctusTogglePanel:
@@ -2336,15 +2451,17 @@ class TestWordDrillForm:
         return (cv_g, cv_s, cv_b, rem_g, rem_s, rem_b,
                 sc_g, sc_s, sc_b, rst_g, rst_s, hist_g, hist_s, fut_g, fut_s)
 
-    def _call(self, gu, state, wi=None, next_v=None, prev_v=None, vocab=None, lang="ru"):
+    def _call(self, gu, state, wi=None, next_v=None, prev_v=None, check_v=None, vocab=None, lang="ru",
+              get_checked=None, set_checked=None, nav_icons=False):
         cv_g, cv_s, _, rem_g, rem_s, _, sc_g, sc_s, _, rst_g, rst_s, hist_g, hist_s, fut_g, fut_s = state
         wi = wi or _FakeWI()
         return gu.word_drill_form(
             cv_g, cv_s, rem_g, rem_s, sc_g, sc_s, rst_g, rst_s,
             hist_g, hist_s, fut_g, fut_s,
-            wi, wi._ui, _FakeBtn(None), _FakeBtn(prev_v), _FakeBtn(next_v),
+            wi, wi._ui, _FakeBtn(check_v), _FakeBtn(prev_v), _FakeBtn(next_v),
             vocab=vocab or _WD_VOCAB,
             lang=lang,
+            get_checked=get_checked, set_checked=set_checked, nav_icons=nav_icons,
         )
 
     def test_uninit_initializes_and_returns_placeholder(self, gu_form):
@@ -2371,6 +2488,87 @@ class TestWordDrillForm:
         self._call(gu_form, state, wi=_FakeWI(_WD_VOCAB[0]["form"]), next_v=1)
         assert sc_b[0]["correct"] == 1
         assert sc_b[0]["total"] == 1
+
+    # Check-button auto-advance: mirrors _paradigm_drill_form's "correct ->
+    # immediately advance, no separate Next click needed" behavior.
+
+    def test_check_correct_auto_advances(self, gu_form):
+        state = self._state(cv=_WD_VOCAB[0], rem=_WD_VOCAB[1:])
+        cv_b = state[2]; rem_b = state[5]; sc_b = state[8]
+        result = self._call(gu_form, state, wi=_FakeWI(_WD_VOCAB[0]["form"]), check_v=1)
+        assert result == "*...*"
+        assert cv_b[0] == _WD_VOCAB[1]
+        assert rem_b[0] == _WD_VOCAB[2:]
+        assert sc_b[0] == {"correct": 1, "total": 1}
+
+    def test_enter_correct_auto_advances(self, gu_form):
+        # Enter must advance exactly like the Check button -- verified this
+        # can't double-fire even though enter_pressed never auto-resets
+        # (see the long comment at the fix site for why: write_input
+        # rebuilds empty on the very re-run this triggers, before this
+        # code ever re-reads the stale enter_pressed count).
+        state = self._state(cv=_WD_VOCAB[0], rem=_WD_VOCAB[1:])
+        cv_b = state[2]; rem_b = state[5]; sc_b = state[8]
+        wi = _FakeWI(_WD_VOCAB[0]["form"])
+        wi._ui.value = {"enter_pressed": 1}
+        result = self._call(gu_form, state, wi=wi, check_v=None)
+        assert result == "*...*"
+        assert cv_b[0] == _WD_VOCAB[1]
+        assert rem_b[0] == _WD_VOCAB[2:]
+        assert sc_b[0] == {"correct": 1, "total": 1}
+
+    def test_enter_with_zero_count_does_not_advance(self, gu_form):
+        # enter_pressed=0 (the default -- Enter never actually pressed)
+        # must not be treated as truthy the way a real press (nonzero) is.
+        state = self._state(cv=_WD_VOCAB[0], rem=_WD_VOCAB[1:])
+        cv_b = state[2]
+        self._call(gu_form, state, wi=_FakeWI(_WD_VOCAB[0]["form"]), check_v=None)
+        assert cv_b[0] == _WD_VOCAB[0]
+
+    def test_check_wrong_does_not_advance(self, gu_form):
+        # Falls through to word_drill_display instead -- same "stay on this
+        # word, show feedback" behavior as before this fix, unchanged.
+        state = self._state(cv=_WD_VOCAB[0], rem=_WD_VOCAB[1:])
+        cv_b = state[2]; sc_b = state[8]
+        result = self._call(gu_form, state, wi=_FakeWI("wrong answer"), check_v=1)
+        assert result != "*...*"
+        assert cv_b[0] == _WD_VOCAB[0]
+        assert sc_b[0] == {"correct": 0, "total": 0}
+
+    def test_check_empty_input_does_not_advance(self, gu_form):
+        state = self._state(cv=_WD_VOCAB[0], rem=_WD_VOCAB[1:])
+        cv_b = state[2]
+        result = self._call(gu_form, state, wi=_FakeWI(""), check_v=1)
+        assert result != "*...*"
+        assert cv_b[0] == _WD_VOCAB[0]
+
+    def test_check_correct_records_history(self, gu_form):
+        state = self._state(cv=_WD_VOCAB[0], rem=_WD_VOCAB[1:])
+        hist_b = [None]
+        orig_hist_s = state[12]
+        def _capture(v): hist_b[0] = v; orig_hist_s(v)
+        state = state[:12] + (_capture,) + state[13:]
+        self._call(gu_form, state, wi=_FakeWI(_WD_VOCAB[0]["form"]), check_v=1)
+        assert hist_b[0] == [{"word": _WD_VOCAB[0], "answer": _WD_VOCAB[0]["form"], "correct": True}]
+
+    def test_check_correct_ignored_while_browsing_future(self, gu_form):
+        # Matches the Next-button's own "future" branch being a distinct
+        # code path from a normal new answer -- Check shouldn't auto-advance
+        # past whatever's being reviewed via Prev/Next history navigation.
+        fut_entry = {"word": _WD_VOCAB[1], "answer": _WD_VOCAB[1]["form"], "correct": True}
+        state = self._state(cv=_WD_VOCAB[0], rem=_WD_VOCAB[2:], fut=[fut_entry])
+        cv_b = state[2]
+        result = self._call(gu_form, state, wi=_FakeWI(_WD_VOCAB[0]["form"]), check_v=1)
+        assert result != "*...*"
+        assert cv_b[0] == _WD_VOCAB[0]
+
+    def test_check_without_click_does_not_advance(self, gu_form):
+        # check_v=None (the default) -- typing alone, with no Check click,
+        # must not auto-advance.
+        state = self._state(cv=_WD_VOCAB[0], rem=_WD_VOCAB[1:])
+        cv_b = state[2]
+        self._call(gu_form, state, wi=_FakeWI(_WD_VOCAB[0]["form"]))
+        assert cv_b[0] == _WD_VOCAB[0]
 
     def test_done_shows_callout(self, gu_form):
         state = self._state(cv=None, rem=[], sc={"correct": 2, "total": 4})
@@ -2436,6 +2634,89 @@ class TestWordDrillForm:
         assert "correct" in text
         assert "правильно" not in text
 
+    def test_nav_icons_forwarded_to_display(self, gu_form):
+        # No history -- word_drill_form computes prev_disabled=True itself
+        # (a real check_btn/prev_btn has no readable .disabled to read back),
+        # so nav_icons hides Prev: 2 buttons, not 3.
+        state = self._state(cv=_WD_VOCAB[0], rem=_WD_VOCAB[1:])
+        result = self._call(gu_form, state, nav_icons=True)
+        assert len(result[-1]) == 2
+
+    def test_nav_icons_shows_prev_with_history(self, gu_form):
+        past = {"word": _WD_VOCAB[1], "answer": _WD_VOCAB[1]["form"], "correct": True}
+        state = self._state(cv=_WD_VOCAB[0], rem=_WD_VOCAB[2:], hist=[past])
+        result = self._call(gu_form, state, nav_icons=True)
+        assert len(result[-1]) == 3
+
+    # get_checked/set_checked: tracks the exact text last submitted via
+    # Check/Enter for the current word, for word_drill_check_button's
+    # "warn"-when-dirty coloring -- mirrors _paradigm_drill_form's own
+    # "cap" snapshot, updated on every check attempt (right or wrong),
+    # reset/restored in lockstep with restore_entry at every transition.
+
+    def test_checked_records_wrong_attempt(self, gu_form):
+        state = self._state(cv=_WD_VOCAB[0], rem=_WD_VOCAB[1:])
+        chk_g, chk_s, chk_b = _pair(None)
+        self._call(gu_form, state, wi=_FakeWI("wrong answer"), check_v=1,
+                   get_checked=chk_g, set_checked=chk_s)
+        assert chk_b[0] == "wrong answer"
+
+    def test_checked_resets_on_correct_auto_advance(self, gu_form):
+        state = self._state(cv=_WD_VOCAB[0], rem=_WD_VOCAB[1:])
+        chk_g, chk_s, chk_b = _pair("stale")
+        self._call(gu_form, state, wi=_FakeWI(_WD_VOCAB[0]["form"]), check_v=1,
+                   get_checked=chk_g, set_checked=chk_s)
+        assert chk_b[0] is None
+
+    def test_checked_resets_on_next_normal_advance(self, gu_form):
+        state = self._state(cv=_WD_VOCAB[0], rem=_WD_VOCAB[1:])
+        chk_g, chk_s, chk_b = _pair("stale")
+        self._call(gu_form, state, wi=_FakeWI("wrong"), next_v=1,
+                   get_checked=chk_g, set_checked=chk_s)
+        assert chk_b[0] is None
+
+    def test_checked_resets_on_restart(self, gu_form):
+        state = self._state(cv=None, rem=[], sc={"correct": 2, "total": 4})
+        chk_g, chk_s, chk_b = _pair("stale")
+        self._call(gu_form, state, next_v=1, get_checked=chk_g, set_checked=chk_s)
+        assert chk_b[0] is None
+
+    def test_checked_restored_on_next_forward_through_future(self, gu_form):
+        fut_entry = {"word": _WD_VOCAB[1], "answer": _WD_VOCAB[1]["form"], "correct": True}
+        state = self._state(cv=_WD_VOCAB[0], rem=_WD_VOCAB[2:],
+                            sc={"correct": 0, "total": 0}, fut=[fut_entry])
+        chk_g, chk_s, chk_b = _pair("stale")
+        self._call(gu_form, state, next_v=1, get_checked=chk_g, set_checked=chk_s)
+        assert chk_b[0] == _WD_VOCAB[1]["form"]
+
+    def test_checked_restored_on_prev(self, gu_form):
+        past = {"word": _WD_VOCAB[1], "answer": _WD_VOCAB[1]["form"], "correct": True}
+        state = self._state(cv=_WD_VOCAB[0], rem=_WD_VOCAB[2:],
+                            sc={"correct": 1, "total": 1}, hist=[past])
+        chk_g, chk_s, chk_b = _pair(None)
+        self._call(gu_form, state, prev_v=1, get_checked=chk_g, set_checked=chk_s)
+        assert chk_b[0] == _WD_VOCAB[1]["form"]
+
+    def test_checked_untouched_when_not_wired(self, gu_form):
+        # get_checked/set_checked both default None -- existing callers
+        # (Odyssey) unaffected, no crash from the optional bookkeeping.
+        state = self._state(cv=_WD_VOCAB[0], rem=_WD_VOCAB[1:])
+        result = self._call(gu_form, state, wi=_FakeWI(_WD_VOCAB[0]["form"]), check_v=1)
+        assert result == "*...*"
+
+    def test_wrong_check_shows_feedback_with_checked_wired(self, gu_form):
+        # Regression test: a check_btn built via word_drill_check_button
+        # rebuilds (and its own transient click value resets) the moment
+        # set_checked's state update lands, which would otherwise erase the
+        # click signal before word_drill_display ever shows feedback for a
+        # wrong answer. Confirmed missing live before word_drill_display's
+        # own `checked` parameter was added to cover this exact case.
+        state = self._state(cv=_WD_VOCAB[0], rem=_WD_VOCAB[1:])
+        chk_g, chk_s, _ = _pair(None)
+        result = self._call(gu_form, state, wi=_FakeWI("wrong answer"), check_v=1,
+                            get_checked=chk_g, set_checked=chk_s)
+        assert "✗" in str(result)
+
 
 # ────────────────────────────────────────── word_quiz_widgets ──
 
@@ -2472,6 +2753,19 @@ class TestWordQuizWidgets:
         )
         assert radio.value == w["form"]
 
+    def test_nav_icons_true_uses_triangle_labels(self, gu_form):
+        _, next_btn, prev_btn = gu_form.word_quiz_widgets(
+            cv=_WQ_VOCAB[0], remaining=_WQ_VOCAB[1:], vocab=_WQ_VOCAB, nav_icons=True,
+        )
+        assert next_btn.label == "Следующий ▶"
+        assert prev_btn.label == "◀ Предыдущий"
+
+    def test_nav_icons_true_done_uses_restart_glyph(self, gu_form):
+        _, next_btn, _ = gu_form.word_quiz_widgets(
+            cv=None, remaining=[], vocab=_WQ_VOCAB, nav_icons=True,
+        )
+        assert next_btn.label == "↺ Пройти снова"
+
 
 # ────────────────────────────────────────── word_quiz_form ──
 
@@ -2480,7 +2774,7 @@ class TestWordQuizForm:
         return _form_state(cv, rem, sc, rst, hist, fut)
 
     def _call(self, gu, state, radio=None, next_v=None, prev_v=None, vocab=None,
-              build_paradigm_table=None, lang="ru", renew_btn=None):
+              build_paradigm_table=None, lang="ru", renew_btn=None, nav_icons=False):
         cv_g, cv_s, _, rem_g, rem_s, _, sc_g, sc_s, _, rst_g, rst_s, hist_g, hist_s, _, fut_g, fut_s = state
         return gu.word_quiz_form(
             cv_g, cv_s, rem_g, rem_s, sc_g, sc_s, rst_g, rst_s,
@@ -2490,6 +2784,7 @@ class TestWordQuizForm:
             build_paradigm_table=build_paradigm_table,
             lang=lang,
             renew_btn=renew_btn,
+            nav_icons=nav_icons,
         )
 
     def test_uninit_initializes(self, gu_form):
@@ -2508,25 +2803,68 @@ class TestWordQuizForm:
         assert result == "*...*"
         assert sc_b[0]["total"] == 1
 
-    def test_next_without_answer_rerenders(self, gu_form):
+    def test_next_without_answer_advances_scored_wrong(self, gu_form):
+        # Matches word_drill_form's own blank-submit skip -- Next always
+        # advances, an empty/no selection just can't be correct.
         w = _WQ_VOCAB[0]
         state = self._state(cv=w, rem=_WQ_VOCAB[1:])
-        sc_b = state[8]
+        cv_b = state[2]; sc_b = state[8]
         result = self._call(gu_form, state, radio=_FakeRadio(value=None), next_v=1)
-        assert result != "*...*"
-        assert sc_b[0]["total"] == 0
+        assert result == "*...*"
+        assert cv_b[0] == _WQ_VOCAB[1]
+        assert sc_b[0] == {"correct": 0, "total": 1}
+
+    def test_next_without_answer_records_none_in_history(self, gu_form):
+        w = _WQ_VOCAB[0]
+        state = self._state(cv=w, rem=_WQ_VOCAB[1:])
+        hist_b = state[13]
+        self._call(gu_form, state, radio=_FakeRadio(value=None), next_v=1)
+        assert hist_b[0] == [{"word": w, "answer": None, "correct": False}]
 
     def test_renew_btn_included_in_nav_row(self, gu_form):
         w = _WQ_VOCAB[0]
         state = self._state(cv=w, rem=_WQ_VOCAB[1:])
         renew = _FakeBtn(label="renew")
-        result = self._call(gu_form, state, radio=_FakeRadio(value=None), next_v=1, renew_btn=renew)
+        result = self._call(gu_form, state, renew_btn=renew)
         assert renew in result[-1]
+
+    def test_nav_icons_keeps_next_last_with_renew_btn(self, gu_form):
+        # renew_btn must not push Next out of the last slot in icon mode --
+        # Prev/Next stay first/last regardless of what else is in the row
+        # (the default, non-icon row keeps renew_btn last -- see
+        # test_renew_btn_included_in_nav_row -- this is opt-in reordering).
+        past = {"word": _WQ_VOCAB[1], "answer": _WQ_VOCAB[1]["form"], "correct": True}
+        state = self._state(cv=_WQ_VOCAB[0], rem=_WQ_VOCAB[2:], hist=[past])
+        renew = _FakeBtn(label="renew")
+        result = self._call(gu_form, state, renew_btn=renew, nav_icons=True)
+        row = result[-1]
+        assert len(row) == 3
+        assert row[1] is renew
 
     def test_no_renew_btn_omitted_from_nav_row(self, gu_form):
         w = _WQ_VOCAB[0]
         state = self._state(cv=w, rem=_WQ_VOCAB[1:])
-        result = self._call(gu_form, state, radio=_FakeRadio(value=None), next_v=1)
+        result = self._call(gu_form, state)
+        assert len(result[-1]) == 2
+
+    def test_nav_icons_hides_prev_with_no_history(self, gu_form):
+        w = _WQ_VOCAB[0]
+        state = self._state(cv=w, rem=_WQ_VOCAB[1:])  # hist defaults to []
+        result = self._call(gu_form, state, nav_icons=True)
+        assert len(result[-1]) == 1
+
+    def test_nav_icons_shows_prev_with_history(self, gu_form):
+        past = {"word": _WQ_VOCAB[1], "answer": _WQ_VOCAB[1]["form"], "correct": True}
+        state = self._state(cv=_WQ_VOCAB[0], rem=_WQ_VOCAB[2:], hist=[past])
+        result = self._call(gu_form, state, nav_icons=True)
+        assert len(result[-1]) == 2
+
+    def test_nav_icons_false_keeps_prev_visible_with_no_history(self, gu_form):
+        # Default -- Prev stays visible-but-greyed (real marimo disables it
+        # via the button's own disabled arg), same as before this feature.
+        w = _WQ_VOCAB[0]
+        state = self._state(cv=w, rem=_WQ_VOCAB[1:])
+        result = self._call(gu_form, state)
         assert len(result[-1]) == 2
 
     def test_done_shows_callout(self, gu_form):
@@ -3720,15 +4058,26 @@ class TestParadigmDrillWidgets:
             _, prev_btn, _, _ = gu.paradigm_drill_widgets(labels=["1 sg:"], history_len=2)
         assert prev_btn.disabled is False
 
-    def test_nxt_disabled_with_one_remaining(self, gu):
+    def test_nxt_enabled_with_one_remaining(self, gu):
+        # Confirmed with the user: Next moving the sole remaining word
+        # straight to "done" works fine unscored (no per-word score to get
+        # wrong on skip in this family) -- no longer disabled at exactly 1,
+        # matching word_drill_widgets' own next_btn (never disabled at all).
         with self._patched():
             _, _, nxt_btn, _ = gu.paradigm_drill_widgets(labels=["1 sg:"], remaining_len=1)
-        assert nxt_btn.disabled is True
+        assert nxt_btn.disabled is False
 
     def test_nxt_enabled_with_more_remaining(self, gu):
         with self._patched():
             _, _, nxt_btn, _ = gu.paradigm_drill_widgets(labels=["1 sg:"], remaining_len=3)
         assert nxt_btn.disabled is False
+
+    def test_nxt_disabled_with_zero_remaining(self, gu):
+        # Practically unreachable (a current word always counts itself in
+        # remaining_len), but the parameter still supports it defensively.
+        with self._patched():
+            _, _, nxt_btn, _ = gu.paradigm_drill_widgets(labels=["1 sg:"], remaining_len=0)
+        assert nxt_btn.disabled is True
 
     def test_restart_btn_uses_custom_label(self, gu):
         with self._patched():
@@ -3742,16 +4091,24 @@ class TestParadigmDrillWidgets:
             _, prev_btn, nxt_btn, restart_btn = gu.paradigm_drill_widgets(labels=["1 sg:"])
         assert nxt_btn.label == "Следующее"
         assert prev_btn.label == "Предыдущее"
-        assert restart_btn.label == "Начать заново"
+        assert restart_btn.label == "Пройти снова"
 
     def test_lang_en_uses_english_labels(self, gu):
+        # Plain text, matching ru/el and nav_next_label/nav_prev_label's own
+        # convention. Restart's default now comes from nav_again_label
+        # ("Again") rather than the since-retired restart_label key
+        # ("Start over") -- confirmed with the user that the two wordings
+        # were an unintentional gap, not a deliberate distinction, since
+        # word_drill_form/word_quiz_form's own restart button already says
+        # "Again" and both buttons do the exact same thing (reshuffle and
+        # start the round over).
         with self._patched():
             _, prev_btn, nxt_btn, restart_btn = gu.paradigm_drill_widgets(
                 labels=["1 sg:"], lang="en",
             )
-        assert nxt_btn.label == "Next ▸"
-        assert prev_btn.label == "◂ Prev"
-        assert restart_btn.label == "↺ Start over"
+        assert nxt_btn.label == "Next"
+        assert prev_btn.label == "Prev"
+        assert restart_btn.label == "Again"
 
     def test_lang_el_uses_greek_labels(self, gu):
         with self._patched():
@@ -3760,7 +4117,7 @@ class TestParadigmDrillWidgets:
             )
         assert nxt_btn.label == "Επόμενο"
         assert prev_btn.label == "Προηγούμενο"
-        assert restart_btn.label == "Από την αρχή"
+        assert restart_btn.label == "Ξανά"
 
     def test_explicit_labels_override_lang_default(self, gu):
         with self._patched():
@@ -3769,6 +4126,33 @@ class TestParadigmDrillWidgets:
             )
         assert nxt_btn.label == "Continue"
         assert prev_btn.label == "Back"
+
+    def test_nav_icons_true_decorates_default_labels(self, gu):
+        with self._patched():
+            _, prev_btn, nxt_btn, restart_btn = gu.paradigm_drill_widgets(
+                labels=["1 sg:"], lang="en", nav_icons=True,
+            )
+        assert prev_btn.label == "◀ Prev"
+        assert nxt_btn.label == "Next ▶"
+        assert restart_btn.label == "↺ Again"
+
+    def test_nav_icons_true_decorates_explicit_label_override_too(self, gu):
+        # Whichever text ends up in effect gets decorated, not just the
+        # looked-up default -- the caller asked for icon mode either way.
+        with self._patched():
+            _, prev_btn, nxt_btn, _ = gu.paradigm_drill_widgets(
+                labels=["1 sg:"], lang="en", next_label="Continue", prev_label="Back",
+                nav_icons=True,
+            )
+        assert nxt_btn.label == "Continue ▶"
+        assert prev_btn.label == "◀ Back"
+
+    def test_nav_icons_false_default_leaves_labels_plain(self, gu):
+        with self._patched():
+            _, prev_btn, nxt_btn, restart_btn = gu.paradigm_drill_widgets(
+                labels=["1 sg:"], lang="en",
+            )
+        assert "◀" not in prev_btn.label and "▶" not in nxt_btn.label and "↺" not in restart_btn.label
 
 
 # ────────────────────────────────────────── verb_paradigm_drill_form / noun_paradigm_drill_form ──
@@ -3895,6 +4279,37 @@ class TestVerbParadigmDrillForm(_ParadigmDrillFormBase):
         with patch.object(gu, "check_verb_test", return_value=(False, "")) as m:
             self._call(gu, state, cv, _pdform(["asd"]), self._meta(), check_v=1, lang="el")
         assert m.call_args.kwargs.get("lang") == "el"
+
+    # nav_icons: reorders check/prev/next so Prev/Next stay first/last, and
+    # hides (not just disables) Prev when there's no history yet. Next is
+    # never hidden (or disabled) at all -- confirmed with the user that
+    # skipping the sole remaining word straight to "done" via Next should
+    # work, matching word_drill/word_quiz's own next_btn (never disabled
+    # by remaining count either).
+
+    def test_nav_icons_hides_prev_with_no_history(self, gu):
+        cv = self._VOCAB[0]
+        state = self._state()  # default: both words remaining, hist=[]
+        result = self._call(gu, state, cv, _pdform(["", ""]), self._meta(), nav_icons=True)
+        assert len(result[-2]) == 2  # [check_btn, nxt_btn] -- no prev_btn
+
+    def test_nav_icons_shows_next_even_with_one_remaining(self, gu):
+        cv = self._VOCAB[0]
+        state = self._state(words=[cv], hist=[{"form": "dummy", "meaning": "dummy"}])
+        result = self._call(gu, state, cv, _pdform(["", ""]), self._meta(), nav_icons=True)
+        assert len(result[-2]) == 3  # [prev_btn, check_btn, nxt_btn] -- nxt_btn never hides
+
+    def test_nav_icons_shows_both_with_history_and_remaining(self, gu):
+        cv = self._VOCAB[0]
+        state = self._state(hist=[{"form": "dummy", "meaning": "dummy"}])
+        result = self._call(gu, state, cv, _pdform(["", ""]), self._meta(), nav_icons=True)
+        assert len(result[-2]) == 3  # [prev_btn, check_btn, nxt_btn]
+
+    def test_nav_icons_false_default_row_unchanged(self, gu):
+        cv = self._VOCAB[0]
+        state = self._state()
+        result = self._call(gu, state, cv, _pdform(["", ""]), self._meta())
+        assert len(result[-2]) == 3  # [check_btn, prev_btn, nxt_btn] -- prev just disabled, still shown
 
     def test_lang_defaults_to_ru(self, gu):
         cv = self._VOCAB[0]
@@ -4253,6 +4668,49 @@ class TestVerbParadigmDrillForm(_ParadigmDrillFormBase):
                             retry_btn=retry_btn)
         assert retry_btn not in result
 
+    # ─────────────────────────────── show_prev_when_done ──
+
+    def test_done_state_prev_hidden_by_default(self, gu):
+        state = self._state(words=[], hist=[self._VOCAB[0]])
+        result = self._call(gu, state, None, _pdform([]), self._meta())
+        assert len(result) == 2  # callout + bare restart_btn only
+        assert not isinstance(result[-1], list)
+
+    def test_done_state_shows_prev_when_opted_in_with_history(self, gu):
+        state = self._state(words=[], hist=[self._VOCAB[0]])
+        result = self._call(gu, state, None, _pdform([]), self._meta(), show_prev_when_done=True)
+        assert isinstance(result[-1], list) and len(result[-1]) == 2  # [prev_btn, restart_btn]
+
+    def test_done_state_hides_prev_when_opted_in_but_no_history(self, gu):
+        # Empty vocab entirely -- words=[] and hist=[] both -- nothing to
+        # review back into, so Prev stays hidden even with the flag on.
+        state = self._state(words=[], hist=[])
+        result = self._call(gu, state, None, _pdform([]), self._meta(), show_prev_when_done=True)
+        assert not isinstance(result[-1], list)
+
+    def test_done_state_prev_and_retry_both_shown_when_both_apply(self, gu):
+        get_errors, set_errors, _ = _pair({"λύω": 1})
+        get_retry_cnt, set_retry_cnt, _ = _pair(0)
+        state = self._state(words=[], hist=[self._VOCAB[0]])
+        retry_btn = _FakeBtn(None, label="Retry mistakes")
+        result = self._call(gu, state, None, _pdform([]), self._meta(),
+                            get_errors=get_errors, set_errors=set_errors,
+                            get_retry_cnt=get_retry_cnt, set_retry_cnt=set_retry_cnt,
+                            retry_btn=retry_btn, show_prev_when_done=True)
+        assert len(result[-1]) == 3  # [prev_btn, restart_btn, retry_btn]
+        assert retry_btn in result[-1]
+
+    def test_prev_click_from_done_restores_last_word(self, gu):
+        # The done-screen's Prev handling isn't just about whether the
+        # button is *shown* -- the click itself must work even though
+        # `words` is empty, since the handler now runs before the
+        # done-screen's own early return (see _paradigm_drill_form).
+        state = self._state(words=[], hist=[self._VOCAB[0]])
+        result = self._call(gu, state, None, _pdform([""]), self._meta(), prev_v=1)
+        assert result == "*...*"
+        assert state["words"][2][0] == [self._VOCAB[0]]
+        assert state["hist"][2][0] == []
+
 
 class TestNounParadigmDrillForm(_ParadigmDrillFormBase):
     _VOCAB = [{"form": "ὁ ἀγρός", "meaning": "field"}, {"form": "ἡ γυνή", "meaning": "woman"}]
@@ -4309,6 +4767,21 @@ class TestNounParadigmDrillForm(_ParadigmDrillFormBase):
         with patch.object(gu, "check_noun_test", return_value=(False, "")) as m:
             self._call(gu, state, cv, _pdform(["asd", ""]), self._meta(), check_v=1, lang="el")
         assert m.call_args.kwargs.get("lang") == "el"
+
+    def test_nav_icons_hides_prev_with_no_history(self, gu):
+        # nav_icons threads through to _paradigm_drill_form the same way as
+        # verb -- see TestVerbParadigmDrillForm for the full row/hide battery.
+        cv = self._VOCAB[0]
+        state = self._state()
+        result = self._call(gu, state, cv, _pdform(["", ""]), self._meta(), nav_icons=True)
+        assert len(result[-2]) == 2
+
+    def test_show_prev_when_done_reaches_paradigm_drill_form(self, gu):
+        # show_prev_when_done threads through the same way as nav_icons --
+        # see TestVerbParadigmDrillForm for the full battery.
+        state = self._state(words=[], hist=[self._VOCAB[0]])
+        result = self._call(gu, state, None, _pdform([]), self._meta(), show_prev_when_done=True)
+        assert isinstance(result[-1], list) and len(result[-1]) == 2
 
     def test_enter_on_correct_slot_advances_focus_using_active_cases(self, gu):
         cv = self._VOCAB[0]
@@ -5213,6 +5686,24 @@ class TestDiacriticsText:
         result = _diacritics_text_fn(_FormMo(), value="hello")
         assert result._ui.value == "hello"
 
+    def test_polytonic_defaults_true(self):
+        # Matches this function's original Ancient-Greek-only behavior --
+        # existing callers that don't pass polytonic= see no change.
+        # _FormMo.ui.anywidget() is a no-op passthrough (unlike real marimo's
+        # wrapping UIElement), so ._ui is the raw widget instance itself here.
+        import eee_project.notebook_utils as _nu
+        if not _nu._ANYWIDGET_OK:
+            pytest.skip("anywidget not installed")
+        result = _diacritics_text_fn(_FormMo())
+        assert result._ui.polytonic is True
+
+    def test_polytonic_false_settable(self):
+        import eee_project.notebook_utils as _nu
+        if not _nu._ANYWIDGET_OK:
+            pytest.skip("anywidget not installed")
+        result = _diacritics_text_fn(_FormMo(), polytonic=False)
+        assert result._ui.polytonic is False
+
 
 class TestDiacriticsElement:
     def _fake_ui(self, val="text", enter_pressed=0):
@@ -6100,6 +6591,21 @@ class TestAdjectiveParadigmDrillForm(_ParadigmDrillFormBase):
             self._call(gu, state, cv, _pdform(["asd"] * 6), check_v=1, lang="el")
         assert m.call_args.kwargs.get("lang") == "el"
 
+    def test_nav_icons_hides_prev_with_no_history(self, gu):
+        # nav_icons threads through to _paradigm_drill_form the same way as
+        # verb -- see TestVerbParadigmDrillForm for the full row/hide battery.
+        cv = self._VOCAB[0]
+        state = self._state()
+        result = self._call(gu, state, cv, _pdform(["", "", "", "", "", ""]), nav_icons=True)
+        assert len(result[-2]) == 2
+
+    def test_show_prev_when_done_reaches_paradigm_drill_form(self, gu):
+        # show_prev_when_done threads through the same way as nav_icons --
+        # see TestVerbParadigmDrillForm for the full battery.
+        state = self._state(words=[], hist=[self._VOCAB[0]])
+        result = self._call(gu, state, None, _pdform([]), show_prev_when_done=True)
+        assert isinstance(result[-1], list) and len(result[-1]) == 2
+
     def test_enter_on_correct_slot_advances_focus(self, gu):
         cv = self._VOCAB[0]
         state = self._state()
@@ -6193,6 +6699,23 @@ class TestPronounParadigmDrillForm(_ParadigmDrillFormBase):
             self._call_form(gu.pronoun_paradigm_drill_form, state, cv, form, check_v=1, lang="el")
         assert m.call_args.kwargs.get("lang") == "el"
 
+    def test_nav_icons_hides_prev_with_no_history(self, gu):
+        # nav_icons threads through to _paradigm_drill_form the same way as
+        # verb -- see TestVerbParadigmDrillForm for the full row/hide battery.
+        cv = self._VOCAB[0]
+        state = self._state()
+        form = _pdform([""] * 6)
+        result = self._call_form(gu.pronoun_paradigm_drill_form, state, cv, form, nav_icons=True)
+        assert len(result[-2]) == 2
+
+    def test_show_prev_when_done_reaches_paradigm_drill_form(self, gu):
+        # show_prev_when_done threads through the same way as nav_icons --
+        # see TestVerbParadigmDrillForm for the full battery.
+        state = self._state(words=[], hist=[self._VOCAB[0]])
+        result = self._call_form(gu.pronoun_paradigm_drill_form, state, None, _pdform([]),
+                                 show_prev_when_done=True)
+        assert isinstance(result[-1], list) and len(result[-1]) == 2
+
 
 # ──────────────────────────────── make_item_drill_rows use_diacritics ──
 
@@ -6222,6 +6745,32 @@ class TestWordDrillDisplay:
         content = exc_info.value.args[0]
         assert "callout" in str(content)
         assert content[-1] is btn
+
+    def test_done_with_show_prev_when_done_includes_prev(self, gu_form):
+        next_btn = _FakeBtn(value=0, label="↺")
+        prev_btn = _FakeBtn(value=0, label="◀")
+        with pytest.raises(StopIteration) as exc_info:
+            gu_form.word_drill_display(
+                None, [], {"correct": 2, "total": 3}, None,
+                _FakeWI(""), _FakeWI("")._ui, _FakeBtn(None), prev_btn, next_btn,
+                vocab=[{"meaning": "write", "form": "γράφε"}],
+                show_prev_when_done=True,
+            )
+        content = exc_info.value.args[0]
+        assert content[-1] == [prev_btn, next_btn]
+
+    def test_done_without_show_prev_when_done_keeps_next_btn_bare(self, gu_form):
+        # Default False -- every existing caller keeps today's exact shape
+        # (a bare next_btn, not wrapped in an hstack with anything).
+        next_btn = _FakeBtn(value=0, label="↺")
+        with pytest.raises(StopIteration) as exc_info:
+            gu_form.word_drill_display(
+                None, [], {"correct": 2, "total": 3}, None,
+                _FakeWI(""), _FakeWI("")._ui, _FakeBtn(None), _FakeBtn(None), next_btn,
+                vocab=[{"meaning": "write", "form": "γράφε"}],
+            )
+        content = exc_info.value.args[0]
+        assert content[-1] is next_btn
 
     def test_check_branch_gives_feedback(self, gu_form):
         cv = {"meaning": "write", "form": "γράφε"}
@@ -6284,6 +6833,149 @@ class TestWordDrillDisplay:
         assert "correct" in str(result)
         assert "правильно" not in str(result)
 
+    def test_default_button_row_order_unchanged(self, gu_form):
+        cv = {"meaning": "write", "form": "γράφε"}
+        wi = _FakeWI("")
+        check_btn, prev_btn, next_btn = _FakeBtn(None), _FakeBtn(None), _FakeBtn(None)
+        result = gu_form.word_drill_display(
+            cv, [], {"correct": 0, "total": 0}, None,
+            wi, wi._ui, check_btn, prev_btn, next_btn,
+            vocab=[cv],
+        )
+        assert result[-1] == [check_btn, prev_btn, next_btn]
+
+    def test_nav_icons_reorders_prev_check_next(self, gu_form):
+        cv = {"meaning": "write", "form": "γράφε"}
+        wi = _FakeWI("")
+        check_btn, prev_btn, next_btn = _FakeBtn(None), _FakeBtn(None), _FakeBtn(None)
+        result = gu_form.word_drill_display(
+            cv, [], {"correct": 0, "total": 0}, None,
+            wi, wi._ui, check_btn, prev_btn, next_btn,
+            vocab=[cv], nav_icons=True,
+        )
+        assert result[-1] == [prev_btn, check_btn, next_btn]
+
+    def test_nav_icons_hides_disabled_prev(self, gu_form):
+        # A real mo.ui.button has no readable .disabled after construction
+        # (only an internal frontend arg) -- word_drill_display can't
+        # introspect the passed-in button for this, it needs the explicit
+        # prev_disabled flag the caller already knows.
+        cv = {"meaning": "write", "form": "γράφε"}
+        wi = _FakeWI("")
+        check_btn, prev_btn, next_btn = _FakeBtn(None), _FakeBtn(None), _FakeBtn(None)
+        result = gu_form.word_drill_display(
+            cv, [], {"correct": 0, "total": 0}, None,
+            wi, wi._ui, check_btn, prev_btn, next_btn,
+            vocab=[cv], nav_icons=True, prev_disabled=True,
+        )
+        assert result[-1] == [check_btn, next_btn]
+
+    def test_default_mode_keeps_disabled_button_visible(self, gu_form):
+        # Without nav_icons, prev_disabled=True is ignored -- Prev stays
+        # visible (real marimo still greys it out client-side via its own
+        # disabled arg on the button itself), as before this fix. Only the
+        # icon mode hides it, matching eee_footer's own ◀/▶ convention.
+        cv = {"meaning": "write", "form": "γράφε"}
+        wi = _FakeWI("")
+        check_btn, prev_btn, next_btn = _FakeBtn(None), _FakeBtn(None), _FakeBtn(None)
+        result = gu_form.word_drill_display(
+            cv, [], {"correct": 0, "total": 0}, None,
+            wi, wi._ui, check_btn, prev_btn, next_btn,
+            vocab=[cv], prev_disabled=True,
+        )
+        assert result[-1] == [check_btn, prev_btn, next_btn]
+
+    # `checked`: needed because a check_btn built via word_drill_check_button
+    # rebuilds (resetting its own transient click value) the instant a check
+    # attempt updates the "checked" state it's colored from -- without this,
+    # the very re-render that update triggers would show plain meaning text
+    # instead of feedback, since check_btn.value has already reset to falsy
+    # by the time it re-renders. Confirmed live: a real Check click on a
+    # wrong answer showed no feedback at all until this was added.
+
+    def test_checked_matching_typed_shows_feedback_even_when_check_btn_falsy(self, gu_form):
+        cv = {"meaning": "write", "form": "γράφε"}
+        wi = _FakeWI("wrong")
+        result = gu_form.word_drill_display(
+            cv, [], {"correct": 0, "total": 0}, None,
+            wi, wi._ui, _FakeBtn(None), _FakeBtn(None), _FakeBtn(None),
+            vocab=[cv], checked="wrong",
+        )
+        assert "✗" in str(result)
+
+    def test_checked_not_matching_typed_shows_plain_meaning(self, gu_form):
+        cv = {"meaning": "write", "form": "γράφε"}
+        wi = _FakeWI("wrong")
+        result = gu_form.word_drill_display(
+            cv, [], {"correct": 0, "total": 0}, None,
+            wi, wi._ui, _FakeBtn(None), _FakeBtn(None), _FakeBtn(None),
+            vocab=[cv], checked="something else entirely",
+        )
+        assert "write" in str(result)
+        assert "✗" not in str(result)
+
+    def test_checked_none_default_unaffected(self, gu_form):
+        # Odyssey and any other existing caller never passes `checked` --
+        # must behave exactly as before this fix (no feedback from typing
+        # alone, with no check_btn/_enter signal either).
+        cv = {"meaning": "write", "form": "γράφε"}
+        wi = _FakeWI("wrong")
+        result = gu_form.word_drill_display(
+            cv, [], {"correct": 0, "total": 0}, None,
+            wi, wi._ui, _FakeBtn(None), _FakeBtn(None), _FakeBtn(None),
+            vocab=[cv],
+        )
+        assert "✗" not in str(result)
+        assert "✓" not in str(result)
+
+
+# ──────────────────────────────── _drill_done_content ──
+
+class TestDrillDoneContent:
+    def test_message_only(self, gu_form):
+        result = gu_form._drill_done_content("All done!")
+        assert result == [("callout", "success", "All done!")]
+
+    def test_message_and_score_line(self, gu_form):
+        result = gu_form._drill_done_content("All done!", score_line="❌ 1 / 2")
+        assert result[1] == "❌ 1 / 2"
+
+    def test_falsy_score_line_omitted(self, gu_form):
+        result = gu_form._drill_done_content("All done!", score_line="")
+        assert len(result) == 1
+
+    def test_no_buttons_omits_row_entirely(self, gu_form):
+        result = gu_form._drill_done_content("All done!")
+        assert len(result) == 1
+
+    def test_none_buttons_list_same_as_no_buttons(self, gu_form):
+        result = gu_form._drill_done_content("All done!", buttons=[None, None])
+        assert len(result) == 1
+
+    def test_single_button_rendered_bare(self, gu_form):
+        btn = _FakeBtn(label="Start over")
+        result = gu_form._drill_done_content("All done!", buttons=[btn])
+        assert result[-1] is btn
+
+    def test_none_entries_filtered_before_bare_check(self, gu_form):
+        # A single real button survives filtering alongside Nones and still
+        # renders bare, not wrapped in a one-item hstack.
+        btn = _FakeBtn(label="Start over")
+        result = gu_form._drill_done_content("All done!", buttons=[None, btn, None])
+        assert result[-1] is btn
+
+    def test_multiple_buttons_hstacked_in_order(self, gu_form):
+        a, b = _FakeBtn(label="a"), _FakeBtn(label="b")
+        result = gu_form._drill_done_content("All done!", buttons=[a, b])
+        assert result[-1] == [a, b]
+
+    def test_three_buttons_with_none_hstacks_remaining_two(self, gu_form):
+        prev, main, extra = _FakeBtn(label="prev"), _FakeBtn(label="main"), _FakeBtn(label="extra")
+        result = gu_form._drill_done_content("All done!", buttons=[None, main, extra])
+        assert result[-1] == [main, extra]
+        result2 = gu_form._drill_done_content("All done!", buttons=[prev, main, None])
+        assert result2[-1] == [prev, main]
+
 
 # ──────────────────────────────── _quiz_done_stop ──
 
@@ -6304,6 +6996,24 @@ class TestQuizDoneStop:
         content = exc_info.value.args[0]
         assert len(content) == 3
         assert content[2] is btn
+
+    def test_prev_btn_alone_without_next_btn_is_ignored(self, gu_form):
+        # prev_btn only makes sense alongside a restart action -- passing it
+        # with no next_btn (shouldn't happen from a real caller, but must
+        # not silently show a lone Prev with nothing else) omits it too.
+        prev = _FakeBtn(value=0, label="◀")
+        with pytest.raises(StopIteration) as exc_info:
+            gu_form._quiz_done_stop({"correct": 3, "total": 5}, "ru", prev_btn=prev)
+        assert len(exc_info.value.args[0]) == 2
+
+    def test_prev_and_next_btn_hstacked_together(self, gu_form):
+        prev = _FakeBtn(value=0, label="◀")
+        next_ = _FakeBtn(value=0, label="↺")
+        with pytest.raises(StopIteration) as exc_info:
+            gu_form._quiz_done_stop({"correct": 3, "total": 5}, "ru", next_btn=next_, prev_btn=prev)
+        content = exc_info.value.args[0]
+        assert len(content) == 3
+        assert content[2] == [prev, next_]
 
     def test_done_message_names_the_actual_restart_button(self, gu_form):
         # The done screen's restart button is always labeled _NAV_AGAIN
@@ -6505,6 +7215,16 @@ class TestVocabTable:
         table = gu_marimo.vocab_table(df, initial_selection=[0, 2])
         assert list(table.value["Word"]) == ["a", "c"]
 
+    def test_wraps_all_columns_not_just_word_translation(self, gu_marimo):
+        # A long phrase (e.g. a "Useful Phrases" quiz row) must wrap instead
+        # of being cut off mid-word -- derived from df.columns, not a
+        # hardcoded ["Word", "Translation"], since mo.ui.table raises if a
+        # named column doesn't exist (e.g. Kapodistrias's extra "Type" col).
+        import pandas as pd
+        df = pd.DataFrame({"Word": ["a"], "Translation": ["b"], "Type": ["noun"]})
+        table = gu_marimo.vocab_table(df)
+        assert set(table._component_args["wrapped-columns"]) == {"Word", "Translation", "Type"}
+
 
 # ──────────────────────────────────── load_vocab_table ──
 
@@ -6626,6 +7346,16 @@ class TestWordWriteQuestion:
             widget = gu_form.word_write_question({"form": "λύω", "meaning": "loosen"}, "ru")
         assert widget is fake_w
 
+    def test_passes_config_polytonic(self, gu_form):
+        # gu_form defaults to MODERN_GREEK (polytonic=False) -- must reach
+        # the underlying widget, not silently stay at the module function's
+        # own polytonic=True default (the original Ancient-Greek-only bug:
+        # a Modern Greek phrase drill showed the full breathing/circumflex
+        # mark set, confusing for post-1982 monotonic orthography).
+        with patch("eee_project.notebook_utils.diacritics_text", return_value=MagicMock()) as mock_fn:
+            gu_form.word_write_question({"form": "λύω", "meaning": "loosen"}, "ru")
+        assert mock_fn.call_args.kwargs["polytonic"] is False
+
 
 # ──────────────────────────────── GreekUtils.diacritics_text method ──
 
@@ -6635,6 +7365,17 @@ class TestGreekUtilsDiacriticsTextMethod:
             result = gu_form.diacritics_text(placeholder="test", label="lbl", value="v")
         assert result == "widget"
         mock_fn.assert_called_once()
+
+    def test_defaults_to_config_polytonic(self, gu_form):
+        # gu_form defaults to MODERN_GREEK (polytonic=False).
+        with patch("eee_project.notebook_utils.diacritics_text", return_value="widget") as mock_fn:
+            gu_form.diacritics_text()
+        assert mock_fn.call_args.kwargs["polytonic"] is False
+
+    def test_explicit_polytonic_overrides_config(self, gu_form):
+        with patch("eee_project.notebook_utils.diacritics_text", return_value="widget") as mock_fn:
+            gu_form.diacritics_text(polytonic=True)
+        assert mock_fn.call_args.kwargs["polytonic"] is True
 
 
 # ──────────────────────────────── build_grc_paradigm_table with data ──

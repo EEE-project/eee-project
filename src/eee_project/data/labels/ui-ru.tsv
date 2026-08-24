@@ -25,7 +25,6 @@ indefinite_label	Также с неопределённым артиклем
 check_label	Проверить
 next_label	Следующее
 prev_label	Предыдущее
-restart_label	Начать заново
 retry_label	Ошибки
 footer_label	Исходный код:
 quiz_form_label	Форма в тексте:
@@ -58,10 +57,10 @@ verbs_not_found	_verbs.tsv не найден — загрузите файл._
 adjs_not_found	_adjectives.tsv не найден — загрузите файл._
 pron_not_found	_pronouns.tsv не найден — загрузите файл._
 translation_presence_not_found	_translation_presence.tsv не найден и не удалось загрузить с сервера._
-test1_done	Все существительные пройдены за эту сессию!
-test2_done	Все глаголы пройдены за эту сессию!
-test3_done	Все прилагательные пройдены за эту сессию!
-test4_done	Все местоимения пройдены за эту сессию!
+test1_done	🎉 Все существительные пройдены! Нажмите «Пройти снова» для повтора.
+test2_done	🎉 Все глаголы пройдены! Нажмите «Пройти снова» для повтора.
+test3_done	🎉 Все прилагательные пройдены! Нажмите «Пройти снова» для повтора.
+test4_done	🎉 Все местоимения пройдены! Нажмите «Пройти снова» для повтора.
 poem_section_heading	## Текст поэмы с параллельными переводами
 vocabulary_heading	## ПОЛЕЗНЫЕ СЛОВА
 test_label	Тест
@@ -76,10 +75,6 @@ pos_label	Часть речи
 load_tsv_label	Загрузить TSV (столбцы Word и Translation) — необязательно
 require_article_label	Требовать артикль (существительное)
 full_paradigm_label	Полная парадигма (все падежи, не только именительный)
-verb_done	Готово — все глаголы отработаны!
-noun_done	Готово — все существительные отработаны!
-adj_done	Готово — все прилагательные отработаны!
-pron_done	Готово — все местоимения отработаны!
 word_label	Слово
 renew_label	↺ Новый набор
 ictus_note_label	Икты (ударные слоги) каждой стопы выделены {color_html}.
@@ -119,3 +114,13 @@ el_verb_col_imp	Повел.
 el_voice_cap_act	действ.
 el_voice_cap_pass	страд.
 el_default_caption	новогреческий
+phrases_heading	## Полезные фразы: тест
+select_phrases	### Выберите фразы для практики
+phrases_empty	_Выберите фразы из таблицы выше, чтобы начать._
+phrases_not_found	_phrases.tsv не найден — загрузите файл._
+phrases_done	Все фразы пройдены за эту сессию!
+phrase_heading	**Тест на фразы**
+phrases_too_few	_Выберите минимум 4 фразы, иначе выбор не будет реальным._
+phrase_mode_label	Режим теста:
+quiz_mode_choice	Выбор варианта
+quiz_mode_type	Ввод ответа

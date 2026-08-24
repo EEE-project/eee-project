@@ -1,5 +1,478 @@
 # Changelog
 
+## 1.9.1 - 2026-08-21
+- `word_drill_form` now auto-advances to the next word immediately on a
+  correct check (Check-button click *or* Enter), matching the paradigm-drill
+  family's own "correct -> immediately advance, no separate Next click
+  needed" behavior (`_paradigm_drill_form`'s `if ok: ... set_words(...)
+  ...`) — previously every correct answer still required an extra manual
+  Next click that the noun/verb/adjective/pronoun tests never needed.
+  `dia_reactive`'s `enter_pressed` is a counter that never auto-resets
+  (unlike `mo.ui.button.value`, which marimo itself resets to `False` once
+  a click is consumed), which initially looked like a double-fire risk on
+  a later state-triggered re-render — but `word_drill_widgets` rebuilds
+  `write_input` fresh on every `cv`/`restore_entry` change, and marimo's
+  dependency graph guarantees that rebuild runs before this code re-reads
+  it on the very re-run advancing triggers, so the already-empty input
+  blocks re-triggering regardless of the stale `enter_pressed` count.
+  Confirmed empirically with an isolated probe notebook mirroring this
+  exact shape, not just reasoned about. Skipped while browsing forward
+  through answered history (`future` non-empty), matching how the Next
+  button already treats that case separately. 8 new tests (including one
+  specifically for the Enter path landing on the correct word exactly
+  once), verified against the real live kernel too (not just mocked unit
+  tests) — a correct answer without its expected trailing punctuation
+  advanced automatically to the next phrase with the right score/history,
+  in one call. Full suite 1394/1394, `ruff check` clean.
+- Fixed `load_ga_config()`'s docstring, which blanket-instructed gitignoring
+  `ga.json` — correct for the plain local-file case this function reads
+  directly, but wrong for the actual production pattern real course
+  notebooks use (`ConfigStore.from_url`/`from_file_or_url`, which *fetch*
+  `ga.json` from the repo's own raw-content URL when deployed as a WASM
+  export, requiring the file to be committed). A GA measurement ID isn't a
+  secret, so committing it for that case is correct, not an oversight — the
+  docstring just never said so.
+- Added 10 new `ui-{en,ru,el}.tsv` keys (`phrases_heading`, `select_phrases`,
+  `phrases_empty`, `phrases_not_found`, `phrases_done`, `phrase_heading`,
+  `phrases_too_few`, `phrase_mode_label`, `quiz_mode_choice`, `quiz_mode_type`)
+  for a new phrase-recall quiz type in course notebooks — the same
+  `word_quiz_widgets`/`word_quiz_form` (multiple-choice) and
+  `word_drill_widgets`/`word_drill_form` (type-the-answer) mechanisms already
+  used for Odyssey's word-form quizzes, now also wired to a course's own
+  "Useful Phrases" vocabulary via `vocab_table`/`load_vocab_table`, with a
+  mode toggle between the two. Also fixed a stale `__init__.py.__version__`
+  (said 1.8.1, one release behind pyproject.toml's 1.9.0) while bumping this
+  release.
+- Fixed `diacritics_text()`/`word_drill_widgets`/`word_write_question`
+  hardcoding the full polytonic (Ancient Greek) diacritics mark set —
+  breathing marks, circumflex, iota subscript — with no way to get the
+  Modern Greek monotonic set (acute accent + diaeresis only) instead, unlike
+  its sibling `make_paradigm_form`, which already had exactly this
+  `polytonic` toggle sourced from `GreekConfig.polytonic`
+  (`MODERN_GREEK`=`False`, `ANCIENT_GREEK`=`True`). Found live testing the
+  new phrase-drill's type-the-answer mode on a Modern Greek course, where
+  the full Ancient Greek mark bar made no sense. `diacritics_text()` gained
+  a `polytonic: bool = True` parameter (default preserves every existing
+  caller's behavior unchanged); `GreekUtils.diacritics_text()` defaults it
+  from `self._cfg.polytonic` when not given explicitly, same convention as
+  `make_paradigm_form`'s own config-driven default — so `word_drill_widgets`
+  (which already calls the method with no explicit `polytonic`) picks up
+  the right mark set automatically, with no changes to that function itself.
+  Moved the `MONOTONIC_MARKS` filter into the shared `_DIACRITIC_CORE_JS`
+  prefix (previously duplicated inside `_PARA_ESM` alone) so both widgets'
+  JS use the identical filter instead of two copies.
+- Fixed `greek_compare()` (and therefore every `word_drill_form`/`_ci`
+  answer check) requiring exact punctuation and whitespace to match —
+  harmless for the single grammatical forms it was originally designed to
+  compare (no embedded punctuation or spaces in a bare declined/conjugated
+  form), but wrong for the new phrase-drill mode, where a student typing the
+  entirely correct phrase without its trailing "?"/";"/"..." or with an
+  extra space was marked wrong. Found in the same live test as the
+  diacritics fix above. `greek_compare()` now treats any run of punctuation
+  as a word separator (replaced with a space) and collapses whitespace runs,
+  comparing only the resulting word sequence — a no-op for a plain
+  single-word form (nothing to strip), verified against all 13 pre-existing
+  `greek_compare` tests still passing unchanged, plus 7 new tests for the
+  phrase case. 12 new tests total this entry (7 `greek_compare`, 5
+  `diacritics_text`/`GreekUtils.diacritics_text`/`word_write_question`
+  polytonic-threading). Full suite 1386/1386, `ruff check` clean.
+- Fixed `vocab_table()` truncating long entries (e.g. full sentences in the
+  new phrase-quiz table) instead of wrapping them — `mo.ui.table` truncates
+  any column by default unless told to wrap it via its own
+  `wrapped_columns: list[str] | None` parameter, which `vocab_table()` never
+  passed. Fixed by passing `wrapped_columns=list(df.columns)` — every
+  column, derived from the actual DataFrame rather than hardcoded as
+  `["Word", "Translation"]`, since `mo.ui.table` raises `ValueError` if a
+  named column doesn't exist and `vocab_table` is also used with an
+  additional `Type` column elsewhere. Found live-testing the phrase-quiz
+  selection table with a full-sentence phrase. 1 new test asserting all
+  columns of a 3-column table are wrapped, not just the first two. Full
+  suite 1395/1395, `ruff check` clean.
+- Added `word_drill_check_button` and an opt-in `nav_icons` parameter to
+  `word_drill_widgets`/`word_drill_form`/`word_drill_display`, for a
+  `word_drill_form` caller that wants the same "warn"-colored (orange)
+  Check button `dirty_check_button` already gives paradigm-drill exercises,
+  plus bare ◀/▶ Prev/Next buttons flanking Check instead of localized
+  text-labeled ones. Both default off/absent, so every existing caller
+  (Odyssey's word-form quizzes, still using the plain `check_btn`
+  `word_drill_widgets` returns) is unaffected.
+  `word_drill_check_button(dia_reactive, checked, *, label="Check")` is the
+  single-field analogue of `dirty_check_button`: built in its own cell
+  (same reason `dirty_check_button` is kept out of `paradigm_drill_widgets`
+  — it needs `dia_reactive` for live-as-you-type recoloring, and folding it
+  into `word_drill_widgets` would rebuild `write_input` from scratch on
+  every keystroke). `checked` is the exact text last submitted via
+  Check/Enter for the current word; `word_drill_form` now accepts an
+  optional `get_checked`/`set_checked` state pair it keeps in lockstep with
+  `restore_entry` at every transition (reset together on a fresh word,
+  restored together when browsing Prev/Next history) so the button always
+  compares against "what was checked for the word on screen."
+  Found and fixed a real bug building this: a check button that recolors
+  live necessarily rebuilds (resetting its own transient click value)
+  the instant a check attempt updates the `checked` state it's colored
+  from — which was erasing `word_drill_display`'s own `check_btn.value`-based
+  feedback trigger before a wrong answer's feedback ever rendered (confirmed
+  live: a real wrong-answer Check click showed no feedback at all, not even
+  briefly, until fixed). Fixed by giving `word_drill_display` its own
+  optional `checked` parameter, treating `checked == typed` the same as a
+  fresh click for showing feedback — mirroring how `_paradigm_drill_form`'s
+  own feedback decision already reads persisted `cap` state rather than the
+  transient check-button value, for exactly this reason. `checked=None`
+  (the default) leaves existing callers byte-for-byte unaffected.
+  `nav_icons=True` also hides (rather than greys out) whichever of
+  Prev/Next is at a history boundary, matching `eee_footer`'s own ◀/▶
+  convention (a spacer instead of a disabled link). Found and fixed a
+  second real bug here too: a real `mo.ui.button` has no readable
+  `.disabled` after construction (only an internal frontend arg,
+  confirmed by reading marimo's own `input.py` — `args={"disabled":
+  disabled, ...}`, no `self.disabled` anywhere) — the first attempt at
+  this read `prev_btn.disabled`/`next_btn.disabled` back off the
+  already-built button objects, which crashed the live notebook with
+  `AttributeError: 'button' object has no attribute 'disabled'` on the
+  very first real click, even though the *entire* test suite passed,
+  because the test double happened to store `disabled` as a plain
+  instance attribute mirroring the constructor kwarg — a stub being
+  looser than the real API it stands in for, silently. Fixed by adding
+  explicit `prev_disabled`/`next_disabled` parameters to
+  `word_drill_display` instead, which `word_drill_form` computes itself
+  (`len(history) == 0` for `prev_disabled`, mirroring the exact condition
+  `_make_nav_buttons` already used to build the button) rather than
+  trying to read state back off a widget that never exposed it. 25 new
+  tests (6 `word_drill_check_button`, 1 `word_drill_widgets` `nav_icons`,
+  8 `word_drill_display` `nav_icons`/`checked`/hide-when-disabled, 10
+  `word_drill_form` `get_checked`/`set_checked`/`nav_icons` transitions).
+  Full suite 1420/1420, `ruff check` clean. Verified live end-to-end:
+  dirty-orange while typing, neutral once the text matches what was last
+  checked (right or wrong), wrong-answer feedback persists, correct-answer
+  auto-advance unaffected, ◀/▶ flank Check and ◀ is genuinely absent (not
+  just disabled) on the first phrase, reappearing once history exists.
+- Fixed `nav_icons=True`'s restart button showing a bare ▶ (identical to
+  "skip forward") once a drill reaches its done screen, contradicting the
+  done-screen's own "press «Again»" callout text right next to it. Found by
+  driving a full 15-phrase forward/backward/restart cycle live through
+  marimo-pair (a fork agent, not just unit tests) at the user's request
+  after the earlier `.disabled` incident — the backward/forward history
+  walk itself turned out clean (Prev hides/reappears exactly at
+  `history==0` in both directions, including the history→future seam), but
+  this confirmed a second real issue: `_make_nav_buttons`'s `nav_icons`
+  branch used a fixed "▶"/"◀" pair with no `done`-awareness at all, unlike
+  its own text-label branch (`nav_again_label` vs `nav_next_label`). Now
+  uses "↺" once done — the same restart glyph `make_renew_button` already
+  uses elsewhere in this file, so there's no third icon convention to
+  learn. 1 new test. Full suite 1421/1421, `ruff check` clean.
+  Also confirmed the same walk-through: `_quiz_done_stop` (shared by
+  `word_drill_display`/`word_quiz_form`/`stanza_match_form`/
+  `translation_presence_form`) never received `prev_btn` at all, so Prev
+  was unconditionally absent on every done screen for every quiz type —
+  pre-existing, not introduced by `nav_icons`. Given the choice between
+  leaving it, fixing it for every quiz type, or fixing it for just the one
+  caller that asked, added it as opt-in: `_quiz_done_stop` gained an
+  optional `prev_btn` parameter (rendered in an `mo.hstack` alongside
+  `next_btn` only when *both* are given — a lone `next_btn`, every existing
+  caller's exact shape today, still appends bare, unwrapped, preserving
+  `content[-1] is next_btn`), and `word_drill_display`/`word_drill_form`
+  gained `show_prev_when_done: bool = False` to opt into passing their own
+  `prev_btn` through. Needed no new state-machine work — `_handle_prev`/
+  `_make_future_entry` already handled `cv=None` gracefully (they just
+  never had a visible button to trigger it from at the done screen).
+  4 new tests (2 `_quiz_done_stop`, 2 `word_drill_display`). Full suite
+  1425/1425, `ruff check` clean. Verified live end-to-end via marimo-pair
+  (engineering the done state directly rather than 15 real clicks, since
+  the forward/backward walk itself was already separately verified): ◀
+  and ↺ both render at 15/15 done, clicking ◀ correctly reviews the last
+  answered word (history 15→14, future 0→1, score 15/15→14/14, restore
+  populated, 3-button row with ▶ not ↺ since we're not done anymore),
+  clicking ▶ returns cleanly to the identical done screen, and ↺ from
+  there still restarts correctly (fresh word, history/future/score all
+  reset, Prev hidden again).
+- Extended `nav_icons` (and its hide-at-history-boundary behavior) from
+  `word_drill_widgets`/`word_drill_form` to `word_quiz_widgets`/
+  `word_quiz_form` too, so a multiple-choice quiz can look and behave the
+  same as its type-the-answer sibling. `word_quiz_form` needed no new
+  reordering logic — its row was already Prev-before-Next (there's no
+  Check button to flank, since selecting a radio option scores
+  immediately) — just hiding Prev at the start of history, reusing
+  `_nav_row`'s own existing "drop `None` entries" mechanic (already how it
+  omits an unused `renew_btn`) rather than adding a new mechanism: pass
+  `None` instead of `prev_btn` when it should hide, no changes to the
+  shared `_nav_row` helper itself (still used unmodified by
+  `stanza_match_form`/`translation_presence_form`). The done-screen
+  "▶"-vs-"↺" distinction came for free — `next_btn`'s label is built by
+  the already-fixed `_make_nav_buttons`. 6 new tests. Full suite
+  1430/1430, `ruff check` clean. Verified live: ◀ absent on question 1,
+  both ◀/▶ present on question 2 in Multiple Choice mode.
+- Changed `word_quiz_form`'s Next button to always advance, whether or not
+  a radio option is selected — previously clicking Next with nothing
+  picked just re-rendered the same question in place (a deliberate,
+  tested, but inconsistent design: `word_drill_form`'s own Next has never
+  required typing anything first, an empty submit already scores wrong
+  and advances). This is a **default behavior change**, not opt-in like
+  every other fix in this release — confirmed explicitly with the user,
+  who chose it over scoping it to one caller, so it applies to every
+  existing `word_quiz_form` caller (16+ Odyssey/Palaestra lessons, not
+  just the phrase quiz that prompted the question). `stanza_match_form`/
+  `translation_presence_form` share a *different* helper
+  (`_handle_quiz_next`) with the identical "require a selection" pattern —
+  intentionally NOT touched here, since only `word_quiz_form` was in
+  scope of what was actually asked. An unanswered question now scores
+  wrong (`answer_radio.value is None` never equals `cv[form_key]`, no
+  special-casing needed) and is recorded in history as
+  `{"answer": None, "correct": False}`, reviewable via Prev exactly like
+  any other answered word. 2 new tests replace the one that asserted the
+  old behavior; 4 more existing tests updated (they used
+  `next_v=1, radio=value=None` merely as a way to reach the display
+  path without a real click — now they just don't click Next at all,
+  which is both simpler and no longer coincidentally relies on the
+  behavior being changed here). Full suite 1431/1431, `ruff check` clean.
+- `nav_icons=True`'s ◀/▶ now decorate the localized Prev/Next(/Again) text
+  instead of replacing it (``"◀ Prev"``, ``"Next ▶"`` — arrow pointing in
+  the direction of travel; done screen's restart gets ``"↺ Again"``, icon
+  *before* text there, matching `make_renew_button`'s own convention).
+  Also fixed `word_quiz_form` so Prev/Next stay first/last in the row even
+  with `renew_btn` present in icon mode — previously the row order was
+  fixed at `[prev_btn, next_btn, renew_btn]` regardless of `nav_icons`, so
+  a caller passing `renew_btn` would end up with Next in the middle, not
+  last. `word_drill_display`'s own row was already `[prev_btn, check_btn,
+  next_btn]` (Prev/Next already first/last, Check in between) — no change
+  needed there. Default (non-icon) ordering is untouched either way — this
+  reorder only applies when `nav_icons=True`. 5 new/updated tests
+  (4 label-content fixes across `word_drill_widgets`/`word_quiz_widgets`,
+  1 new `renew_btn`-ordering test). Full suite 1432/1432, `ruff check`
+  clean. Verified live: "◀ Prev" / "Check" / "Next ▶" all render with
+  their labels, in the right order, through a full type-answer cycle.
+- Extended `nav_icons` to the paradigm-drill family too (`paradigm_drill_widgets`
+  and `verb_paradigm_drill_form`/`noun_paradigm_drill_form`/
+  `adjective_paradigm_drill_form`/`pronoun_paradigm_drill_form`, the shared
+  engine behind noun/verb/adjective/pronoun "pos tests") — same idea as
+  `word_drill`/`word_quiz`, but genuinely different mechanics: this family
+  builds its own Prev/Next/Restart directly (never went through
+  `_make_nav_buttons`), and Restart is its own always-separate button
+  rather than Next relabeling itself when done. `_paradigm_drill_form`'s
+  row reorders to `[prev_btn, check_btn, nxt_btn]` (was fixed at
+  `[check_btn, prev_btn, nxt_btn]`); Prev's hide condition is computed from
+  `hist` itself, matching the exact condition `paradigm_drill_widgets`
+  used to build it disabled (not read back off the button object — same
+  `.disabled`-doesn't-exist reasoning as before). Restart gets
+  `"↺ {text}"` for free from `paradigm_drill_widgets`, so
+  `_paradigm_drill_form` doesn't need `nav_icons` for that part, only for
+  the reordering/hiding.
+  **Found and fixed a real, pre-existing, unrelated inconsistency while
+  wiring this up**: the `next_label`/`prev_label`/`restart_label` TSV keys
+  (distinct from `nav_next_label`/`nav_prev_label`/`nav_again_label`,
+  which this whole `nav_icons` feature is built on) already had ◂/▸/↺
+  baked into their *English* values only (`"Next ▸"`, `"◂ Prev"`,
+  `"↺ Start over"` — ru/el plain, and the sibling `nav_*_label` keys
+  introduced in the very same commit also plain) — an accidental
+  inconsistency from v1.9.0's original EN-translation pass, not a
+  deliberate design. Left as-is, this would have doubled up with
+  `nav_icons`'s own decoration for English paradigm drills specifically
+  (`"Next ▸ ▶"`). Fixed by making `ui-en.tsv` plain here too, matching
+  every other language and every other nav-label key; `nav_icons=True`
+  is now the only source of icons anywhere in the UI, uniformly across
+  ru/en/el.
+  **Also compared directly against `word_drill`/`word_quiz` at the user's
+  request and found a real behavioral gap, not just cosmetic**:
+  `paradigm_drill_widgets` originally disabled `nxt_btn` at
+  `remaining_len <= 1` (Next unusable with only one word queued at all) —
+  unlike `word_drill_widgets`' own `next_btn`, never disabled by remaining
+  count. Confirmed with the user and changed to `remaining_len < 1` (a
+  bound the current-word-inclusive count never actually reaches in
+  practice, so effectively "never disabled"): the underlying handler
+  already tolerated moving the sole word straight to "done" via Next with
+  no special-casing needed (this family has no per-word score to get
+  wrong on skip, unlike `word_drill_form`'s own Next) — it just needed the
+  disabled-arg loosened. `_paradigm_drill_form`'s own nxt-hide condition
+  became permanently unreachable once the early "if not words" return
+  guarantees `words` is non-empty by then, so it was removed rather than
+  left as dead code — Next is now never hidden here either, mirroring
+  `word_drill`/`word_quiz` exactly: only Prev ever hides, Next never does.
+  13 new/updated tests total across both rounds (11 net new; 4 widget-level
+  label tests — one being the existing EN-TSV test updated for the
+  plain-text fix rather than new; 4 on the verb sibling covering the full
+  row/hide battery, one of which was updated again for the
+  `remaining_len` fix; 1 smoke test each on noun/adjective/pronoun; 2 more
+  for the `remaining_len` threshold itself — one updating a pre-existing
+  test, one new). Full suite 1443/1443, `ruff check` clean. Verified live on the noun
+  test, both rounds: "◀ Prev" appears once history exists and "Next"
+  hides on the last word (first round); then, with only 1 word selected
+  from the start, "Next ▶" is genuinely clickable and correctly advances
+  straight to the done screen, "↺ Start over" rendering correctly with a
+  single icon (second round, after the `remaining_len` fix).
+- Consolidated the `nav_icons=True` button-row logic — Prev first (hidden
+  if disabled), Next last (hidden if disabled), whatever's in between
+  (`check_btn` for `word_drill_display`/`_paradigm_drill_form`,
+  `renew_btn` for `word_quiz_form`) unchanged — from three near-identical
+  inline copies into one shared `_icon_nav_row` helper, at the user's
+  request after comparing the two families' logic directly. Returns a
+  plain widget list rather than an already-built `mo.hstack`, since each
+  caller wraps it with its own `justify` value (`"start"` for word_drill/
+  word_quiz, `"end"` for paradigm-drill — an existing difference this
+  consolidation doesn't touch). Purely mechanical: every existing test
+  passed unchanged, confirming behavior is identical to the three
+  separate copies it replaces. 6 new direct unit tests for the helper
+  itself (prev/next hiding independently, multiple middle widgets kept in
+  order, a `None` middle widget dropped the same way `renew_btn=None`
+  already needed, zero middle widgets). Full suite 1449/1449, `ruff check`
+  clean. Verified live: the phrase quiz's "Type the answer" mode still
+  renders "Check"/"Next ▶" identically to before the refactor.
+- Consolidated the two families' *done-screen* rendering too, at the
+  user's request after comparing pos-test vs. phrase-test done screens
+  directly and asking for one shared function. `_quiz_done_stop` (used by
+  `word_drill_display`/`word_quiz_form`/`stanza_match_form`/
+  `translation_presence_form`) now delegates its actual content-building
+  to a new `_drill_done_content(message, *, score_line=None,
+  buttons=None)` — a success callout plus an optional score line plus a
+  button row (bare if one button, hstacked if more, omitted if none) —
+  and `_paradigm_drill_form`'s own done-block, previously a hand-rolled
+  `mo.vstack`, now calls the same function directly (its done-check is
+  the function's first early-return rather than a mid-function halt, so
+  it returns the content instead of wrapping it in `mo.stop` the way
+  `_quiz_done_stop` does). A literal single function driving *both*
+  families' Next-button click-handling turned out not to be sound — the
+  two track fundamentally different state (single-radio answer + running
+  correct/total score + bidirectional history/future replay stacks, vs.
+  multi-field form + no per-word score on Next at all + one-directional
+  history only) — so the click-handling itself stays separate; only the
+  done-*screen* (message/score-line/buttons) is genuinely shared now,
+  confirmed as the right scope with the user before implementing.
+  New `show_prev_when_done` parameter on `_paradigm_drill_form` and all
+  four public wrappers (`verb_`/`noun_`/`adjective_`/
+  `pronoun_paradigm_drill_form`) — same name and convention as
+  `word_drill_display`'s own flag — lets a finished pos-test round still
+  be reviewed via Prev instead of only restart/retry, closing a real gap:
+  pos-tests' Prev was previously unreachable from the done screen at all,
+  not just hidden — the function returned early on `if not words` before
+  `prev_btn.value` was ever checked, even though the Prev handler itself
+  only ever depended on `hist`, never on `cv`/`form`/whether `words` was
+  empty. Moved the Prev-click check to run before the done-screen
+  early-return (harmless for the in-progress case, since restart/retry
+  still take priority and nothing about Prev's own logic changes) so
+  Prev now actually works from done, not just renders there. Default
+  `False` — every existing caller's restart-only (or restart+retry) done
+  screen is unchanged unless it opts in.
+  17 new tests: 9 directly on `_drill_done_content` (message-only,
+  message+score, single button bare, `None` entries filtered before the
+  bare-vs-hstack check, multiple buttons hstacked in order, no buttons
+  omits the row); 5 on `show_prev_when_done` in `TestVerbParadigmDrillForm`
+  (hidden by default, shown with history when opted in, hidden with no
+  history even when opted in, shown alongside retry_btn when both apply,
+  and the functional case — clicking Prev from the done screen actually
+  restores the last word); 3 one-line smoke tests confirming the
+  parameter threads through on the noun/adjective/pronoun siblings. Every
+  pre-existing `_quiz_done_stop`/`_paradigm_drill_form` done-state test
+  passed unchanged, confirming the refactor is behavior-preserving. Full
+  suite 1466/1466, `ruff check` clean. Verified live on the noun test
+  with a single noun selected: done screen now shows "◀ Prev" alongside
+  "↺ Start over", and clicking it correctly returns to the question
+  (empty fields, since the word was skipped unscored, never answered);
+  re-verified the phrase quiz's own done screen unchanged ("🎉 All words
+  done! Press «Again» to repeat.", "Correct: 0 / 1", "◀ Prev" / "↺ Again").
+- `paradigm_drill_widgets`' restart button now defaults its label from
+  `nav_again_label` instead of the separate `restart_label` key, at the
+  user's request after noticing pos-tests showed "↺ Start over" while
+  phrase-tests showed "↺ Again" for what is the identical restart action —
+  an unintentional wording gap between two TSV keys, not a deliberate
+  distinction (confirmed with the user before merging them). `restart_label`
+  is now unused (its only consumer was this one default-fallback line) and
+  was removed from all 3 `ui-{en,ru,el}.tsv` files. Also rewrote
+  `test1_done`/`test2_done`/`test3_done`/`test4_done` (the shared
+  eee-project-level done-messages pos-tests use across 13 course notebooks,
+  distinct from `quiz_done_message` used by phrase-tests) in all 3 languages
+  to match `quiz_done_message`'s own "🎉 ... Press «Again» to repeat."
+  template, keeping each key's own part-of-speech word (nouns/verbs/
+  adjectives/pronouns) rather than genericizing to "words". No test-count
+  change (existing tests' expected label text updated, none added/removed):
+  full suite 1466/1466, `ruff check` clean. Verified live: the noun test's
+  done screen now reads "🎉 All nouns done! Press «Again» to repeat." with
+  "↺ Again", matching the phrase quiz's phrasing exactly.
+- Added a "forms of a Modern Greek verb" example to `docs/api-patterns.md`'s
+  Pattern B section (previously `grc`-only): `get_slot_templates` +
+  `inflect_slot` for the full paradigm, `inflect()` directly for the aorist
+  specifically — which isn't its own UD `Tense` value in Modern Greek (unlike
+  Ancient Greek's literal `"Aor"`), it's `Tense=Past` + `Aspect=Perf`, a
+  non-obvious mapping worth calling out explicitly. Verified against the
+  real backend rather than hand-typed (λύω has 104 verb slots; aorist active
+  1sg → `έλυσα`).
+- Moved `docs/examples.md` to `examples/README.md` (`git mv`), turned the
+  file-listing table into real relative links (render correctly on all 3
+  hosts' directory pages), and fixed the one cross-reference in root
+  `README.md` — which also had a stale "13 runnable scripts" count, one
+  behind the real total of 14.
+- Fixed `greek_exercise_notebook.py` showing duplicate navigation chrome
+  once deployed: its own internal `eee_topbar`/`eee_footer` calls, stacked
+  underneath the WASM-export deploy shell's own topbar/footer (added at
+  publish time, outside version control on the `pages` branch, identical
+  across all 6 live demos) — two "back" links to two different
+  destinations, two source-footers. Removed the internal calls, and the
+  API-reference table row describing them (no longer true). This notebook's
+  own content now starts with just its title/description like the other 5
+  deployed notebooks; the deploy shell alone carries page-level navigation.
+  Confirmed via live DOM inspection after a local re-export: `#eee-topbar`/
+  `#eee-footer` both absent.
+- Brought `modern_greek_drill_notebook.py`'s paradigm-drill calls up to the
+  same look and feel as `ellinika_b/chapter_08`: switched `done_message`
+  from its own separate `verb_done`/`noun_done`/`adj_done`/`pron_done` TSV
+  keys (plain "Done — every verb drilled!", no emoji) to the shared
+  `test1_done`..`test4_done` keys, and added `nav_icons=True,
+  show_prev_when_done=True`. Removed the now-dead `verb_done`/`noun_done`/
+  `adj_done`/`pron_done` keys (confirmed no other consumer) from all 3
+  TSVs.
+- Fixed a stale `codeberg.org/EEE-project/eee` link (pre-rename repo name;
+  redirects correctly, but inconsistent with every other reference) to
+  `EEE-project/eee-project` in the 3 notebooks that had it.
+- Investigated a reported "Couldn't load notebook" failure on the live
+  `greek/` demo — could not reproduce after two full loads (~30-40s each,
+  well under the deploy shell's 90s timeout), no console errors, no failed
+  requests. `greek_notebook.py` registers 4 backends at once (modern-greek,
+  ancient-greek, unimorph×2 languages) — the heaviest of the 6 demos to
+  boot — most likely a transient slow-network/cold-CDN load rather than a
+  code defect. Full suite 1466/1466, `marimo check`/`ruff check` clean on
+  every touched file.
+- Pulled the live demos' shared WASM deploy shell (loading animation, topbar
+  with back-link/GA, source footer, error/retry state — iframes the actual
+  notebook) into version control as `examples/deploy/shell_template.html`.
+  Previously it existed only as 6 hand-duplicated copies on the `pages`
+  branch, outside `main` entirely, differing from each other only in one
+  title string repeated at 4 spots — confirmed byte-identical otherwise by
+  diffing all 6 pairwise. Added `examples/deploy/build_shell.py` (stdlib
+  only) to fill in the title and split a raw `marimo export html-wasm`
+  output into the deployed two-file shape: its own `index.html` becomes
+  `notebook.html`, the filled-in template becomes the new `index.html`.
+  Wired into all 6 `export-*` Makefile targets, so `make export-drill` (etc.)
+  now produces `dist/<name>/` exactly as it appears on the `pages` branch,
+  with no manual shell-copying step. Verified by generating `drill` and
+  `exercise` (the latter to exercise the `&` in "Exercise & Quiz Demo")
+  through the new pipeline and diffing each against its real deployed
+  `index.html`: byte-identical both times.
+- `/simplify` pass over the accumulated diff (4 parallel review agents —
+  reuse, simplification, efficiency, altitude): reuse and efficiency came
+  back clean; simplification and altitude found 3 real issues, all fixed.
+  `word_drill_form`'s auto-advance-on-correct-check block and its Next-
+  button "normal advance" block had become two independent copies of the
+  same 6-statement "record this answer, advance to the next word" sequence
+  (differing only in whether correctness was hardcoded `True` or computed)
+  — extracted into a shared `_advance(typed, ok)` closure, called from
+  both. `_icon_nav_row` carried a `next_disabled` parameter added purely
+  for symmetry with `prev_disabled` — its own docstring already admitted
+  "nothing passes it today" — with zero real callers across
+  `_paradigm_drill_form`/`word_drill_display`/`word_quiz_form`, only two
+  unit tests that existed solely to exercise it; removed from
+  `_icon_nav_row` and `word_drill_display` (and the two tests that covered
+  only it) rather than keep speculative flexibility nothing uses.
+  Separately, the ◀/▶/↺ icon-decoration convention (which glyph goes on
+  which side of the text) was hand-written independently in both
+  `_make_nav_buttons` and `paradigm_drill_widgets`, even though this same
+  round already consolidated the *adjacent* row-arrangement logic into one
+  shared `_icon_nav_row` — the kind of two-places-encode-the-same-rule gap
+  that had already caused one real bug earlier in this round (the TSV/
+  `nav_icons` double-decoration fix). Extracted a new `_icon_decorate(text,
+  icon, *, before)` helper, used by both. All three fixes are pure
+  refactors verified against the existing test suite (no new tests needed
+  — output strings are unchanged, confirmed by construction and by every
+  pre-existing label-text assertion still passing): full suite 1469/1469
+  (2 fewer than before — the two `next_disabled`-only tests removed, none
+  else touched), `ruff check`/`marimo check` clean.
+
 ## 1.9.0 - 2026-08-20
 - Consolidated `_QUIZ_CASE_LABEL`/`_QUIZ_NUM_LABEL`/`_QUIZ_ADJ_GENDER`/
   `_QUIZ_ADJ_NUM` (noun/adjective quiz-label fallbacks) and `_GRC_NL`/

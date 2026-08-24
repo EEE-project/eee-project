@@ -135,8 +135,16 @@ def load_ga_config(path=None) -> "dict | None":
         _ga = load_ga_config(__file__)
         eee_topbar(mo, back_url="...", lang=lang, titles=TITLES, ga_config=_ga)
 
-    The ``ga.json`` file must **not** be committed to the repository — add it
-    to ``.gitignore``.  Minimal content::
+    For **local-only** use (this function read directly, no WASM/molab
+    deployment), keep ``ga.json`` out of the repository — add it to
+    ``.gitignore``. But a WASM-exported notebook has no real local
+    filesystem to read from at runtime, so :class:`ConfigStore`'s
+    ``from_url``/``from_file_or_url`` (the pattern actual course notebooks
+    use) instead *fetch* ``ga.json`` over HTTPS from the repo's own raw-
+    content URL when deployed — which only works if the file **is**
+    committed. A GA measurement ID isn't a secret (every page load exposes
+    it in plain network requests anyway), so committing it for that case is
+    correct, not an oversight. Minimal content::
 
         {"measurement_id": "G-XXXXXXXXXX"}
     """
@@ -1107,6 +1115,11 @@ const ALL_MARKS = [
   {ch: 'ϊ', dia: '\\u0308', label: 'diaer',  cat: 'diaer'},
 ];
 
+// Modern Greek monotonic orthography (post-1982) only uses the acute accent
+// and diaeresis -- grave/circumflex accent and breathing/iota-subscript are
+// polytonic-only and would confuse a Modern Greek exercise, not just clutter it.
+const MONOTONIC_MARKS = ALL_MARKS.filter(m => m.label === 'acute' || m.cat === 'diaer');
+
 // Clicking a mark clears its own category plus any listed exclusions.
 const EXCL = {
   accent: ['accent'],
@@ -1222,7 +1235,8 @@ function render({ model, el }) {
   inp.className = 'eee-dia-inp';
   inp.placeholder = EEE_PLACEHOLDER;
 
-  for (const {ch, dia, label, cat} of ALL_MARKS) {
+  const MARKS = model.get('polytonic') ? ALL_MARKS : MONOTONIC_MARKS;
+  for (const {ch, dia, label, cat} of MARKS) {
     const btn = makeMarkButton(ch, label);
     btn.addEventListener('click', () => {
       toggleMark(activeMarks, cat, dia, btn);
@@ -1325,6 +1339,7 @@ def _make_dia_widget_class(placeholder: str, label: str):
         "_esm": _make_dia_esm(placeholder, label),
         "value": _traitlets.Unicode("").tag(sync=True),
         "enter_pressed": _traitlets.Int(0).tag(sync=True),
+        "polytonic": _traitlets.Bool(True).tag(sync=True),
     })
 
 
@@ -1349,12 +1364,20 @@ class _DiacriticsElement:
         return self._ui._mime_()
 
 
-def diacritics_text(mo, *, placeholder: str = "", label: str = "", value: str = "") -> Any:
-    """Combined polytonic diacritics bar + text input widget.
+def diacritics_text(mo, *, placeholder: str = "", label: str = "", value: str = "",
+                     polytonic: bool = True) -> Any:
+    """Combined diacritics bar + text input widget.
 
     Returns an element whose ``.value`` is the typed text as a plain string
     (drop-in for ``mo.ui.text().value``).
     Buttons stay highlighted until pressed again (persistent diacritic mode).
+    ``polytonic`` (default ``True``, matching this function's original
+    Ancient-Greek-only behavior): ``False`` shows only the acute accent and
+    diaeresis (Modern Greek's monotonic orthography) instead of the full
+    breathing/circumflex/iota-subscript mark set, which would confuse a
+    Modern Greek exercise. Mirrors :func:`make_paradigm_form`'s own
+    ``polytonic`` parameter — prefer ``self._cfg.polytonic`` (from
+    :class:`GreekConfig`) over hardcoding, same as that function's callers do.
     Requires ``anywidget``. See ``GreekUtils.word_write_question`` for the
     ``.enter_pressed`` reactivity caveat if hand-rolling a cell around this.
     """
@@ -1363,6 +1386,7 @@ def diacritics_text(mo, *, placeholder: str = "", label: str = "", value: str = 
                           value=value)
     cls = _make_dia_widget_class(placeholder, label)
     inst = cls()
+    inst.polytonic = polytonic
     if value:
         inst.value = value
     return _DiacriticsElement(mo.ui.anywidget(inst))
@@ -1379,11 +1403,6 @@ _PARA_CSS = _bar_css(".eee-para-bar", "margin:6px 0 8px") + """\
 """
 
 _PARA_ESM = _DIACRITIC_CORE_JS + r"""
-// Modern Greek monotonic orthography (post-1982) only uses the acute accent
-// and diaeresis -- grave/circumflex accent and breathing/iota-subscript are
-// polytonic-only and would confuse a Modern Greek exercise, not just clutter it.
-const MONOTONIC_MARKS=ALL_MARKS.filter(m=>m.label==='acute'||m.cat==='diaer');
-
 function render({model,el}){
   // anywidget calls this fresh for every new widget instance, and
   // make_paradigm_form() always constructs a brand-new _ParadigmFormWidget
@@ -2013,7 +2032,14 @@ def greek_compare(
 ) -> bool:
     """Compare two Greek strings with configurable normalization.
 
-    Works for both Modern and Ancient Greek.
+    Works for both Modern and Ancient Greek, and for both single grammatical
+    forms and full phrases: punctuation is always treated as a word
+    separator, not compared -- a trailing "?"/";"/"..." or a stray comma
+    never affects the result, and runs of whitespace collapse to one
+    separator. A no-op for a plain single-word form (nothing to strip),
+    so this doesn't change behavior for the vast majority of existing
+    callers (paradigm-drill checkers comparing one declined/conjugated
+    form) -- only phrase-comparison callers (multi-word text) are affected.
 
     Args:
         case_sensitive: If ``False`` (default), comparison ignores case.
@@ -2026,16 +2052,21 @@ def greek_compare(
         greek_compare("λεγε", "λέγε")                        # True
         greek_compare("λεγε", "λέγε", diacritics=True)       # False
         greek_compare("Λέγε", "λέγε", case_sensitive=True)   # False
+        greek_compare("Έχεις κανένα σχέδιο", "Έχεις κανένα σχέδιο;")  # True
     """
     def _norm(s: str) -> str:
-        s = s.strip()
         if not diacritics:
             s = strip_diacritics(s)
         else:
             s = _unicodedata.normalize("NFC", s)
         if not case_sensitive:
             s = s.lower()
-        return s
+        # Punctuation is a separator between words, not content to compare --
+        # replace any run of non-word characters with a single space, then
+        # split/rejoin to also collapse whitespace runs (handles a phrase's
+        # trailing "?"/";"/"..." and multiple spaces alike). \w matches Greek
+        # letters correctly under Python 3's default Unicode regex.
+        return " ".join(_re.sub(r"[^\w\s]+", " ", s).split())
     return _norm(a) == _norm(b)
 
 
@@ -2740,6 +2771,15 @@ class GreekUtils:
         ``initial_selection``: a plain pass-through for callers that don't
         need persistence (e.g. leave both unset for nothing pre-selected).
         Mutually exclusive with ``select_state``.
+
+        Wraps every column's text (``wrapped_columns=list(df.columns)``,
+        not a hardcoded ``["Word", "Translation"]`` — ``mo.ui.table`` raises
+        if a named column doesn't exist, and this stays correct regardless
+        of the DataFrame's actual schema) rather than letting a long entry
+        get cut off mid-word — harmless for the short single-word vocab
+        this was originally built for (nothing to wrap), but load-bearing
+        once a course's vocab is a full phrase (e.g. a "Useful Phrases"
+        quiz) rather than one word.
         """
         if df is None:
             return None
@@ -2747,7 +2787,8 @@ class GreekUtils:
         if select_state is not None:
             sel = select_state()
             initial_selection = sel if sel is not None else list(range(n))
-        return self._mo.ui.table(df, selection="multi", page_size=n, initial_selection=initial_selection)
+        return self._mo.ui.table(df, selection="multi", page_size=n, initial_selection=initial_selection,
+                                  wrapped_columns=list(df.columns))
 
     def get_words(self, table) -> list[dict]:
         if table is None:
@@ -3683,13 +3724,44 @@ class GreekUtils:
         except Exception as e:
             return None, str(e)
 
-    def _make_nav_buttons(self, *, done: bool = False, history_len: int = 0, lang: str = "ru") -> tuple:
-        """Return ``(next_btn, prev_btn)`` for word-drill / word-quiz exercises."""
+    def _icon_decorate(self, text: str, icon: str, *, before: bool) -> str:
+        """Decorate *text* with *icon* on the given side.
+
+        The one place the ◀/▶/↺ nav-icon convention is spelled out — shared
+        by :meth:`_make_nav_buttons` (word-drill/word-quiz) and
+        :meth:`paradigm_drill_widgets` (paradigm-drill), which otherwise
+        each hand-wrote the identical f-string pattern.
+        """
+        return f"{icon} {text}" if before else f"{text} {icon}"
+
+    def _make_nav_buttons(self, *, done: bool = False, history_len: int = 0, lang: str = "ru",
+                          nav_icons: bool = False) -> tuple:
+        """Return ``(next_btn, prev_btn)`` for word-drill / word-quiz exercises.
+
+        ``nav_icons=True`` adds a ◀/▶ triangle to the localized Prev/Next
+        text (``"◀ Prev"``, ``"Next ▶"`` — arrow pointing in the direction
+        of travel) instead of text alone — opt-in, old text-only behavior
+        stays the default since :meth:`stanza_match_widgets` and
+        :meth:`translation_presence_widgets` don't pass it. Still
+        distinguishes ``done`` from not: ``"Next ▶"`` normally, ``"↺ Again"``
+        once done (icon *before* text there, matching the restart-icon
+        convention :meth:`make_renew_button` already uses, e.g. "↺ New set")
+        — never a bare ▶ that would visually contradict a "press «Again»"
+        done-screen callout right next to it.
+        """
         mo = self._mo
-        _next_lbl = self.ui_label('nav_again_label', lang) if done else self.ui_label('nav_next_label', lang)
+        _next_text = self.ui_label('nav_again_label', lang) if done else self.ui_label('nav_next_label', lang)
+        _prev_text = self.ui_label('nav_prev_label', lang)
+        if nav_icons:
+            _next_lbl = (self._icon_decorate(_next_text, "↺", before=True) if done
+                         else self._icon_decorate(_next_text, "▶", before=False))
+            _prev_lbl = self._icon_decorate(_prev_text, "◀", before=True)
+        else:
+            _next_lbl = _next_text
+            _prev_lbl = _prev_text
         return (
             mo.ui.button(label=_next_lbl, on_click=_INC),
-            mo.ui.button(label=self.ui_label('nav_prev_label', lang), on_click=_INC, disabled=history_len == 0),
+            mo.ui.button(label=_prev_lbl, on_click=_INC, disabled=history_len == 0),
         )
 
     def _nav_row(self, *buttons: Any, justify: str = "start") -> Any:
@@ -3698,6 +3770,30 @@ class GreekUtils:
         :meth:`word_quiz_form`, :meth:`stanza_match_form`, and
         :meth:`translation_presence_form`."""
         return self._mo.hstack([b for b in buttons if b is not None], justify=justify)
+
+    def _icon_nav_row(self, prev_btn: Any, next_btn: Any, *middle: Any,
+                      prev_disabled: bool) -> list:
+        """Build a ``nav_icons=True`` button row as a plain widget list:
+        ``prev_btn`` first (dropped, not greyed out, when *prev_disabled*),
+        ``*middle`` unchanged in between (``check_btn`` for
+        :meth:`word_drill_display`/:meth:`_paradigm_drill_form`,
+        ``renew_btn`` for :meth:`word_quiz_form` — either or neither, any
+        ``None`` among them is dropped the same way), ``next_btn`` last —
+        matching ``eee_footer``'s own ◀/▶ convention. Returns the plain
+        list rather than an already-built ``mo.hstack`` since callers wrap
+        it with their own ``justify`` value (``"start"`` vs ``"end"``,
+        differs per caller already).
+
+        *prev_disabled* must be the same condition the caller used to
+        *build* the button disabled in the first place — a real
+        ``mo.ui.button`` has no readable ``.disabled`` after construction,
+        so this never tries to read it back off the object. ``next_btn``
+        is never conditionally hidden here — no caller's Next is ever
+        disabled (word_drill/word_quiz never were; paradigm-drill's own
+        ``nxt_btn`` no longer is either, see :meth:`paradigm_drill_widgets`).
+        """
+        _prev = None if prev_disabled else prev_btn
+        return [b for b in (_prev, *middle, next_btn) if b is not None]
 
     def make_renew_button(self, lang: str = "ru") -> Any:
         """``↺`` button whose value counts clicks. Notebooks put it in its own
@@ -4024,6 +4120,7 @@ class GreekUtils:
         history_len: int = 0, remaining_len: int = 1,
         next_label: "str | None" = None, prev_label: "str | None" = None,
         restart_label: "str | None" = None, lang: str = "ru",
+        nav_icons: bool = False,
     ) -> tuple:
         """Create the form + nav/restart-button widgets for a hand-rolled
         paradigm-drill exercise (a full multi-field paradigm per word via
@@ -4044,6 +4141,16 @@ class GreekUtils:
         text defaults — pass explicit ``next_label``/``prev_label``/
         ``restart_label`` strings only to override those defaults.
 
+        ``nav_icons=True`` decorates whichever Next/Prev/Restart text ends
+        up in effect (default or explicit override) with a ◀/▶/↺ — same
+        convention as :meth:`word_drill_widgets`: arrow after Next's text
+        (points in the direction of travel), before Prev's and Restart's
+        (matching :meth:`make_renew_button`'s own icon-before-text
+        convention). Pair with the same flag on :meth:`_paradigm_drill_form`
+        (via the public ``*_paradigm_drill_form`` wrapper) so Prev/Next also
+        hide — rather than grey out — when disabled, and stay first/last in
+        the button row. Opt-in, default unchanged.
+
         Deliberately does *not* build the check button — call
         :meth:`dirty_check_button` separately, in its own cell. It needs
         ``cap`` (the check snapshot) to color itself, and ``cap`` updates
@@ -4060,10 +4167,24 @@ class GreekUtils:
         if prev_label is None:
             prev_label = self.ui_label('prev_label', lang)
         if restart_label is None:
-            restart_label = self.ui_label('restart_label', lang)
+            # Reuses nav_again_label (the same "Again" text word_drill_form/
+            # word_quiz_form's own restart button shows) rather than the
+            # since-retired restart_label key -- the two used to diverge
+            # ("Start over" vs "Again"), confirmed at the user's request to
+            # be an unintentional wording gap, not a deliberate distinction.
+            restart_label = self.ui_label('nav_again_label', lang)
+        if nav_icons:
+            next_label = self._icon_decorate(next_label, "▶", before=False)
+            prev_label = self._icon_decorate(prev_label, "◀", before=True)
+            restart_label = self._icon_decorate(restart_label, "↺", before=True)
         form = make_paradigm_form(self._mo, labels, values=values, polytonic=self._cfg.polytonic)
         prev_btn = self._mo.ui.button(label=prev_label, on_click=_INC, disabled=history_len == 0)
-        nxt_btn = self._mo.ui.button(label=next_label, on_click=_INC, disabled=remaining_len <= 1)
+        # remaining_len < 1 (not <= 1): Next moving the sole remaining word
+        # to done works fine unscored (this family has no per-word score to
+        # get wrong, unlike word_drill/word_quiz's Next) -- matches
+        # word_drill_widgets' own next_btn, which was never disabled by
+        # remaining count at all.
+        nxt_btn = self._mo.ui.button(label=next_label, on_click=_INC, disabled=remaining_len < 1)
         restart_btn = self._mo.ui.button(label=restart_label, on_click=_INC)
         return form, prev_btn, nxt_btn, restart_btn
 
@@ -4124,6 +4245,8 @@ class GreekUtils:
         slot_ok: Any,
         full_check: Any,
         retry_btn: Any = None,
+        nav_icons: bool = False,
+        show_prev_when_done: bool = False,
     ) -> Any:
         """Shared engine behind the public ``*_paradigm_drill_form``
         siblings (noun/verb/adjective/pronoun), which differ only in their
@@ -4137,6 +4260,25 @@ class GreekUtils:
         save/restore across back/next, and display — is identical across
         parts of speech and lives here.
 
+        ``nav_icons``: pass the same flag given to the companion
+        :meth:`paradigm_drill_widgets` call. Reorders the check/prev/next
+        row so Prev/Next stay first/last (``check_btn`` alone flanked
+        between them) and hides — rather than greys out — ``prev_btn``
+        when there's no history yet, matching :meth:`word_drill_display`'s
+        own convention. ``nxt_btn`` is never hidden (or disabled) here at
+        all — :meth:`paradigm_drill_widgets` builds it clickable
+        unconditionally, same as :meth:`word_drill_widgets`' own
+        ``next_btn``: moving the sole remaining word straight to "done"
+        via Next works fine unscored (this family has no per-word score to
+        get wrong on skip, unlike ``word_drill_form``'s own Next). Prev's
+        hide condition is computed from ``hist`` itself (not read back off
+        the button object — a real ``mo.ui.button`` has no readable
+        ``.disabled`` after construction), matching the exact condition
+        :meth:`paradigm_drill_widgets` used to build it disabled in the
+        first place. Default ``False`` leaves every existing caller's row
+        (``[check_btn, prev_btn, nxt_btn]``, ``justify="end"``)
+        byte-for-byte unchanged.
+
         ``state`` is the dict built by :meth:`_pack_paradigm_state` — see
         its docstring for why this bundling is only safe internally, never
         across a marimo cell boundary.
@@ -4149,6 +4291,16 @@ class GreekUtils:
         mistake list first and then clearing it the same way ``restart_btn``
         does -- see :meth:`make_error_tracking_state` for why mistake counts
         are scoped to "this round" rather than kept forever.
+
+        ``show_prev_when_done``: lets a finished round still be reviewed
+        via Prev instead of only restart/retry — same convention and
+        parameter name as :meth:`word_drill_display`'s own opt-in. Prev's
+        click-handling itself is unconditional (it only ever depended on
+        ``hist``, never on whether ``words`` is empty), so this flag
+        controls only whether ``prev_btn`` is *rendered* on the done
+        screen; a caller that leaves it ``False`` (the default, every
+        existing caller) sees today's restart-only (or restart+retry)
+        done screen, unchanged.
         """
         mo = self._mo
         get_words, set_words = state["words"]
@@ -4164,6 +4316,7 @@ class GreekUtils:
         get_errors, set_errors, get_retry_cnt, set_retry_cnt = state.get(
             "errors", (None, None, None, None))
         words = get_words()
+        hist = get_hist()
 
         if (restart_btn.value or 0) > get_restart_cnt():
             set_restart_cnt(restart_btn.value)
@@ -4184,21 +4337,35 @@ class GreekUtils:
             )
             return mo.md("*...*")
 
-        if not words:
-            items = [mo.callout(mo.md(done_message), kind="success")]
-            if retry_btn is not None and get_errors is not None and get_errors():
-                _errs = get_errors()
-                # words is empty here, so hist alone is this round's total
-                # (same round-relative fix as the mid-session progress line
-                # below -- len(vocab) would show the *original* round's size
-                # during a retry round over a smaller subset).
-                items.append(mo.md(f"❌ {len(_errs)} / {len(get_hist())}"))
-                items.append(mo.hstack([restart_btn, retry_btn], justify="start"))
-            else:
-                items.append(restart_btn)
-            return mo.vstack(items)
+        # Checked before the done-screen early-return below so Prev also
+        # works *from* done (via show_prev_when_done) -- this handler only
+        # ever depended on hist, never on cv/form/whether words is empty,
+        # so moving it earlier changes nothing about what it does, only
+        # when it's reachable.
+        if (prev_btn.value or 0) > get_prev_cnt():
+            set_prev_cnt(prev_btn.value)
+            set_entered(self.save_entry(get_entered(), cv, form, word_key=word_key))
+            set_cap(None)
+            set_sub_cnt(0)
+            if hist:
+                prev_word = hist[-1]
+                set_hist(hist[:-1])
+                set_words([prev_word] + [w for w in words if w[word_key] != prev_word[word_key]])
+            return mo.md("*...*")
 
-        hist = get_hist()
+        if not words:
+            _score_line = None
+            _retry = None
+            if retry_btn is not None and get_errors is not None and get_errors():
+                # hist alone is this round's total (same round-relative fix
+                # as the mid-session progress line below -- len(vocab) would
+                # show the *original* round's size during a retry round
+                # over a smaller subset).
+                _score_line = f"❌ {len(get_errors())} / {len(hist)}"
+                _retry = retry_btn
+            _prev = prev_btn if (show_prev_when_done and hist) else None
+            return self._drill_done_content(done_message, score_line=_score_line,
+                                            buttons=[_prev, restart_btn, _retry])
 
         _w = form.widget
         _live = list(_w.values)
@@ -4255,17 +4422,6 @@ class GreekUtils:
                 set_words([w for w in words if w[word_key] != cv[word_key]])
             return mo.md("*...*")
 
-        if (prev_btn.value or 0) > get_prev_cnt():
-            set_prev_cnt(prev_btn.value)
-            set_entered(self.save_entry(get_entered(), cv, form, word_key=word_key))
-            set_cap(None)
-            set_sub_cnt(0)
-            if hist:
-                prev_word = hist[-1]
-                set_hist(hist[:-1])
-                set_words([prev_word] + [w for w in words if w[word_key] != prev_word[word_key]])
-            return mo.md("*...*")
-
         # len(words)+len(hist) is this ROUND's total, not len(vocab) -- the
         # two only ever move a word between each other (see the ok/nxt/prev
         # branches above), and both reset at every round boundary
@@ -4285,7 +4441,15 @@ class GreekUtils:
             items.append(mo.md(_msg))
         items.append(mo.md(f"{meaning_label}: **{cv[meaning_key]}**") if cv else mo.md(""))
         items.append(form)
-        items.append(mo.hstack([check_btn, prev_btn, nxt_btn], justify="end"))
+        if nav_icons:
+            # nxt_btn is never hidden here -- paradigm_drill_widgets no
+            # longer disables it at 1 word remaining (Next moving the sole
+            # word to done works fine unscored), matching word_drill's own
+            # next_btn, which was never conditionally disabled either.
+            _row = self._icon_nav_row(prev_btn, nxt_btn, check_btn, prev_disabled=len(hist) == 0)
+        else:
+            _row = [check_btn, prev_btn, nxt_btn]
+        items.append(mo.hstack(_row, justify="end"))
         items.append(mo.md(fb) if fb else mo.md(""))
         return mo.vstack(items)
 
@@ -4315,6 +4479,8 @@ class GreekUtils:
         get_retry_cnt: Any = None, set_retry_cnt: Any = None,
         retry_btn: Any = None,
         lang: str = "ru",
+        nav_icons: bool = False,
+        show_prev_when_done: bool = False,
     ) -> Any:
         """Unified verb-paradigm drill: per-field Enter-navigation, dirty-check
         snapshot, save/restore across back/next, restart, and full display,
@@ -4367,6 +4533,8 @@ class GreekUtils:
             slot_ok=lambda i, v: bool(cv) and self.check_verb_slot(cv[word_key], tense, i, v, active_slots=active_slots),
             full_check=lambda cap: self.check_verb_test(cv[word_key], cap, tense, lang=lang),
             retry_btn=retry_btn,
+            nav_icons=nav_icons,
+            show_prev_when_done=show_prev_when_done,
         )
 
     def noun_paradigm_drill_form(
@@ -4396,6 +4564,8 @@ class GreekUtils:
         get_retry_cnt: Any = None, set_retry_cnt: Any = None,
         retry_btn: Any = None,
         lang: str = "ru",
+        nav_icons: bool = False,
+        show_prev_when_done: bool = False,
     ) -> Any:
         """Unified noun-paradigm drill — sibling of :meth:`verb_paradigm_drill_form`
         (see its docstring for the shared design, including the "meta is
@@ -4454,6 +4624,8 @@ class GreekUtils:
                                           active_cases=active_cases, indefinite=indefinite)),
             full_check=lambda cap: self.check_noun_test(cv[word_key], cap, article=article, indefinite=indefinite, lang=lang),
             retry_btn=retry_btn,
+            nav_icons=nav_icons,
+            show_prev_when_done=show_prev_when_done,
         )
 
     def adjective_paradigm_drill_form(
@@ -4482,6 +4654,8 @@ class GreekUtils:
         get_retry_cnt: Any = None, set_retry_cnt: Any = None,
         retry_btn: Any = None,
         lang: str = "ru",
+        nav_icons: bool = False,
+        show_prev_when_done: bool = False,
     ) -> Any:
         """Unified adjective-paradigm drill — sibling of :meth:`verb_paradigm_drill_form`
         (see its docstring for the shared design, including the "meta is
@@ -4521,6 +4695,8 @@ class GreekUtils:
             slot_ok=lambda i, v: bool(cv) and self.check_adjective_slot(cv[word_key], mode, i, v, active_slots=active_slots),
             full_check=lambda cap: self.check_adjective_test(cv[word_key], cap, mode, lang=lang),
             retry_btn=retry_btn,
+            nav_icons=nav_icons,
+            show_prev_when_done=show_prev_when_done,
         )
 
     def pronoun_paradigm_drill_form(
@@ -4549,6 +4725,8 @@ class GreekUtils:
         get_retry_cnt: Any = None, set_retry_cnt: Any = None,
         retry_btn: Any = None,
         lang: str = "ru",
+        nav_icons: bool = False,
+        show_prev_when_done: bool = False,
     ) -> Any:
         """Unified pronoun-paradigm drill — sibling of :meth:`adjective_paradigm_drill_form`
         (see its docstring for the shared design, including the "meta is
@@ -4584,6 +4762,8 @@ class GreekUtils:
             slot_ok=lambda i, v: bool(cv) and self.check_pronoun_slot(cv[word_key], mode, i, v, active_slots=active_slots),
             full_check=lambda cap: self.check_pronoun_test(cv[word_key], cap, mode, lang=lang),
             retry_btn=retry_btn,
+            nav_icons=nav_icons,
+            show_prev_when_done=show_prev_when_done,
         )
 
     def _handle_prev(self, cv, restore_entry, history, future, score,
@@ -4650,6 +4830,34 @@ class GreekUtils:
         """
         return cv is None and remaining is not None and len(remaining) == 0
 
+    def word_drill_check_button(self, dia_reactive, checked: "str | None", *, label: str = "Check") -> Any:
+        """Build the "check answer" button for a word-drill exercise (single
+        free-text field via :meth:`diacritics_text` — not the multi-field
+        ``make_paradigm_form``), colored orange ("warn") when the input has
+        unsaved changes since the last check attempt — the single-field
+        analogue of :meth:`dirty_check_button`, same "warn"/"neutral" logic.
+
+        Call in its own cell, alongside :meth:`word_drill_widgets` rather
+        than folded into it — same reason :meth:`dirty_check_button` is
+        kept separate from :meth:`paradigm_drill_widgets`: this needs
+        ``dia_reactive`` for live-as-you-type reactivity (referencing it
+        directly is what makes the calling cell — and this button's color —
+        re-run on every keystroke, not just Enter/Check), and bundling it
+        into :meth:`word_drill_widgets` would make *that* cell depend on it
+        too, rebuilding ``write_input`` from scratch on every keystroke and
+        erasing whatever's typed so far.
+
+        ``dia_reactive`` is ``write_input._ui`` (see :meth:`word_drill_widgets`).
+        ``checked`` is the exact text most recently submitted via Check/Enter
+        for the CURRENT word, or ``None``/``""`` if nothing's been checked
+        yet for it — pass a state getter's current value (e.g.
+        ``checked_state()``); :meth:`word_drill_form` keeps it in sync via
+        its own ``get_checked``/``set_checked`` parameters.
+        """
+        live = (dia_reactive.value.get("value") or "").strip()
+        dirty = bool(live) and live != (checked or "")
+        return self._mo.ui.button(label=label, on_click=_INC, kind="warn" if dirty else "neutral")
+
     def word_drill_widgets(
         self,
         *,
@@ -4660,6 +4868,7 @@ class GreekUtils:
         placeholder: "str | None" = None,
         label: "str | None" = None,
         lang: str = "ru",
+        nav_icons: bool = False,
     ) -> tuple:
         """Create all widgets for a word-drill exercise.
 
@@ -4672,6 +4881,12 @@ class GreekUtils:
         state values (see :meth:`word_drill_done`) — used only to derive
         whether the drill is finished, for the Next/Prev button labels. Use
         the same ``lang`` as the companion :meth:`word_drill_form` call.
+
+        The returned ``check_btn`` is a plain (never "warn"-colored) button —
+        pass ``nav_icons=True`` for ◀/▶ Prev/Next (opt-in, default unchanged
+        for existing callers); for a "warn"-on-dirty Check button too, ignore
+        this ``check_btn`` and build one via :meth:`word_drill_check_button`
+        in its own cell instead, then pass that to :meth:`word_drill_form`.
         """
         mo = self._mo
         if placeholder is None:
@@ -4683,7 +4898,8 @@ class GreekUtils:
         dia = write_input._ui
         check_btn = mo.ui.button(label=label, on_click=_INC)
         _done = self.word_drill_done(cv, remaining)
-        next_btn, prev_btn = self._make_nav_buttons(done=_done, history_len=history_len, lang=lang)
+        next_btn, prev_btn = self._make_nav_buttons(done=_done, history_len=history_len, lang=lang,
+                                                     nav_icons=nav_icons)
         return write_input, dia, check_btn, prev_btn, next_btn
 
     def word_drill_display(
@@ -4704,6 +4920,10 @@ class GreekUtils:
         meaning_key: str = "meaning",
         form_key: str = "form",
         lang: str = "ru",
+        nav_icons: bool = False,
+        checked: "str | None" = None,
+        prev_disabled: bool = False,
+        show_prev_when_done: bool = False,
     ) -> Any:
         """Render the write-the-word drill UI with history navigation.
 
@@ -4729,15 +4949,54 @@ class GreekUtils:
             form_key:      Key in each word dict for the expected answer.
             lang:          UI language for the done-screen and progress line's
                            "correct" label (``ru``/``en``/``el``).
+            nav_icons:     ``True`` renders ``[prev_btn, check_btn, next_btn]``
+                           (Prev/Next flanking Check) instead of the default
+                           ``[check_btn, prev_btn, next_btn]``, and hides
+                           (rather than greys out) ``prev_btn`` when
+                           ``prev_disabled`` marks it — matching
+                           ``eee_footer``'s own ◀/▶ convention. A real
+                           ``mo.ui.button`` has no readable ``.disabled``
+                           after construction (only an internal frontend
+                           arg), so the caller must say whether it was
+                           actually built disabled — same boolean passed to
+                           :meth:`word_drill_widgets`/``_make_nav_buttons``.
+                           Opt-in, pair with the same ``nav_icons`` flag on
+                           :meth:`word_drill_widgets`.
+            prev_disabled: Whether ``prev_btn`` was built with
+                           ``disabled=True`` — only affects rendering when
+                           ``nav_icons`` is also ``True``.
+            show_prev_when_done: ``True`` lets a finished drill still be
+                           reviewed via Prev on the done screen, instead of
+                           only offering restart — passes ``prev_btn``
+                           through to the done-screen's own nav row (already
+                           handles ``cv=None`` correctly: :meth:`_handle_prev`
+                           and :meth:`_make_future_entry` don't assume a
+                           current word). Opt-in; every existing caller keeps
+                           today's restart-only done screen.
+            checked:       The exact text most recently submitted via
+                           Check/Enter for the current word (see
+                           :meth:`word_drill_form`'s ``get_checked``), or
+                           ``None`` if not tracked. When it matches ``_typed``,
+                           treated the same as a fresh ``check_btn`` click for
+                           showing feedback — needed because a check_btn built
+                           via :meth:`word_drill_check_button` rebuilds (and
+                           its transient click value resets) the moment this
+                           very check updates ``checked``'s state, which would
+                           otherwise erase the click signal before feedback
+                           ever renders. A plain (non-"warn") check_btn never
+                           changes ``checked``, so passing it leaves existing
+                           callers unaffected regardless of this parameter.
         """
         mo = self._mo
         _done = self.word_drill_done(cv, remaining)
         if _done:
-            self._quiz_done_stop(score, lang, next_btn=next_btn)
+            self._quiz_done_stop(score, lang, next_btn=next_btn,
+                                 prev_btn=prev_btn if show_prev_when_done else None)
         _meaning = cv.get(meaning_key, "") if cv is not None else ""
         _typed = write_input.value.strip()
         _enter = dia_reactive.value.get("enter_pressed", 0)
-        _check = (check_btn.value or _enter) and _typed and cv is not None
+        _just_checked = bool(check_btn.value or _enter) or (checked is not None and checked == _typed)
+        _check = _just_checked and _typed and cv is not None
         if _check:
             fb = self._feedback_md(mo, self._ci(_typed, {cv[form_key]}), _meaning, cv[form_key])
         elif restore_entry is not None:
@@ -4751,10 +5010,14 @@ class GreekUtils:
             parts.append(mo.md(comment))
         _corr = self.ui_label('quiz_progress_correct', lang)
         parts.append(mo.md(f"**{score['total'] + 1}** / {len(vocab)} — {_corr}: {score['correct']}"))
+        if nav_icons:
+            _row = self._icon_nav_row(prev_btn, next_btn, check_btn, prev_disabled=prev_disabled)
+        else:
+            _row = [check_btn, prev_btn, next_btn]
         return mo.vstack(parts + [
             fb,
             write_input,
-            mo.hstack([check_btn, prev_btn, next_btn], justify="start"),
+            mo.hstack(_row, justify="start"),
         ])
 
     def word_drill_form(
@@ -4777,6 +5040,9 @@ class GreekUtils:
         meaning_key: str = "meaning",
         form_key: str = "form",
         lang: str = "ru",
+        get_checked=None, set_checked=None,
+        nav_icons: bool = False,
+        show_prev_when_done: bool = False,
     ) -> Any:
         """Unified word-drill: initialization, navigation, and display in one call.
 
@@ -4795,7 +5061,9 @@ class GreekUtils:
             get_future / set_future: state pair for forward-navigation stack.
             write_input: Diacritics-text widget (from :meth:`word_drill_widgets`).
             dia_reactive: ``write_input._ui`` — tracks Enter key presses.
-            check_btn: "Check" button.
+            check_btn: "Check" button — pass a :meth:`word_drill_check_button`
+                       result (built in its own cell) for "warn"-on-dirty
+                       coloring, or :meth:`word_drill_widgets`'s plain one.
             prev_btn: "Prev" button.
             next_btn: "Next" / "Again" button.
             vocab: Full word list; used for restart shuffle and total count.
@@ -4805,6 +5073,23 @@ class GreekUtils:
             form_key: Key in each word dict for the expected answer.
             lang: UI language for the done-screen and progress line's "correct"
                   label (``ru``/``en``/``el``).
+            get_checked / set_checked: optional state pair tracking the exact
+                  text most recently submitted via Check/Enter for the current
+                  word — pass alongside a :meth:`word_drill_check_button` as
+                  ``check_btn`` so its "warn" color has something to compare
+                  the live input against. Kept in sync with ``restore_entry``
+                  at every word transition (reset together, restored
+                  together) so it always reflects "what was checked for the
+                  word currently on screen." Both default ``None`` (no-op)
+                  for existing callers that only use the plain check button.
+            nav_icons: ``True`` renders ◀/▶ triangles flanking Check instead
+                  of the default Check/Prev/Next text-labeled row — pass the
+                  same flag to :meth:`word_drill_widgets`. Opt-in, default
+                  unchanged.
+            show_prev_when_done: ``True`` lets Prev keep working on the done
+                  screen (review past answers instead of only restarting).
+                  Opt-in — see :meth:`word_drill_display`'s own parameter of
+                  the same name for what it does and why it's safe.
         """
         mo = self._mo
         cv = get_cv()
@@ -4814,17 +5099,66 @@ class GreekUtils:
         history = get_history()
         future = get_future()
 
+        def _set_checked(value: "str | None") -> None:
+            if set_checked is not None:
+                set_checked(value)
+
+        def _advance(typed: str, ok: bool) -> None:
+            """Record this answer and move to the next word."""
+            set_history(history + [{"word": cv, "answer": typed, "correct": ok}])
+            set_score({"correct": score["correct"] + int(ok), "total": score["total"] + 1})
+            set_cv(remaining[0] if remaining else None)
+            set_remaining(remaining[1:] if remaining else [])
+            set_restore(None)
+            _set_checked(None)
+
         # Initialize on first run (remaining is None = not yet started)
         if remaining is None:
             if vocab:
                 self._shuffle_start(vocab, set_cv, set_remaining)
             return mo.md("*...*")
 
+        # Auto-advance on a correct Check (button click or Enter), mirroring
+        # the paradigm-drill family's "correct -> immediately advance"
+        # behavior (_paradigm_drill_form's own "if ok: ... set_words(...)
+        # ..." -- no separate Next click needed there either).
+        #
+        # dia_reactive's enter_pressed is a *counter* that never auto-resets
+        # (unlike mo.ui.button.value, which marimo itself resets to False
+        # once a click is consumed) -- naively this looks like a double-fire
+        # risk: after advancing, this cell re-runs again (cv/remaining just
+        # changed), and enter_pressed is still the same nonzero count from
+        # before. But word_drill_widgets rebuilds write_input fresh on every
+        # cv/restore_entry change (its own docstring: "must reference cv()
+        # and restore_entry() so marimo resets on each word"), and marimo's
+        # dependency graph guarantees that rebuild runs before this cell
+        # re-reads write_input on the very re-run this triggers -- so
+        # write_input.value (and therefore _typed below) is already empty
+        # by the time this code sees that stale enter_pressed count again,
+        # and the `_typed and ...` guard blocks re-triggering. Confirmed
+        # empirically (not just reasoned about) with an isolated marimo
+        # notebook mirroring exactly this shape: a persistently-nonzero
+        # "enter_pressed"-style value combined with a value that resets
+        # via the SAME mechanism write_input uses landed on the correct
+        # word exactly once, not twice, after one simulated Enter.
+        #
+        # Skipped while browsing forward through history (future non-empty),
+        # matching how the Next-button handling below already treats that
+        # case separately from a normal new answer.
+        _enter = dia_reactive.value.get("enter_pressed", 0)
+        if (check_btn.value or _enter) and cv is not None and not future:
+            _typed = write_input.value.strip()
+            _set_checked(_typed)
+            if _typed and self._ci(_typed, {cv[form_key]}):
+                _advance(_typed, True)
+                return mo.md("*...*")
+
         # Handle Next button
         if next_btn.value:
             if cv is None:  # restart after done
                 self._restart_quiz(vocab, set_cv, set_remaining,
                                     set_score, set_history, set_future, set_restore)
+                _set_checked(None)
             elif future:  # forward through history
                 _re = restore_entry
                 _next = future[0]
@@ -4838,26 +5172,30 @@ class GreekUtils:
                     {"answer": _next["answer"], "correct": _next["correct"]}
                     if _next["correct"] is not None else None
                 )
+                _set_checked(_next["answer"] if _next["correct"] is not None else None)
             else:  # normal advance
                 _typed = write_input.value.strip()
-                _ok = self._ci(_typed, {cv[form_key]})
-                set_history(history + [{"word": cv, "answer": _typed, "correct": _ok}])
-                set_score({"correct": score["correct"] + int(_ok), "total": score["total"] + 1})
-                set_cv(remaining[0] if remaining else None)
-                set_remaining(remaining[1:] if remaining else [])
-                set_restore(None)
+                _advance(_typed, self._ci(_typed, {cv[form_key]}))
             return mo.md("*...*")
 
         # Handle Prev button
         if prev_btn.value:
-            return self._handle_prev(cv, restore_entry, history, future, score,
-                                     set_cv, set_history, set_future, set_score, set_restore, mo)
+            _result = self._handle_prev(cv, restore_entry, history, future, score,
+                                        set_cv, set_history, set_future, set_score, set_restore, mo)
+            if set_checked is not None:
+                _restored = get_restore()
+                _set_checked(_restored["answer"] if _restored else None)
+            return _result
 
         return self.word_drill_display(
             cv, remaining, score, restore_entry,
             write_input, dia_reactive, check_btn, prev_btn, next_btn,
             vocab=vocab, title=title, comment=comment,
             meaning_key=meaning_key, form_key=form_key, lang=lang,
+            nav_icons=nav_icons,
+            checked=get_checked() if get_checked is not None else None,
+            prev_disabled=len(history) == 0,
+            show_prev_when_done=show_prev_when_done,
         )
 
     # ------------------------------------------------------- word-form quiz
@@ -4869,22 +5207,58 @@ class GreekUtils:
             word.get("meaning", ""),
         )
 
-    def _quiz_done_stop(self, score_dict: dict, lang: str, *, next_btn: Any = None) -> None:
+    def _drill_done_content(self, message: str, *, score_line: "str | None" = None,
+                            buttons: "list | None" = None) -> Any:
+        """Build the standard done-screen: a success callout with
+        ``message``, an optional ``score_line``, and a button row built
+        from ``buttons`` — pass exactly the widgets that should render,
+        already filtered by the caller (e.g. ``None`` in place of a
+        button that shouldn't appear this time, such as a hidden Prev
+        with no history — same convention as :meth:`_icon_nav_row`).
+        Rendered bare if exactly one button survives filtering, hstacked
+        (``justify="start"``) if more than one, omitted entirely if none.
+
+        Shared by every quiz/drill family's done-screen:
+        :meth:`_quiz_done_stop` wraps this in ``mo.stop`` for
+        word_drill_display/word_quiz_form/stanza_match_form/
+        translation_presence_form (a "Correct: X/Y" ``score_line``);
+        :meth:`_paradigm_drill_form` returns it directly instead (an
+        optional "❌ N/M" mistake-count ``score_line``) since its own
+        done-check is already the function's first early-return, not a
+        mid-function halt — no ``mo.stop`` needed there.
+        """
+        mo = self._mo
+        content = [mo.callout(mo.md(message), kind="success")]
+        if score_line:
+            content.append(mo.md(score_line))
+        _btns = [b for b in (buttons or []) if b is not None]
+        if len(_btns) == 1:
+            content.append(_btns[0])
+        elif _btns:
+            content.append(mo.hstack(_btns, justify="start"))
+        return mo.vstack(content)
+
+    def _quiz_done_stop(self, score_dict: dict, lang: str, *, next_btn: Any = None,
+                        prev_btn: Any = None) -> None:
         """Call mo.stop with the standard done-screen (shared by all quiz/drill types).
 
         next_btn: optional restart button embedded in the done-screen vstack
         (word_drill_display/word_quiz_form pass their own; word_quiz_feedback's
         caller renders next_btn separately, so it stays out of the callout there).
+        prev_btn: optional — lets a finished quiz still be reviewed via Prev
+        instead of only restart. Omitted by every existing caller (``None``),
+        so the done-screen shape is unchanged unless a caller opts in (see
+        word_drill_display's ``show_prev_when_done``). Only rendered — and
+        only as an hstack alongside next_btn — when *both* are given (a lone
+        prev_btn with no next_btn renders neither, via
+        :meth:`_drill_done_content`'s own None-filtering) — a caller passing
+        just next_btn (everyone today) keeps the exact same single-bare-widget
+        shape as before this parameter existed.
         """
-        mo = self._mo
         _done_msg = self.ui_label('quiz_done_message', lang).format(btn=self.ui_label('nav_again_label', lang))
-        content = [
-            mo.callout(mo.md(_done_msg), kind="success"),
-            mo.md(f"{self.ui_label('quiz_correct_label', lang)} **{score_dict['correct']}** / **{score_dict['total']}**"),
-        ]
-        if next_btn is not None:
-            content.append(next_btn)
-        mo.stop(True, mo.vstack(content))
+        _score_line = f"{self.ui_label('quiz_correct_label', lang)} **{score_dict['correct']}** / **{score_dict['total']}**"
+        _prev = prev_btn if next_btn is not None else None
+        self._mo.stop(True, self._drill_done_content(_done_msg, score_line=_score_line, buttons=[_prev, next_btn]))
 
     def word_quiz_question(
         self,
@@ -5006,6 +5380,7 @@ class GreekUtils:
         restore_entry: "dict | None" = None,
         history_len: int = 0,
         lang: str = "ru",
+        nav_icons: bool = False,
     ) -> tuple:
         """Create widgets for a multiple-choice word-quiz exercise.
 
@@ -5016,7 +5391,11 @@ class GreekUtils:
         given to the companion :meth:`word_quiz_form` call. ``remaining`` is
         the already-called state value (see :meth:`word_drill_done`) — used
         only alongside ``cv`` to derive whether the quiz is finished, for the
-        Next/Prev button labels.
+        Next/Prev button labels. ``nav_icons=True`` renders bare ◀/▶ (and
+        "↺" once done) instead of localized text — same flag as
+        :meth:`word_drill_widgets`, pass the same value to the companion
+        :meth:`word_quiz_form` call so Prev also hides (rather than greys
+        out) at the start of history. Opt-in, default unchanged.
         """
         if cv is None:
             answer_radio = self._mo.ui.radio(options=[""])
@@ -5024,7 +5403,8 @@ class GreekUtils:
             _restore = restore_entry.get("answer") if restore_entry else None
             answer_radio, _ = self.word_quiz_question(cv, vocab, lang, _random, initial_value=_restore)
         _done = self.word_drill_done(cv, remaining)
-        next_btn, prev_btn = self._make_nav_buttons(done=_done, history_len=history_len, lang=lang)
+        next_btn, prev_btn = self._make_nav_buttons(done=_done, history_len=history_len, lang=lang,
+                                                     nav_icons=nav_icons)
         return answer_radio, next_btn, prev_btn
 
     def word_quiz_form(
@@ -5046,6 +5426,7 @@ class GreekUtils:
         lang: str = "ru",
         build_paradigm_table: "Any | None" = None,
         renew_btn: "Any | None" = None,
+        nav_icons: bool = False,
     ) -> Any:
         """Unified multiple-choice quiz: initialization, navigation, and display.
 
@@ -5053,9 +5434,10 @@ class GreekUtils:
         state and widget cells.
 
         Feedback appears immediately when the user selects a radio option;
-        clicking "Next" advances to the next word.  If "Next" is
-        clicked before a selection is made the cell re-renders in place without
-        advancing.
+        clicking "Next" always advances to the next word, whether or not a
+        selection was made -- an unanswered question just scores wrong
+        (``answer_radio.value is None`` never equals ``cv[form_key]``),
+        matching :meth:`word_drill_form`'s own blank-submit skip.
 
         Args:
             get_cv / set_cv: state pair for the current word dict.
@@ -5079,6 +5461,14 @@ class GreekUtils:
             renew_btn: Optional extra button (e.g. "draw a new random set")
                        shown alongside prev/next — this function only renders
                        it, the caller's own cell wires what it does on click.
+            nav_icons: Same flag as :meth:`word_drill_form` — pass the same
+                       value given to the companion :meth:`word_quiz_widgets`
+                       call. Hides (not just greys out) Prev at the start of
+                       history, matching ``eee_footer``'s own ◀/▶ convention;
+                       Next's "▶"-vs-"↺" (done) distinction already comes
+                       from ``next_btn`` itself (built by
+                       :meth:`word_quiz_widgets`), nothing extra needed here
+                       for that part. Opt-in, default unchanged.
         """
         mo = self._mo
         cv = get_cv()
@@ -5117,7 +5507,11 @@ class GreekUtils:
                     if _next["correct"] is not None else None
                 )
                 return mo.md("*...*")
-            elif _ans is not None:  # normal advance
+            else:
+                # Normal advance -- no selection scores wrong and still
+                # advances, matching word_drill_form's own blank-submit skip
+                # (`_ans == cv[form_key]` is already correctly False when
+                # _ans is None, nothing else needed).
                 _ok = _ans == cv[form_key]
                 set_history(history + [{"word": cv, "answer": _ans, "correct": _ok}])
                 set_score({"correct": score["correct"] + int(_ok), "total": score["total"] + 1})
@@ -5125,7 +5519,6 @@ class GreekUtils:
                 set_remaining(remaining[1:] if remaining else [])
                 set_restore(None)
                 return mo.md("*...*")
-            # else: no selection — fall through and re-render as-is
 
         # Handle Prev button
         if prev_btn.value:
@@ -5155,7 +5548,15 @@ class GreekUtils:
         _pfx = f"{title}\n\n" if title else ""
         _corr = self.ui_label('quiz_progress_correct', lang)
         progress = mo.md(f"{_pfx}**{score['total'] + 1}** / {len(vocab)} — {_corr}: {score['correct']}")
-        return mo.vstack([progress, answer_radio, fb, self._nav_row(prev_btn, next_btn, renew_btn)])
+        if nav_icons:
+            # In icon mode Prev/Next must stay first/last even with
+            # renew_btn present -- reorder only here; the default
+            # (text-label) row below keeps its original order unchanged.
+            _row = self._icon_nav_row(prev_btn, next_btn, renew_btn, prev_disabled=len(history) == 0)
+            _nav_widgets = mo.hstack(_row, justify="start")
+        else:
+            _nav_widgets = self._nav_row(prev_btn, next_btn, renew_btn)
+        return mo.vstack([progress, answer_radio, fb, _nav_widgets])
 
     # ------------------------------------------------------- stanza-match quiz (5a)
 
@@ -5984,11 +6385,21 @@ class GreekUtils:
             mo.stop(True, mo.md(""))
         return diacritics_text(
             mo, placeholder=self.ui_label('write_placeholder', lang),
+            polytonic=self._cfg.polytonic,
         )
 
-    def diacritics_text(self, *, placeholder: str = "", label: str = "", value: str = "") -> Any:
-        """Combined diacritics bar + text input; wraps :func:`diacritics_text`."""
-        return diacritics_text(self._mo, placeholder=placeholder, label=label, value=value)
+    def diacritics_text(self, *, placeholder: str = "", label: str = "", value: str = "",
+                         polytonic: "bool | None" = None) -> Any:
+        """Combined diacritics bar + text input; wraps :func:`diacritics_text`.
+
+        ``polytonic`` defaults to ``self._cfg.polytonic`` (from
+        :class:`GreekConfig`) when not given explicitly — same convention as
+        :meth:`make_paradigm_form`'s own ``config.polytonic`` default.
+        """
+        if polytonic is None:
+            polytonic = self._cfg.polytonic
+        return diacritics_text(self._mo, placeholder=placeholder, label=label, value=value,
+                                polytonic=polytonic)
 
 
 # ══════════════════════════════ grc paradigm display ══

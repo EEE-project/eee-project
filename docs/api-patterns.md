@@ -98,7 +98,7 @@ The notebook sees only domain-level calls (`check_verb`, `check_noun`);
 | `compare_diacritics` | `True` (keep accents) | `True` (keep polytonic) |
 | `polytonic` | `False` (acute + diaeresis only) | `True` (full mark set) |
 
-`MODERN_GREEK` is the default — existing notebooks require no change. `polytonic` also drives `make_paradigm_form`'s diacritics bar automatically via `paradigm_drill_widgets` — no separate setting needed.
+`MODERN_GREEK` is the default — existing notebooks require no change. `polytonic` also drives `make_paradigm_form`'s diacritics bar automatically via `paradigm_drill_widgets`, and (1.9.1+) `GreekUtils.diacritics_text()`'s (and therefore `word_drill_widgets`'s) diacritics bar the same way — no separate setting needed either way.
 
 `indef_articles` is data the config carries, not something any Pattern A method reads on its own — pass `noun_paradigm_drill_form(..., indefinite=True)` to actually test it: appends one indefinite-article slot per singular case (indefinite articles don't inflect for plural) after the definite ones, each requiring its article regardless of the separate `article` param. Build the matching label list as `noun_slot_labels(active_cases) + [f"Ind. {l}" for l in noun_slot_labels(noun_indef_cells(active_cases))]`. `noun_indef_cells` no-ops safely (returns `[]`) when `config.indef_articles` is `None` (Ancient Greek) — fine to pass unconditionally from a notebook that doesn't branch on config itself.
 
@@ -176,6 +176,45 @@ def _vf(tag):
         )
     return _vcache[tag]
 ```
+
+### Example — forms of a Modern Greek verb
+
+A minimal, standalone script — no notebook, no `GreekUtils` — that prints
+every inflected form of a verb, then pulls out the aorist specifically:
+
+```python
+import eee_project as eee
+from modern_greek_backend_eee import ModernGreekBackend
+
+eee.register_backend("el", ModernGreekBackend())
+
+# All forms: load the verb's slot templates once, then inflect each one.
+slots = eee.get_slot_templates("el", "verb", "en") or []
+for slot in slots:
+    forms = eee.inflect_slot("λύω", slot, "verb", language="el")
+    print(f"{slot.label:<20} {sorted(forms)}")
+# → Pres. Act. 1 Sg.     ['λύω']
+#   ...
+#   Aor. Act. 1 Sg.      ['έλυσα']
+#   Aor. Act. 3 Pl.      ['έλυσαν', 'λύσανε']
+#   ...                  (104 slots total for a verb)
+
+# The aorist itself isn't its own UD Tense value -- it's Tense=Past +
+# Aspect=Perf (perfective aspect; imperfective aspect + Past gives the
+# imperfect instead). Reach for it directly with inflect() for one form
+# when you don't need the whole paradigm:
+eee.inflect("λύω", {"Tense": "Past", "Aspect": "Perf", "Voice": "Act",
+                     "Mood": "Ind", "Person": "1", "Number": "Sing"},
+            "verb", language="el")
+# → {"έλυσα"}
+```
+
+Only one backend is registered for `"el"` above, so `get_slot_templates`/
+`inflect`/`inflect_slot` all resolve it without a `backend=` argument — that
+kwarg only matters once a second backend (e.g. `unimorph`) is registered for
+the same language. See `examples/modern_greek.py` for more — nouns,
+adjectives, and further verb moods/voices — runnable standalone with
+`uv run examples/modern_greek.py`.
 
 ---
 
@@ -486,11 +525,15 @@ strip_diacritics("ἄνθρωπος") # → "ανθρωπος"
 greek_compare("λεγε", "λέγε")                          # True  (default: strip accents)
 greek_compare("λεγε", "λέγε", diacritics=True)         # False (accents must match)
 greek_compare("Λέγε", "λέγε", case_sensitive=True)     # False (case must match)
+greek_compare("Έχεις κανένα σχέδιο;", "Έχεις κανένα σχέδιο")  # True (1.9.1+: punctuation/whitespace ignored)
 ```
 
 `greek_compare` works for both Modern (monotonic) and Ancient (polytonic)
 Greek. `diacritics=False` uses NFD decomposition to strip Unicode category Mn
 marks; `diacritics=True` uses NFC normalization so accented forms must agree.
+Punctuation is always treated as a word separator, not compared (1.9.1+) —
+a no-op for a plain single-word form, but lets `word_drill_form` accept a
+typed phrase regardless of trailing "?"/";"/"..." or extra whitespace.
 
 ### Grammar labels
 
@@ -617,16 +660,21 @@ override. `ru_variant=True` with `language="ru"` tries
 exists.
 
 `vocab_table` wraps `mo.ui.table(df, selection="multi", page_size=len(df),
-...)` — every row on one scrollable page, no pagination controls, since
-these tables are meant to be scanned/selected from as a whole, not paged
-through. Returns `None` when `df` is `None` (mirror the `nouns_not_found`-
-style fallback message pattern other tables use). Pass `select_state=` (a
-0-arg getter returning a persisted selection, or `None` if nothing's
-persisted yet) for a table whose selection should survive reactive re-runs
-— when the getter returns `None`, every row starts selected; when it
-returns a list, that list is used as-is. Leave `select_state` unset and
-pass `initial_selection=` directly for a plain pass-through (e.g. `None`
-for nothing pre-selected).
+wrapped_columns=list(df.columns), ...)` — every row on one scrollable page,
+no pagination controls, since these tables are meant to be scanned/selected
+from as a whole, not paged through. Every column wraps rather than
+truncates long text (e.g. full-sentence phrase entries), derived
+dynamically from the DataFrame's own columns rather than hardcoded, since
+`mo.ui.table` raises `ValueError` on a named column that doesn't exist and
+this table isn't always just `Word`/`Translation` (a `Type` column is also
+used elsewhere). Returns `None` when `df` is `None` (mirror the
+`nouns_not_found`-style fallback message pattern other tables use). Pass
+`select_state=` (a 0-arg getter returning a persisted selection, or `None`
+if nothing's persisted yet) for a table whose selection should survive
+reactive re-runs — when the getter returns `None`, every row starts
+selected; when it returns a list, that list is used as-is. Leave
+`select_state` unset and pass `initial_selection=` directly for a plain
+pass-through (e.g. `None` for nothing pre-selected).
 
 **Vocab entry schema** (plain reference, not a `TypedDict` — see the note
 above for why `lemma`/`context` are optional rather than a design flaw):
@@ -849,6 +897,88 @@ gu.word_drill_form(
 again on restart. Prev/Next navigation replays history; the pre-fill
 `restore_entry` shows the previous answer so the student can review it.
 
+A correct check (1.9.1+, Check-button click *or* Enter) advances to the
+next word immediately — no separate Next click needed, matching the
+paradigm-drill family. Next still works as a manual "skip without
+answering" or "advance past a wrong answer" control.
+
+**Opt-in: "warn"-colored Check button + ◀/▶ nav icons (1.9.1+).** For a
+`word_drill_form` caller that wants the same live "warn"-on-dirty Check
+button `dirty_check_button` gives paradigm drills, plus ◀/▶ decorating
+Prev/Next's own localized text (arrow pointing in the direction of
+travel — e.g. `"◀ Prev"`, `"Next ▶"`) — add a `checked` state pair and
+build the Check
+button in its own cell via `word_drill_check_button`, same reason
+`dirty_check_button` is kept out of `paradigm_drill_widgets`:
+
+```python
+# Cell 1 — state, add one more pair
+checked, set_checked = mo.state(None)
+```
+
+```python
+# Cell 2 — widgets, pass nav_icons=True; discard word_drill_widgets' own check_btn
+write_input, dia, _plain_check_btn, prev_btn, next_btn = gu.word_drill_widgets(
+    cv=cv(), remaining=remaining(), restore_entry=restore_entry(),
+    history_len=len(history()), nav_icons=True,
+)
+```
+
+```python
+# Cell 2b — check button, in its own cell (recolors live as dia changes)
+check_btn = gu.word_drill_check_button(dia, checked())
+```
+
+```python
+# Cell 3 — form, thread get_checked/set_checked + nav_icons=True through
+gu.word_drill_form(
+    cv, set_cv, remaining, set_remaining,
+    score, set_score, restore_entry, set_restore,
+    history, set_history, future, set_future,
+    write_input, dia, check_btn, prev_btn, next_btn,
+    vocab=VOCAB, get_checked=checked, set_checked=set_checked, nav_icons=True,
+)
+```
+
+Both defaults (`nav_icons=False`, `get_checked=None`/`set_checked=None`)
+leave `word_drill_widgets`/`word_drill_form`/`word_drill_display` byte-for-
+byte unchanged for every existing caller — this is entirely additive.
+
+`nav_icons=True` also hides (not just greys out) Prev/Next at a history
+boundary — e.g. Prev is absent entirely on the first word, matching
+`eee_footer`'s own prev/next-arrow convention. This is computed by
+`word_drill_form` itself (`len(history) == 0`, the same condition
+`word_drill_widgets` used to build `prev_btn` disabled) rather than read
+back off the button objects — a real `mo.ui.button` has no readable
+`.disabled` after construction, only an internal frontend arg. Its restart
+button also switches to `"↺ Again"` (icon *before* text, matching
+`make_renew_button`'s own convention) instead of `"Next ▶"` once the drill
+is done, so it doesn't visually contradict the done screen's own "press
+«Again»" text. Prev/Next always stay the first/last widgets in the row —
+in `word_drill_display` that's true by construction (`[prev_btn, check_btn,
+next_btn]`); `word_quiz_form` reorders around an optional `renew_btn`
+specifically so it lands in the middle, not after Next, when `nav_icons`
+is on (the default, non-icon row keeps its original order either way).
+
+**Opt-in: reviewable done screen (1.9.1+).** By default the done screen
+only offers restart (`↺`/localized "Again" text) — every quiz/drill type
+built on the shared `_quiz_done_stop` helper has always worked this way.
+Pass `show_prev_when_done=True` to `word_drill_form` to also keep Prev
+working there, letting a finished drill still be reviewed instead of only
+restarted:
+
+```python
+gu.word_drill_form(
+    ..., vocab=VOCAB, nav_icons=True, show_prev_when_done=True,
+)
+```
+
+No extra state needed — `_handle_prev`/`_make_future_entry` already treat
+`cv=None` correctly (a "done" position is just another future-stack entry),
+this only adds the missing button. Default `False` leaves every other
+caller (Odyssey, and any `word_drill_form` call that doesn't pass it)
+exactly as before.
+
 ### Paradigm drill (3-cell API)
 
 For exercises where the student fills in an entire paradigm at once (every
@@ -895,6 +1025,45 @@ of Cell 3's call — same order, no repacking. `check_btn` is built in its own
 cell (not bundled into `paradigm_drill_widgets`) because it depends on `cap`,
 which changes on every check; bundling it would rebuild `form` from scratch
 on each check and lose whatever the student just typed.
+
+**Opt-in: ◀/▶/↺ nav icons (1.9.1+).** Pass `nav_icons=True` to both
+`paradigm_drill_widgets` and the `*_paradigm_drill_form` call — same flag
+and `"◀ Prev"`/`"Next ▶"`/`"↺ {restart_label}"` convention, and the same
+"only Prev ever hides, Next never does" behavior, as
+`word_drill_widgets`/`word_drill_form` (see "Write-the-word drill" above).
+`paradigm_drill_widgets` builds `nxt_btn` unconditionally clickable
+(`disabled=remaining_len < 1`, a bound the current-word-inclusive count
+never actually reaches) — moving the sole remaining word straight to
+"done" via Next works fine unscored, since this family has no per-word
+score to get wrong on skip. Prev's hide condition is computed from `hist`
+itself inside `_paradigm_drill_form` (matching the exact condition
+`paradigm_drill_widgets` used to build it disabled — a real
+`mo.ui.button` has no `.disabled` to read back after construction). The
+row also reorders to `[prev_btn, check_btn, nxt_btn]` (Prev/Next first/
+last, `check_btn` — still built separately via `dirty_check_button` —
+flanked between them), instead of the default `[check_btn, prev_btn,
+nxt_btn]`. Restart's icon comes from `paradigm_drill_widgets` alone
+(nothing to pass on the form-call side for that part). Default `False`
+leaves every existing caller's row and labels byte-for-byte unchanged.
+
+**Opt-in: reviewable done screen (1.9.1+).** By default the done screen
+only offers restart (plus retry-mistakes, if wired up) — every
+`*_paradigm_drill_form` sibling has always worked this way. Pass
+`show_prev_when_done=True` to also keep Prev working there, same
+parameter name and convention as `word_drill_form`'s own opt-in above:
+
+```python
+gu.verb_paradigm_drill_form(
+    ..., vocab=VERBS, verb_meta=verb_meta, tense=tense,
+    show_prev_when_done=True,
+)
+```
+
+Prev's click-handling itself is unconditional — it only ever depended on
+`hist`, never on whether `words` is empty — so this flag controls only
+whether `prev_btn` is *rendered* on the done screen. Default `False`
+leaves every existing caller's restart-only (or restart+retry) done
+screen unchanged.
 
 `verb_meta` (from `gu.verb_drill_meta(cv["form"], tense)`) supplies
 `active_slots` — the slots `verb_paradigm_drill_form` and

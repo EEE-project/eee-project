@@ -55,7 +55,7 @@ def _():
 def _(mo):
     mo.md(r"""
     # Ancient Greek Morphology
-    **[eee](https://codeberg.org/EEE-project/eee)** — language-agnostic morphology engine for the EEE project.
+    **[eee](https://codeberg.org/EEE-project/eee-project)** — language-agnostic morphology engine for the EEE project.
 
     Select a part of speech and backend, then pick a word from the corpus table.
     Feature keys follow [Universal Dependencies FEATS](https://universaldependencies.org/u/feat/index.html).

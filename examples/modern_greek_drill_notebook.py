@@ -390,8 +390,10 @@ def _(
             vocab=vocab,
             tense=tense_selector.value,
             meaning_label=_meaning_label,
-            done_message=t_ui("verb_done", _lang),
+            done_message=t_ui("test2_done", _lang),
             lang=_lang,
+            nav_icons=True,
+            show_prev_when_done=True,
         )
     elif pos_selector.value == "noun":
         out = gu.noun_paradigm_drill_form(
@@ -406,8 +408,10 @@ def _(
             article=article_toggle.value,
             indefinite=indefinite_toggle.value,
             meaning_label=_meaning_label,
-            done_message=t_ui("noun_done", _lang),
+            done_message=t_ui("test1_done", _lang),
             lang=_lang,
+            nav_icons=True,
+            show_prev_when_done=True,
         )
     elif pos_selector.value == "adjective":
         out = gu.adjective_paradigm_drill_form(
@@ -421,8 +425,10 @@ def _(
             adj_meta=adj_meta,
             mode=adj_mode,
             meaning_label=_meaning_label,
-            done_message=t_ui("adj_done", _lang),
+            done_message=t_ui("test3_done", _lang),
             lang=_lang,
+            nav_icons=True,
+            show_prev_when_done=True,
         )
     elif pos_selector.value == "pronoun":
         out = gu.pronoun_paradigm_drill_form(
@@ -436,8 +442,10 @@ def _(
             pron_meta=pron_meta,
             mode=adj_mode,
             meaning_label=_meaning_label,
-            done_message=t_ui("pron_done", _lang),
+            done_message=t_ui("test4_done", _lang),
             lang=_lang,
+            nav_icons=True,
+            show_prev_when_done=True,
         )
     out
     return
