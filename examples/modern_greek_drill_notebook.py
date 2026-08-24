@@ -269,7 +269,18 @@ def _(
     if pos_selector.value == "verb":
         _controls = tense_selector
     elif pos_selector.value == "noun":
-        _controls = mo.hstack([article_toggle, indefinite_toggle], gap="1.5rem")
+        # indefinite_toggle only makes sense once article_toggle is on (its
+        # own slots always require the indefinite article regardless of
+        # article_toggle's value -- see noun_paradigm_drill_form's docstring)
+        # -- hidden rather than disabled since mo.ui.switch has no disabled
+        # state to toggle post-construction, and reconstructing it here to
+        # vary a disabled= arg would tie its build cell to article_toggle,
+        # which the comment on that cell already warns resets it to False on
+        # every unrelated rerun.
+        _controls = mo.hstack(
+            [article_toggle] + ([indefinite_toggle] if article_toggle.value else []),
+            gap="1.5rem",
+        )
     else:
         _controls = full_mode_toggle
     _controls
@@ -278,6 +289,7 @@ def _(
 
 @app.cell(hide_code=True)
 def _(
+    article_toggle,
     entered,
     full_mode_toggle,
     gu,
@@ -302,7 +314,9 @@ def _(
         noun_meta = gu.noun_drill_meta(cur["form"]) if cur else None
         active_cases = getattr(noun_meta, "active_cases", [])
         labels = gu.noun_slot_labels(active_cases, lang=_lang)
-        if indefinite_toggle.value:
+        # indefinite_toggle is hidden (and its effect ignored) whenever
+        # article_toggle is off -- see the display cell for why.
+        if article_toggle.value and indefinite_toggle.value:
             labels = labels + [f"Ind. {l}" for l in gu.noun_slot_labels(gu.noun_indef_cells(active_cases), lang=_lang)]
     elif pos_selector.value == "adjective":
         adj_meta = gu.adjective_drill_meta(cur["form"], adj_mode) if cur else None
@@ -316,6 +330,7 @@ def _(
         history_len=len(hist()),
         remaining_len=len(w4t()),
         lang=_lang,
+        nav_icons=True,
     )
     set_prev_cnt(0)
     set_nxt_cnt(0)
@@ -406,7 +421,7 @@ def _(
             vocab=vocab,
             noun_meta=noun_meta,
             article=article_toggle.value,
-            indefinite=indefinite_toggle.value,
+            indefinite=article_toggle.value and indefinite_toggle.value,
             meaning_label=_meaning_label,
             done_message=t_ui("test1_done", _lang),
             lang=_lang,
