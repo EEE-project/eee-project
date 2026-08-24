@@ -68,3 +68,9 @@ wraps it in the shared deploy shell — `deploy/shell_template.html` +
 `deploy/build_shell.py` — so `dist/<name>/` comes out as `index.html`
 (loading animation, topbar, source footer) + `notebook.html` (the app),
 ready to copy straight into the `pages`-branch worktree.
+
+`deploy/hub_index.html` is the landing hub — the card-list page linking to
+all 6 live demos, served as `index.html` at the `pages`-branch root (copied
+verbatim, no build step). Its 🌐 language switcher shares the `eee_lang`
+localStorage key with every demo's own `language_bridge()`/
+`language_selector()`, so a choice made on one carries into the other.
