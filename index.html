@@ -77,6 +77,37 @@
       text-decoration: none;
     }
 
+    #langWrap {
+      position: fixed;
+      top: 60px;
+      right: 10px;
+      z-index: 1000;
+      background: white;
+      padding: 8px 12px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .lang-globe {
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    .lang-select {
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 400;
+      color: var(--text);
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 6px;
+      cursor: pointer;
+    }
+
     @keyframes pulse {
       0%, 100% { transform: scale(1); opacity: 1; }
       50% { transform: scale(0.85); opacity: 0.7; }
@@ -225,10 +256,19 @@
     <a class="tb-badge" href="https://telegram.me/+VuocC5la3ZwyNDky" target="_blank" rel="noopener">EEE Community</a>
   </div>
 
+  <div id="langWrap">
+    <span class="lang-globe">🌐</span>
+    <select class="lang-select" id="langSelect" aria-label="Language">
+      <option value="en">English</option>
+      <option value="ru">Русский</option>
+      <option value="el">Ελληνικά</option>
+    </select>
+  </div>
+
   <div class="content">
     <div class="hero">
       <div class="hero-title">Ελληνικά Εκπαιδευτικά Εργαλεία</div>
-      <div class="hero-subtitle">Interactive Ancient &amp; Modern Greek morphology tools, running entirely in your browser via WebAssembly — no install needed.</div>
+      <div class="hero-subtitle" data-i18n="hero_subtitle">Interactive Ancient &amp; Modern Greek morphology tools, running entirely in your browser via WebAssembly — no install needed.</div>
     </div>
 
     <div class="cards">
@@ -240,7 +280,7 @@
             <div class="card-greek">Άσκηση Κλίσης</div>
           </div>
         </div>
-        <div class="card-desc">Practice verb, noun, and adjective forms with the built-in vocabulary or your own uploaded word list.</div>
+        <div class="card-desc" data-i18n="desc_drill">Practice verb, noun, and adjective forms with the built-in vocabulary or your own uploaded word list.</div>
         <div class="card-arrow">OPEN &rarr;</div>
       </a>
 
@@ -252,7 +292,7 @@
             <div class="card-greek">Μορφολογία — Νέα &amp; Αρχαία</div>
           </div>
         </div>
-        <div class="card-desc">Look up any word's full inflection paradigm, switching freely between Modern and Ancient Greek backends.</div>
+        <div class="card-desc" data-i18n="desc_greek">Look up any word's full inflection paradigm, switching freely between Modern and Ancient Greek backends.</div>
         <div class="card-arrow">OPEN &rarr;</div>
       </a>
 
@@ -264,7 +304,7 @@
             <div class="card-greek">Ἀρχαία Ἑλληνικά</div>
           </div>
         </div>
-        <div class="card-desc">Browse 5 period/corpus backends — Homer, LSJ, LXX, MorphGNT, and Byzantine — plus UniMorph.</div>
+        <div class="card-desc" data-i18n="desc_ancient_greek">Browse 5 period/corpus backends — Homer, LSJ, LXX, MorphGNT, and Byzantine — plus UniMorph.</div>
         <div class="card-arrow">OPEN &rarr;</div>
       </a>
 
@@ -276,7 +316,7 @@
             <div class="card-greek">Νέα Ελληνικά</div>
           </div>
         </div>
-        <div class="card-desc">Compare the dedicated Modern Greek backend against UniMorph for the same lemma.</div>
+        <div class="card-desc" data-i18n="desc_modern_greek">Compare the dedicated Modern Greek backend against UniMorph for the same lemma.</div>
         <div class="card-arrow">OPEN &rarr;</div>
       </a>
 
@@ -288,7 +328,7 @@
             <div class="card-greek">187 γλώσσες</div>
           </div>
         </div>
-        <div class="card-desc">Explore inflection data for all 187 languages in the UniMorph corpus — 6 bundled offline, the rest fetched on demand.</div>
+        <div class="card-desc" data-i18n="desc_unimorph">Explore inflection data for all 187 languages in the UniMorph corpus — 6 bundled offline, the rest fetched on demand.</div>
         <div class="card-arrow">OPEN &rarr;</div>
       </a>
 
@@ -300,16 +340,89 @@
             <div class="card-greek">Ασκήσεις &amp; Κουίζ</div>
           </div>
         </div>
-        <div class="card-desc">Live comparison, custom drills, multiple choice, write-the-word with polytonic diacritics, and full paradigm drills.</div>
+        <div class="card-desc" data-i18n="desc_exercise">Live comparison, custom drills, multiple choice, write-the-word with polytonic diacritics, and full paradigm drills.</div>
         <div class="card-arrow">OPEN &rarr;</div>
       </a>
     </div>
 
     <div class="footer">
-      <div class="footer-text">EEE — Greek Language Educational Tools</div>
+      <div class="footer-text" data-i18n="footer_text">EEE — Greek Language Educational Tools</div>
       <div style="font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text); margin-top: 8px;">Source code: <a class="footer-link" href="https://codeberg.org/EEE-project/eee-project" target="_blank" rel="noopener">codeberg.org/EEE-project/eee-project</a></div>
     </div>
   </div>
+
+  <script>
+    // Shares the "eee_lang" localStorage key with every demo's own
+    // language_bridge()/language_selector() (see notebook_utils.py) --
+    // picking a language here carries into whichever demo you open next,
+    // and vice versa. Card titles and the hero's Greek headline are brand
+    // names, not translated content, so they stay fixed across languages
+    // (matching the demo pages' own topbar/tab titles, which don't
+    // translate either); only the descriptive prose switches.
+    const TRANSLATIONS = {
+      en: {
+        hero_subtitle: "Interactive Ancient &amp; Modern Greek morphology tools, running entirely in your browser via WebAssembly — no install needed.",
+        desc_drill: "Practice verb, noun, and adjective forms with the built-in vocabulary or your own uploaded word list.",
+        desc_greek: "Look up any word's full inflection paradigm, switching freely between Modern and Ancient Greek backends.",
+        desc_ancient_greek: "Browse 5 period/corpus backends — Homer, LSJ, LXX, MorphGNT, and Byzantine — plus UniMorph.",
+        desc_modern_greek: "Compare the dedicated Modern Greek backend against UniMorph for the same lemma.",
+        desc_unimorph: "Explore inflection data for all 187 languages in the UniMorph corpus — 6 bundled offline, the rest fetched on demand.",
+        desc_exercise: "Live comparison, custom drills, multiple choice, write-the-word with polytonic diacritics, and full paradigm drills.",
+        footer_text: "EEE — Greek Language Educational Tools",
+      },
+      ru: {
+        hero_subtitle: "Интерактивные инструменты морфологии древнегреческого и новогреческого языков — работают полностью в браузере через WebAssembly, установка не требуется.",
+        desc_drill: "Тренируйте формы глаголов, существительных и прилагательных — со встроенным словарём или своим списком слов.",
+        desc_greek: "Ищите полную парадигму словоформ любого слова, свободно переключаясь между новогреческим и древнегреческим движками.",
+        desc_ancient_greek: "5 периодов/корпусов — Гомер, LSJ, LXX, MorphGNT и византийский — плюс UniMorph.",
+        desc_modern_greek: "Сравните специализированный движок новогреческого языка с UniMorph для одной и той же леммы.",
+        desc_unimorph: "Данные словоизменения для всех 187 языков корпуса UniMorph — 6 встроены офлайн, остальные загружаются по запросу.",
+        desc_exercise: "Живое сравнение, свои упражнения, тесты с выбором ответа, ввод слова с политоническими диакритиками и полные парадигмы.",
+        footer_text: "EEE — образовательные инструменты греческого языка",
+      },
+      el: {
+        hero_subtitle: "Διαδραστικά εργαλεία μορφολογίας αρχαίων και νέων ελληνικών, που εκτελούνται εξ ολοκλήρου στον browser σας μέσω WebAssembly — χωρίς εγκατάσταση.",
+        desc_drill: "Εξασκηθείτε σε τύπους ρημάτων, ουσιαστικών και επιθέτων με το ενσωματωμένο λεξιλόγιο ή τη δική σας λίστα λέξεων.",
+        desc_greek: "Αναζητήστε την πλήρη κλίση οποιασδήποτε λέξης, εναλλάσσοντας ελεύθερα ανάμεσα σε νέα και αρχαία ελληνικά.",
+        desc_ancient_greek: "5 περίοδοι/σώματα κειμένων — Όμηρος, LSJ, LXX, MorphGNT και βυζαντινή — συν UniMorph.",
+        desc_modern_greek: "Συγκρίνετε την ειδική μηχανή νέων ελληνικών με το UniMorph για το ίδιο λήμμα.",
+        desc_unimorph: "Δεδομένα κλίσης για όλες τις 187 γλώσσες του σώματος UniMorph — 6 ενσωματωμένες offline, οι υπόλοιπες φορτώνονται κατ' απαίτηση.",
+        desc_exercise: "Ζωντανή σύγκριση, προσαρμοσμένες ασκήσεις, πολλαπλή επιλογή, γραφή λέξης με πολυτονικά διακριτικά και πλήρεις κλίσεις.",
+        footer_text: "EEE — Εκπαιδευτικά εργαλεία ελληνικής γλώσσας",
+      },
+    };
+
+    const KEY = "eee_lang";
+    const select = document.getElementById("langSelect");
+
+    function applyLang(lang) {
+      const dict = TRANSLATIONS[lang] || TRANSLATIONS.en;
+      document.querySelectorAll("[data-i18n]").forEach((el) => {
+        const key = el.getAttribute("data-i18n");
+        if (dict[key]) el.innerHTML = dict[key];
+      });
+    }
+
+    let stored = "en";
+    try {
+      stored = localStorage.getItem(KEY) || "en";
+      if (!TRANSLATIONS[stored]) stored = "en";
+    } catch (e) {
+      // localStorage inaccessible (private mode, blocked) -- fall back to en.
+    }
+    select.value = stored;
+    applyLang(stored);
+
+    select.addEventListener("change", () => {
+      const lang = select.value;
+      applyLang(lang);
+      try {
+        localStorage.setItem(KEY, lang);
+      } catch (e) {
+        // Ignore -- selection still applies for this page view.
+      }
+    });
+  </script>
 
 </body>
 </html>
