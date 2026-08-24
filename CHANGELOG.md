@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.10.0 - 2026-08-24
+- `GreekConfig` is now a frozen dataclass, so a course can no longer
+  accidentally mutate the shared `MODERN_GREEK`/`ANCIENT_GREEK` singletons
+  in place (which would silently affect every other course reusing them).
+  Customize via `dataclasses.replace(MODERN_GREEK, ...)` to get a new,
+  independent instance instead.
+- `GreekConfig` gained two new opt-in fields, `nav_icons` and
+  `show_prev_when_done` (both default `False`, matching every existing
+  config's current behavior unchanged). The nine public quiz/drill
+  functions that already accepted same-named `nav_icons`/
+  `show_prev_when_done` keyword arguments (`paradigm_drill_widgets`,
+  `word_drill_widgets`, `word_quiz_widgets`, `word_drill_form`,
+  `word_quiz_form`, `noun_paradigm_drill_form`, `verb_paradigm_drill_form`,
+  `adjective_paradigm_drill_form`, `pronoun_paradigm_drill_form`) now
+  default those parameters to `None` and resolve from `self._cfg` when the
+  caller doesn't pass an explicit value — an explicit `True`/`False` at the
+  call site still always wins. Lets a course that wants the ◀/▶/↺ nav-icon
+  treatment and done-screen Prev review everywhere set it once, on the
+  `GreekConfig` it passes to `GreekUtils(..., config=...)`, instead of
+  repeating both kwargs at every one of dozens of call sites across every
+  chapter. Not exposed as a named config constant here — courses derive
+  their own opted-in value via `dataclasses.replace(MODERN_GREEK,
+  nav_icons=True, show_prev_when_done=True)` (or the same on
+  `ANCIENT_GREEK`) at the point where they construct `GreekUtils`, since
+  the feature itself is language-agnostic and this package shouldn't
+  presume which specific course wants it. 10 new tests (one per function,
+  proving the resolve-from-config path specifically, plus an explicit-
+  override-wins case for `paradigm_drill_widgets`) — the full suite
+  passing alone wouldn't have caught a config field silently not reaching
+  one of the nine call sites, since every existing test already passes
+  `nav_icons` explicitly. Full suite 1479/1479, `ruff check` clean.
+
 ## 1.9.1 - 2026-08-21
 - `word_drill_form` now auto-advances to the next word immediately on a
   correct check (Check-button click *or* Enter), matching the paradigm-drill

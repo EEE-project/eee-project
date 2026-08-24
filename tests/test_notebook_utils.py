@@ -1,6 +1,7 @@
 """Tests for notebook_utils — greek_compare, strip_diacritics, GreekConfig, nav functions."""
 import pytest
 
+import dataclasses
 import json
 import unicodedata
 from unittest.mock import patch, MagicMock
@@ -58,6 +59,13 @@ from eee_project.notebook_utils import (
     _EL_VOICE_CAP,
 )
 from conftest import StubMo as _StubMo, StubBackend as _StubBackend, StubMoLayout as _StubMoLayout
+
+# Test-only config fixture for the nav_icons/show_prev_when_done
+# resolve-from-config tests below -- not exported from the library. Any
+# course (Modern or Ancient Greek) can derive the same kind of value for
+# itself via dataclasses.replace(MODERN_GREEK/ANCIENT_GREEK, nav_icons=True,
+# ...); the library doesn't bake in a single named variant for one language.
+_NAV_ICONS_CONFIG = dataclasses.replace(MODERN_GREEK, nav_icons=True, show_prev_when_done=True)
 
 
 # ────────────────────────────────────────── poly_to_mono ──
@@ -620,6 +628,26 @@ class TestModernGreekConfig:
     def test_not_polytonic(self):
         # Monotonic orthography (post-1982) -- no breathing/subscript marks needed.
         assert MODERN_GREEK.polytonic is False
+
+    def test_nav_icons_false_by_default(self):
+        assert MODERN_GREEK.nav_icons is False
+        assert MODERN_GREEK.show_prev_when_done is False
+
+    def test_frozen_rejects_direct_mutation(self):
+        # The whole point of nav_icons/show_prev_when_done living on the
+        # config is that a course opts in via dataclasses.replace() (a new
+        # instance) rather than mutating the shared singleton in place --
+        # frozen=True makes the unsafe path a hard error, not just a
+        # documented caution, so a future edit can't silently break
+        # kavafis_ithaki (which shares this same MODERN_GREEK instance).
+        with pytest.raises(dataclasses.FrozenInstanceError):
+            MODERN_GREEK.nav_icons = True
+
+    def test_replace_derives_independent_instance(self):
+        variant = dataclasses.replace(MODERN_GREEK, nav_icons=True)
+        assert variant.nav_icons is True
+        assert MODERN_GREEK.nav_icons is False  # untouched
+        assert variant.language == MODERN_GREEK.language  # every other field carries over
 
 
 class TestAncientGreekConfig:
@@ -2288,6 +2316,14 @@ class TestWordDrillWidgets:
             _, _, _, _, next_btn = gu_form.word_drill_widgets(cv=None, remaining=[], nav_icons=True)
         assert next_btn.label == "↺ Пройти снова"
 
+    def test_config_nav_icons_true_used_with_no_explicit_kwarg(self):
+        gu = GreekUtils(mo_module=_FormMo(), config=_NAV_ICONS_CONFIG)
+        wi = MagicMock(); wi._ui = MagicMock()
+        with patch.object(gu, "diacritics_text", return_value=wi):
+            _, _, _, prev_btn, next_btn = gu.word_drill_widgets(cv={}, remaining=[])
+        assert prev_btn.label == "◀ Предыдущий"
+        assert next_btn.label == "Следующий ▶"
+
 
 # ────────────────────────────────────────── make_renew_button ──
 
@@ -2648,6 +2684,26 @@ class TestWordDrillForm:
         result = self._call(gu_form, state, nav_icons=True)
         assert len(result[-1]) == 3
 
+    def test_config_nav_icons_true_used_with_no_explicit_kwarg(self):
+        # Same repro as test_nav_icons_forwarded_to_display, but nav_icons is
+        # never passed at all -- proves the resolve-from-config path, not
+        # just that an explicit True still works.
+        gu = GreekUtils(mo_module=_FormMo(), config=_NAV_ICONS_CONFIG)
+        cv_g, cv_s, _ = _pair(_WD_VOCAB[0])
+        rem_g, rem_s, _ = _pair(_WD_VOCAB[1:])
+        sc_g, sc_s, _ = _pair({"correct": 0, "total": 0})
+        rst_g, rst_s, _ = _pair(None)
+        hist_g, hist_s, _ = _pair([])
+        fut_g, fut_s, _ = _pair([])
+        wi = _FakeWI()
+        result = gu.word_drill_form(
+            cv_g, cv_s, rem_g, rem_s, sc_g, sc_s, rst_g, rst_s,
+            hist_g, hist_s, fut_g, fut_s,
+            wi, wi._ui, _FakeBtn(None), _FakeBtn(None), _FakeBtn(None),
+            vocab=_WD_VOCAB,
+        )
+        assert len(result[-1]) == 2
+
     # get_checked/set_checked: tracks the exact text last submitted via
     # Check/Enter for the current word, for word_drill_check_button's
     # "warn"-when-dirty coloring -- mirrors _paradigm_drill_form's own
@@ -2766,6 +2822,14 @@ class TestWordQuizWidgets:
         )
         assert next_btn.label == "↺ Пройти снова"
 
+    def test_config_nav_icons_true_used_with_no_explicit_kwarg(self):
+        gu = GreekUtils(mo_module=_FormMo(), config=_NAV_ICONS_CONFIG)
+        _, next_btn, prev_btn = gu.word_quiz_widgets(
+            cv=_WQ_VOCAB[0], remaining=_WQ_VOCAB[1:], vocab=_WQ_VOCAB,
+        )
+        assert next_btn.label == "Следующий ▶"
+        assert prev_btn.label == "◀ Предыдущий"
+
 
 # ────────────────────────────────────────── word_quiz_form ──
 
@@ -2858,6 +2922,19 @@ class TestWordQuizForm:
         state = self._state(cv=_WQ_VOCAB[0], rem=_WQ_VOCAB[2:], hist=[past])
         result = self._call(gu_form, state, nav_icons=True)
         assert len(result[-1]) == 2
+
+    def test_config_nav_icons_true_used_with_no_explicit_kwarg(self):
+        gu = GreekUtils(mo_module=_FormMo(), config=_NAV_ICONS_CONFIG)
+        w = _WQ_VOCAB[0]
+        cv_g, cv_s, _, rem_g, rem_s, _, sc_g, sc_s, _, rst_g, rst_s, hist_g, hist_s, _, fut_g, fut_s = \
+            self._state(cv=w, rem=_WQ_VOCAB[1:])
+        result = gu.word_quiz_form(
+            cv_g, cv_s, rem_g, rem_s, sc_g, sc_s, rst_g, rst_s,
+            hist_g, hist_s, fut_g, fut_s,
+            _FakeRadio(), _FakeBtn(None), _FakeBtn(None),
+            vocab=_WQ_VOCAB,
+        )
+        assert len(result[-1]) == 1
 
     def test_nav_icons_false_keeps_prev_visible_with_no_history(self, gu_form):
         # Default -- Prev stays visible-but-greyed (real marimo disables it
@@ -4154,6 +4231,29 @@ class TestParadigmDrillWidgets:
             )
         assert "◀" not in prev_btn.label and "▶" not in nxt_btn.label and "↺" not in restart_btn.label
 
+    def test_config_nav_icons_true_decorates_labels_with_no_explicit_kwarg(self):
+        # nav_icons omitted entirely (not even nav_icons=None) -- must resolve
+        # from config.nav_icons, not silently fall back to the old hardcoded
+        # False default.
+        gu = GreekUtils(_StubBackend(), _StubMo(), config=_NAV_ICONS_CONFIG)
+        with self._patched():
+            _, prev_btn, nxt_btn, restart_btn = gu.paradigm_drill_widgets(
+                labels=["1 sg:"], lang="en",
+            )
+        assert prev_btn.label == "◀ Prev"
+        assert nxt_btn.label == "Next ▶"
+        assert restart_btn.label == "↺ Again"
+
+    def test_explicit_nav_icons_false_overrides_config_true(self):
+        # An explicit False must still win over a config default of True --
+        # config only supplies the default when the caller passes nothing.
+        gu = GreekUtils(_StubBackend(), _StubMo(), config=_NAV_ICONS_CONFIG)
+        with self._patched():
+            _, prev_btn, nxt_btn, restart_btn = gu.paradigm_drill_widgets(
+                labels=["1 sg:"], lang="en", nav_icons=False,
+            )
+        assert "◀" not in prev_btn.label and "▶" not in nxt_btn.label and "↺" not in restart_btn.label
+
 
 # ────────────────────────────────────────── verb_paradigm_drill_form / noun_paradigm_drill_form ──
 
@@ -4291,6 +4391,13 @@ class TestVerbParadigmDrillForm(_ParadigmDrillFormBase):
         cv = self._VOCAB[0]
         state = self._state()  # default: both words remaining, hist=[]
         result = self._call(gu, state, cv, _pdform(["", ""]), self._meta(), nav_icons=True)
+        assert len(result[-2]) == 2  # [check_btn, nxt_btn] -- no prev_btn
+
+    def test_config_nav_icons_true_used_with_no_explicit_kwarg(self):
+        gu = GreekUtils(_StubBackend(), _FormMo(), config=_NAV_ICONS_CONFIG)
+        cv = self._VOCAB[0]
+        state = self._state()
+        result = self._call(gu, state, cv, _pdform(["", ""]), self._meta())
         assert len(result[-2]) == 2  # [check_btn, nxt_btn] -- no prev_btn
 
     def test_nav_icons_shows_next_even_with_one_remaining(self, gu):
@@ -4774,6 +4881,13 @@ class TestNounParadigmDrillForm(_ParadigmDrillFormBase):
         cv = self._VOCAB[0]
         state = self._state()
         result = self._call(gu, state, cv, _pdform(["", ""]), self._meta(), nav_icons=True)
+        assert len(result[-2]) == 2
+
+    def test_config_nav_icons_true_used_with_no_explicit_kwarg(self):
+        gu = GreekUtils(_StubBackend(), _FormMo(), config=_NAV_ICONS_CONFIG)
+        cv = self._VOCAB[0]
+        state = self._state()
+        result = self._call(gu, state, cv, _pdform(["", ""]), self._meta())
         assert len(result[-2]) == 2
 
     def test_show_prev_when_done_reaches_paradigm_drill_form(self, gu):
@@ -6599,6 +6713,13 @@ class TestAdjectiveParadigmDrillForm(_ParadigmDrillFormBase):
         result = self._call(gu, state, cv, _pdform(["", "", "", "", "", ""]), nav_icons=True)
         assert len(result[-2]) == 2
 
+    def test_config_nav_icons_true_used_with_no_explicit_kwarg(self):
+        gu = GreekUtils(_StubBackend(), _FormMo(), config=_NAV_ICONS_CONFIG)
+        cv = self._VOCAB[0]
+        state = self._state()
+        result = self._call(gu, state, cv, _pdform(["", "", "", "", "", ""]))
+        assert len(result[-2]) == 2
+
     def test_show_prev_when_done_reaches_paradigm_drill_form(self, gu):
         # show_prev_when_done threads through the same way as nav_icons --
         # see TestVerbParadigmDrillForm for the full battery.
@@ -6706,6 +6827,14 @@ class TestPronounParadigmDrillForm(_ParadigmDrillFormBase):
         state = self._state()
         form = _pdform([""] * 6)
         result = self._call_form(gu.pronoun_paradigm_drill_form, state, cv, form, nav_icons=True)
+        assert len(result[-2]) == 2
+
+    def test_config_nav_icons_true_used_with_no_explicit_kwarg(self):
+        gu = GreekUtils(_StubBackend(), _FormMo(), config=_NAV_ICONS_CONFIG)
+        cv = self._VOCAB[0]
+        state = self._state()
+        form = _pdform([""] * 6)
+        result = self._call_form(gu.pronoun_paradigm_drill_form, state, cv, form)
         assert len(result[-2]) == 2
 
     def test_show_prev_when_done_reaches_paradigm_drill_form(self, gu):

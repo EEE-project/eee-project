@@ -97,8 +97,12 @@ The notebook sees only domain-level calls (`check_verb`, `check_noun`);
 | `verb_prefix` | `{'future': 'θα'}` | `{}` |
 | `compare_diacritics` | `True` (keep accents) | `True` (keep polytonic) |
 | `polytonic` | `False` (acute + diaeresis only) | `True` (full mark set) |
+| `nav_icons` (1.10.0+) | `False` | `False` |
+| `show_prev_when_done` (1.10.0+) | `False` | `False` |
 
 `MODERN_GREEK` is the default — existing notebooks require no change. `polytonic` also drives `make_paradigm_form`'s diacritics bar automatically via `paradigm_drill_widgets`, and (1.9.1+) `GreekUtils.diacritics_text()`'s (and therefore `word_drill_widgets`'s) diacritics bar the same way — no separate setting needed either way.
+
+`nav_icons`/`show_prev_when_done` (1.10.0+) are course-wide defaults for the same-named keyword arguments on all nine quiz/drill functions below — see "Opt-in: ◀/▶/↺ nav icons" further down. A course that wants both everywhere can set them once via its own config instead of repeating the kwargs at every call site: `config=dataclasses.replace(MODERN_GREEK, nav_icons=True, show_prev_when_done=True)` (works the same on `ANCIENT_GREEK`). An explicit `nav_icons=`/`show_prev_when_done=` at a call site still always overrides the config default.
 
 `indef_articles` is data the config carries, not something any Pattern A method reads on its own — pass `noun_paradigm_drill_form(..., indefinite=True)` to actually test it: appends one indefinite-article slot per singular case (indefinite articles don't inflect for plural) after the definite ones, each requiring its article regardless of the separate `article` param. Build the matching label list as `noun_slot_labels(active_cases) + [f"Ind. {l}" for l in noun_slot_labels(noun_indef_cells(active_cases))]`. `noun_indef_cells` no-ops safely (returns `[]`) when `config.indef_articles` is `None` (Ancient Greek) — fine to pass unconditionally from a notebook that doesn't branch on config itself.
 
@@ -943,6 +947,9 @@ gu.word_drill_form(
 Both defaults (`nav_icons=False`, `get_checked=None`/`set_checked=None`)
 leave `word_drill_widgets`/`word_drill_form`/`word_drill_display` byte-for-
 byte unchanged for every existing caller — this is entirely additive.
+(1.10.0+) omitting `nav_icons` entirely on `word_drill_widgets`/
+`word_drill_form` resolves it from `config.nav_icons` instead of hardcoding
+`False` — see the `GreekConfig` table earlier in this doc.
 
 `nav_icons=True` also hides (not just greys out) Prev/Next at a history
 boundary — e.g. Prev is absent entirely on the first word, matching
@@ -977,7 +984,8 @@ No extra state needed — `_handle_prev`/`_make_future_entry` already treat
 `cv=None` correctly (a "done" position is just another future-stack entry),
 this only adds the missing button. Default `False` leaves every other
 caller (Odyssey, and any `word_drill_form` call that doesn't pass it)
-exactly as before.
+working exactly as before. (1.10.0+) omitting it entirely resolves from
+`config.show_prev_when_done` the same way as `nav_icons` above.
 
 ### Paradigm drill (3-cell API)
 
@@ -1045,6 +1053,9 @@ flanked between them), instead of the default `[check_btn, prev_btn,
 nxt_btn]`. Restart's icon comes from `paradigm_drill_widgets` alone
 (nothing to pass on the form-call side for that part). Default `False`
 leaves every existing caller's row and labels byte-for-byte unchanged.
+(1.10.0+) omitting `nav_icons` entirely resolves it from `config.nav_icons`
+instead of hardcoding `False` — see the `GreekConfig` table above if a
+whole course wants this on everywhere.
 
 **Opt-in: reviewable done screen (1.9.1+).** By default the done screen
 only offers restart (plus retry-mistakes, if wired up) — every
@@ -1058,6 +1069,9 @@ gu.verb_paradigm_drill_form(
     show_prev_when_done=True,
 )
 ```
+
+(1.10.0+) omitting it entirely resolves from `config.show_prev_when_done`
+the same way as `nav_icons` above.
 
 Prev's click-handling itself is unconditional — it only ever depended on
 `hist`, never on whether `words` is empty — so this flag controls only

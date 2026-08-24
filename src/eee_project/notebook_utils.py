@@ -2073,12 +2073,18 @@ def greek_compare(
 # ════════════════════════════════════════════════════ greek configs ══
 
 
-@dataclass
+@dataclass(frozen=True)
 class GreekConfig:
     """Language-period config for GreekUtils quiz widgets.
 
     Pass ``config=ANCIENT_GREEK`` to ``GreekUtils(backend, mo, pd, config=...)``
     to switch between Modern and Ancient Greek exercise conventions.
+
+    Frozen so a course can never accidentally mutate the shared
+    ``MODERN_GREEK``/``ANCIENT_GREEK`` singletons in place (which would
+    silently change every other course reusing them, e.g. kavafis_ithaki
+    alongside ellinika_b) -- customize via ``dataclasses.replace(MODERN_GREEK,
+    nav_icons=True, ...)`` to get a new, independent instance instead.
     """
     language: str                       # EEE language code ("el", "grc")
     articles: "dict | None"             # definite articles by gender/num/case
@@ -2094,6 +2100,8 @@ class GreekConfig:
     adj_cases: "list[str]"              # cases for full adjective paradigm
     compare_diacritics: bool            # default diacritics flag for _ci
     polytonic: bool                     # show breathing/subscript/diaeresis marks in make_paradigm_form's bar, not just the acute accent
+    nav_icons: bool = False             # course-wide default for the ◀/▶/↺ nav_icons param on the quiz/drill widget+form functions
+    show_prev_when_done: bool = False   # course-wide default for the same-named param -- lets Prev review the done screen instead of only restarting
 
 
 # ─────────────────────────────────────────────────── article tables ──
@@ -4120,7 +4128,7 @@ class GreekUtils:
         history_len: int = 0, remaining_len: int = 1,
         next_label: "str | None" = None, prev_label: "str | None" = None,
         restart_label: "str | None" = None, lang: str = "ru",
-        nav_icons: bool = False,
+        nav_icons: "bool | None" = None,
     ) -> tuple:
         """Create the form + nav/restart-button widgets for a hand-rolled
         paradigm-drill exercise (a full multi-field paradigm per word via
@@ -4162,6 +4170,8 @@ class GreekUtils:
         (nothing about its own creation depends on ``cap``), so it stays
         bundled here.
         """
+        if nav_icons is None:
+            nav_icons = self._cfg.nav_icons
         if next_label is None:
             next_label = self.ui_label('next_label', lang)
         if prev_label is None:
@@ -4479,8 +4489,8 @@ class GreekUtils:
         get_retry_cnt: Any = None, set_retry_cnt: Any = None,
         retry_btn: Any = None,
         lang: str = "ru",
-        nav_icons: bool = False,
-        show_prev_when_done: bool = False,
+        nav_icons: "bool | None" = None,
+        show_prev_when_done: "bool | None" = None,
     ) -> Any:
         """Unified verb-paradigm drill: per-field Enter-navigation, dirty-check
         snapshot, save/restore across back/next, restart, and full display,
@@ -4512,6 +4522,10 @@ class GreekUtils:
         ``done_message`` (those are already caller-supplied per-call, same
         as elsewhere in this file).
         """
+        if nav_icons is None:
+            nav_icons = self._cfg.nav_icons
+        if show_prev_when_done is None:
+            show_prev_when_done = self._cfg.show_prev_when_done
         active_slots = getattr(verb_meta, "active_slots", None) or self._cfg.verb_slots
         state = self._pack_paradigm_state(
             get_words, set_words, get_hist, set_hist, get_msg, set_msg,
@@ -4564,8 +4578,8 @@ class GreekUtils:
         get_retry_cnt: Any = None, set_retry_cnt: Any = None,
         retry_btn: Any = None,
         lang: str = "ru",
-        nav_icons: bool = False,
-        show_prev_when_done: bool = False,
+        nav_icons: "bool | None" = None,
+        show_prev_when_done: "bool | None" = None,
     ) -> Any:
         """Unified noun-paradigm drill — sibling of :meth:`verb_paradigm_drill_form`
         (see its docstring for the shared design, including the "meta is
@@ -4595,6 +4609,10 @@ class GreekUtils:
         pass unconditionally from a notebook that doesn't check the config
         itself.
         """
+        if nav_icons is None:
+            nav_icons = self._cfg.nav_icons
+        if show_prev_when_done is None:
+            show_prev_when_done = self._cfg.show_prev_when_done
         active_cases = getattr(noun_meta, "active_cases", None) or self._cfg.noun_cells
         state = self._pack_paradigm_state(
             get_words, set_words, get_hist, set_hist, get_msg, set_msg,
@@ -4654,8 +4672,8 @@ class GreekUtils:
         get_retry_cnt: Any = None, set_retry_cnt: Any = None,
         retry_btn: Any = None,
         lang: str = "ru",
-        nav_icons: bool = False,
-        show_prev_when_done: bool = False,
+        nav_icons: "bool | None" = None,
+        show_prev_when_done: "bool | None" = None,
     ) -> Any:
         """Unified adjective-paradigm drill — sibling of :meth:`verb_paradigm_drill_form`
         (see its docstring for the shared design, including the "meta is
@@ -4674,6 +4692,10 @@ class GreekUtils:
         per-mode list from :meth:`adjective_slot_labels` (every slot shown,
         including any defective for this word).
         """
+        if nav_icons is None:
+            nav_icons = self._cfg.nav_icons
+        if show_prev_when_done is None:
+            show_prev_when_done = self._cfg.show_prev_when_done
         active_slots = getattr(adj_meta, "active_slots", None) or self._adj_slot_list(mode)
         state = self._pack_paradigm_state(
             get_words, set_words, get_hist, set_hist, get_msg, set_msg,
@@ -4725,8 +4747,8 @@ class GreekUtils:
         get_retry_cnt: Any = None, set_retry_cnt: Any = None,
         retry_btn: Any = None,
         lang: str = "ru",
-        nav_icons: bool = False,
-        show_prev_when_done: bool = False,
+        nav_icons: "bool | None" = None,
+        show_prev_when_done: "bool | None" = None,
     ) -> Any:
         """Unified pronoun-paradigm drill — sibling of :meth:`adjective_paradigm_drill_form`
         (see its docstring for the shared design, including the "meta is
@@ -4741,6 +4763,10 @@ class GreekUtils:
         Omitting it falls back to the unfiltered per-mode list (every slot
         shown).
         """
+        if nav_icons is None:
+            nav_icons = self._cfg.nav_icons
+        if show_prev_when_done is None:
+            show_prev_when_done = self._cfg.show_prev_when_done
         active_slots = getattr(pron_meta, "active_slots", None) or self._pronoun_slot_list(mode)
         state = self._pack_paradigm_state(
             get_words, set_words, get_hist, set_hist, get_msg, set_msg,
@@ -4868,7 +4894,7 @@ class GreekUtils:
         placeholder: "str | None" = None,
         label: "str | None" = None,
         lang: str = "ru",
-        nav_icons: bool = False,
+        nav_icons: "bool | None" = None,
     ) -> tuple:
         """Create all widgets for a word-drill exercise.
 
@@ -4888,6 +4914,8 @@ class GreekUtils:
         this ``check_btn`` and build one via :meth:`word_drill_check_button`
         in its own cell instead, then pass that to :meth:`word_drill_form`.
         """
+        if nav_icons is None:
+            nav_icons = self._cfg.nav_icons
         mo = self._mo
         if placeholder is None:
             placeholder = self.ui_label('write_placeholder', lang)
@@ -5041,8 +5069,8 @@ class GreekUtils:
         form_key: str = "form",
         lang: str = "ru",
         get_checked=None, set_checked=None,
-        nav_icons: bool = False,
-        show_prev_when_done: bool = False,
+        nav_icons: "bool | None" = None,
+        show_prev_when_done: "bool | None" = None,
     ) -> Any:
         """Unified word-drill: initialization, navigation, and display in one call.
 
@@ -5091,6 +5119,10 @@ class GreekUtils:
                   Opt-in — see :meth:`word_drill_display`'s own parameter of
                   the same name for what it does and why it's safe.
         """
+        if nav_icons is None:
+            nav_icons = self._cfg.nav_icons
+        if show_prev_when_done is None:
+            show_prev_when_done = self._cfg.show_prev_when_done
         mo = self._mo
         cv = get_cv()
         remaining = get_remaining()
@@ -5380,7 +5412,7 @@ class GreekUtils:
         restore_entry: "dict | None" = None,
         history_len: int = 0,
         lang: str = "ru",
-        nav_icons: bool = False,
+        nav_icons: "bool | None" = None,
     ) -> tuple:
         """Create widgets for a multiple-choice word-quiz exercise.
 
@@ -5397,6 +5429,8 @@ class GreekUtils:
         :meth:`word_quiz_form` call so Prev also hides (rather than greys
         out) at the start of history. Opt-in, default unchanged.
         """
+        if nav_icons is None:
+            nav_icons = self._cfg.nav_icons
         if cv is None:
             answer_radio = self._mo.ui.radio(options=[""])
         else:
@@ -5426,7 +5460,7 @@ class GreekUtils:
         lang: str = "ru",
         build_paradigm_table: "Any | None" = None,
         renew_btn: "Any | None" = None,
-        nav_icons: bool = False,
+        nav_icons: "bool | None" = None,
     ) -> Any:
         """Unified multiple-choice quiz: initialization, navigation, and display.
 
@@ -5470,6 +5504,8 @@ class GreekUtils:
                        :meth:`word_quiz_widgets`), nothing extra needed here
                        for that part. Opt-in, default unchanged.
         """
+        if nav_icons is None:
+            nav_icons = self._cfg.nav_icons
         mo = self._mo
         cv = get_cv()
         remaining = get_remaining()
