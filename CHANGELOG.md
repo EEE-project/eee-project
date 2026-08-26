@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.10.1 - 2026-08-26
+- Fixed `_cors_safe_raw_url()` double-encoding a non-ASCII filename when
+  rewriting a GitLab raw-content URL. `ensure_file()`/`ensure_files()`
+  already percent-encode the filename before building the URL; the
+  GitLab branch was re-quoting the whole path (needed to turn `/` into
+  `%2F` for GitLab's `file_path` API parameter), which also re-encoded
+  the `%` characters already present from the first pass. Broke fetching
+  any course-material file whose name isn't plain ASCII (e.g. Cyrillic
+  PDF filenames) specifically on GitLab-hosted deployments — Codeberg's
+  raw API accepts literal `/` in its path and was never affected.
+
 ## 1.10.0 - 2026-08-24
 - `GreekConfig` is now a frozen dataclass, so a course can no longer
   accidentally mutate the shared `MODERN_GREEK`/`ANCIENT_GREEK` singletons

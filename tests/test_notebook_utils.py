@@ -3151,6 +3151,31 @@ class TestEnsureFile:
             "https://codeberg.org/api/v1/repos/EEE-project/eee-project/raw/examples/vocab.tsv?ref=main"
         )
 
+    def test_gitlab_remote_base_non_ascii_filename_not_double_encoded(self, gu_marimo, tmp_path):
+        # Regression: ensure_file() pre-quotes the filename via
+        # urllib.parse.quote() before handing the URL to
+        # _cors_safe_raw_url(), which used to re-quote the whole path for
+        # GitLab's file_path parameter -- double-encoding the '%' already
+        # in the filename's percent-encoding and 404ing on GitLab specifically
+        # (Codeberg's branch doesn't re-quote, so it never showed this bug).
+        seen = {}
+
+        def fake_urlopen(url, timeout=None):
+            seen["url"] = url
+            return _make_resp(b"%PDF-1.4 fake")
+
+        with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+            gu_marimo.ensure_file(
+                "Одиссея 1.pdf", nb_dir=tmp_path,
+                remote_base="https://gitlab.com/EEE-project/created_with_eee/-/raw/main/"
+                "ancient_greek/odyssey/2026_06_15",
+            )
+        assert seen["url"] == (
+            "https://gitlab.com/api/v4/projects/EEE-project%2Fcreated_with_eee/"
+            "repository/files/ancient_greek%2Fodyssey%2F2026_06_15%2F"
+            "%D0%9E%D0%B4%D0%B8%D1%81%D1%81%D0%B5%D1%8F%201.pdf/raw?ref=main"
+        )
+
 
 class TestEnsureFiles:
     """GreekUtils.ensure_files: concurrent ensure_file() for several filenames at once."""

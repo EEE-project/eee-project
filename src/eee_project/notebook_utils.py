@@ -216,7 +216,12 @@ def _cors_safe_raw_url(url: str) -> str:
     if m:
         owner, repo, branch, path = m.groups()
         project = urllib.parse.quote(f"{owner}/{repo}", safe="")
-        file_path = urllib.parse.quote(path, safe="")
+        # path's segments may already be percent-encoded (e.g. ensure_file()
+        # pre-quotes a non-ASCII filename before building the raw URL this
+        # function receives) -- only the '/' separators need to become %2F
+        # for GitLab's file_path parameter; re-quoting the whole path would
+        # double-encode any '%' already present.
+        file_path = path.replace("/", "%2F")
         return f"https://gitlab.com/api/v4/projects/{project}/repository/files/{file_path}/raw?ref={branch}"
 
     return url
