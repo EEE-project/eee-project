@@ -50,6 +50,7 @@ presence_label	Αποτυπώνεται η λέξη σε αυτή τη μετά�
 presence_empty_label	Δεν υπάρχουν ακόμη ελεγμένα ζεύγη λέξη × μετάφραση — συμπληρώστε τη στήλη `reflected` (yes/no) στο translation_presence.tsv.
 presence_source_label	πρωτότυπο
 presence_switch_label	Εμφάνιση πρωτοτύπου αντί της μετάφρασης
+presence_count_label	Αριθμός ερωτήσεων:
 def_prefix	Οριστ.
 indef_prefix	Αόρ.
 nouns_not_found	_Το αρχείο nouns.tsv δεν βρέθηκε — φόρτωσε αρχείο._

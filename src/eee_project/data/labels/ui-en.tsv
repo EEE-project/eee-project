@@ -50,6 +50,7 @@ presence_label	Is the word reflected in this translation?
 presence_empty_label	No reviewed word × translation pairs yet — fill in the `reflected` (yes/no) column in translation_presence.tsv.
 presence_source_label	original
 presence_switch_label	Show the original instead of the translation
+presence_count_label	Number of questions:
 def_prefix	Def.
 indef_prefix	Ind.
 nouns_not_found	_nouns.tsv not found — upload a file to begin._

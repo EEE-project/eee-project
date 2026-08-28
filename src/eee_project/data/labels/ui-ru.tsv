@@ -50,6 +50,7 @@ presence_label	Отражено ли это слово в переводе?
 presence_empty_label	Пока нет проверенных пар «слово × перевод» — заполните столбец `reflected` (yes/no) в translation_presence.tsv.
 presence_source_label	оригинал
 presence_switch_label	Показать оригинал вместо перевода
+presence_count_label	Количество вопросов:
 def_prefix	Опр.
 indef_prefix	Неопр.
 nouns_not_found	_nouns.tsv не найден — загрузите файл._
