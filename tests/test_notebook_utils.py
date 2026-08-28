@@ -1120,13 +1120,17 @@ class TestEeeTopbar:
         assert "gtag" in widget._esm
 
     def test_ga_no_back_url_returns_html(self):
+        # vstack-wrapped (not the bare widget) -- see the branch's own
+        # comment: a bare anywidget cell output doesn't reliably mount in a
+        # real WASM export, confirmed via a real browser, not unit-testable
+        # with this stub (no real DOM/mount step).
         import eee_project.notebook_utils as _nu
         if not _nu._ANYWIDGET_OK:
             pytest.skip("anywidget not installed")
         result = eee_topbar(_FormMo(), back_url="", lang="en",
                             titles="T", ga_config={"measurement_id": "G-TEST123"})
         assert result is not None
-        assert "G-TEST123" in result._esm
+        assert "G-TEST123" in result[0]._esm
 
     def test_ga_falls_back_to_plain_html_without_anywidget(self):
         import eee_project.notebook_utils as _nu
@@ -1156,13 +1160,17 @@ class TestEeeGaTracker:
     notebook with no topbar at all -- see eee_ga_tracker's own docstring."""
 
     def test_fires_ga_widget(self):
+        # vstack-wrapped (not the bare widget) -- see the function's own
+        # comment: a bare anywidget cell output doesn't reliably mount in a
+        # real WASM export, confirmed via a real browser, not unit-testable
+        # with this stub (no real DOM/mount step).
         import eee_project.notebook_utils as _nu
         if not _nu._ANYWIDGET_OK:
             pytest.skip("anywidget not installed")
-        widget = eee_ga_tracker(_FormMo(), {"measurement_id": "G-TEST123"})
-        assert widget is not None
-        assert "G-TEST123" in widget._esm
-        assert "gtag" in widget._esm
+        result = eee_ga_tracker(_FormMo(), {"measurement_id": "G-TEST123"})
+        assert result is not None
+        assert "G-TEST123" in result[0]._esm
+        assert "gtag" in result[0]._esm
 
     def test_no_ga_config_returns_none(self):
         assert eee_ga_tracker(_FormMo(), None) is None

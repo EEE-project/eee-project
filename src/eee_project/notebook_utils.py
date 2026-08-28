@@ -612,7 +612,15 @@ def eee_topbar(mo, back_url: str, lang: str, titles: "dict | str", *, style: str
         else:
             left = f'<span class="tb-back">{icon} {title}</span>'
     elif not back_url:
-        return ga_widget
+        # A cell whose last expression is a *bare* mo.ui.anywidget(...) does
+        # not reliably mount/execute in a real marimo WASM export -- the
+        # identical widget wrapped in mo.vstack([...]) does, even with
+        # nothing else in it (confirmed directly: bare widget alone fired
+        # zero GA network requests across repeated live exports; the same
+        # widget in a 1-item vstack fired gtag.js + /g/collect correctly
+        # every time). Not unit-testable (the stub mo has no real DOM/mount
+        # step) -- verified via `marimo export html-wasm` + a real browser.
+        return mo.vstack([ga_widget], gap=0) if ga_widget is not None else None
     else:
         left = f'<a class="tb-back" href="{back_url}"{_target_attr}>◀ {title}</a>'
     bar = mo.Html(f"""{_TOPBAR_CSS}
@@ -632,7 +640,12 @@ def eee_ga_tracker(mo, ga_config: "dict | None"):
     its own no-back-url short-circuit. Must be the last expression in a
     marimo cell, same as :func:`eee_topbar`.
     """
-    return _make_ga_widget(mo, ga_config)
+    # vstack-wrapped even though there's nothing else to stack -- see the
+    # identical comment on eee_topbar's own back_url="" branch, which this
+    # mirrors: a bare mo.ui.anywidget(...) cell output doesn't reliably
+    # mount/execute in a real WASM export, confirmed via a real browser.
+    widget = _make_ga_widget(mo, ga_config)
+    return mo.vstack([widget], gap=0) if widget is not None else None
 
 
 @functools.lru_cache(maxsize=32)
