@@ -884,5 +884,12 @@ def _(
     return
 
 
+@app.cell(hide_code=True)
+def _(eee, mo):
+    _ga = eee.load_ga_config("https://codeberg.org/EEE-project/eee-project/raw/branch/main/ga.json")
+    eee.eee_ga_tracker(mo, _ga)
+    return
+
+
 if __name__ == "__main__":
     app.run()

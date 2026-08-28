@@ -21,6 +21,7 @@ from eee_project.notebook_utils import (
     ANCIENT_GREEK,
     GreekUtils,
     eee_topbar,
+    eee_ga_tracker,
     parent_back_url,
     eee_hero,
     eee_card_list,
@@ -51,6 +52,7 @@ from eee_project.notebook_utils import (
     _cors_safe_raw_url,
     _fetch_url_bytes,
     _fetch_url_bytes_async,
+    _fetch_json_url,
     _UI_LABELS,
     _UI_LANGS,
     _load_ui_labels,
@@ -1149,6 +1151,26 @@ class TestEeeTopbar:
         assert "gtag" not in result.s
 
 
+class TestEeeGaTracker:
+    """A no-chrome sibling to eee_topbar's back_url="" short-circuit, for a
+    notebook with no topbar at all -- see eee_ga_tracker's own docstring."""
+
+    def test_fires_ga_widget(self):
+        import eee_project.notebook_utils as _nu
+        if not _nu._ANYWIDGET_OK:
+            pytest.skip("anywidget not installed")
+        widget = eee_ga_tracker(_FormMo(), {"measurement_id": "G-TEST123"})
+        assert widget is not None
+        assert "G-TEST123" in widget._esm
+        assert "gtag" in widget._esm
+
+    def test_no_ga_config_returns_none(self):
+        assert eee_ga_tracker(_FormMo(), None) is None
+
+    def test_missing_measurement_id_returns_none(self):
+        assert eee_ga_tracker(_FormMo(), {"other": "value"}) is None
+
+
 class TestParentBackUrl:
     """Deliberately remote-only (no local-first check) — see the function's
     own docstring: a Path(__file__).parent.parent local lookup silently
@@ -1294,6 +1316,29 @@ class TestLoadGaConfig:
     def test_none_path_missing_cwd_returns_none(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         assert load_ga_config() is None
+
+    def test_fetches_from_url(self):
+        with patch("urllib.request.urlopen", return_value=_make_resp(json.dumps(_SAMPLE_GA).encode("utf-8"))):
+            assert load_ga_config("https://example.com/ga.json") == _SAMPLE_GA
+
+    def test_url_rewrites_codeberg_before_fetch(self):
+        # Same CORS-safe rewrite ConfigStore.from_url()'s ga= URL already
+        # gets -- a WASM export's browser fetch is blocked by Codeberg's
+        # plain git-web raw endpoint (no CORS headers).
+        seen_urls = []
+
+        def fake_urlopen(url, timeout=None):
+            seen_urls.append(url)
+            return _make_resp(json.dumps(_SAMPLE_GA).encode("utf-8"))
+
+        with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+            result = load_ga_config("https://codeberg.org/EEE-project/eee-project/raw/branch/main/ga.json")
+        assert seen_urls == ["https://codeberg.org/api/v1/repos/EEE-project/eee-project/raw/ga.json?ref=main"]
+        assert result == _SAMPLE_GA
+
+    def test_url_fetch_failure_returns_none(self):
+        with patch("urllib.request.urlopen", side_effect=OSError("network down")):
+            assert load_ga_config("https://example.com/ga.json") is None
 
 
 # ──────────────────────────────────────────────────── fmt_ud_feats ──
@@ -3362,6 +3407,37 @@ class TestFetchUrlBytes:
         self._install_fake_js(monkeypatch, status=404, status_text="Not Found")
         with pytest.raises(HTTPError):
             _fetch_url_bytes("https://example.com/missing.pdf", 30)
+
+
+class TestFetchJsonUrl:
+    """_fetch_json_url: the CORS-rewrite + fetch + JSON-parse composition
+    shared by load_ga_config's URL branch. ConfigStore.from_url keeps its
+    own inline copy rather than calling this -- see _fetch_json_url's own
+    docstring for why (it swallows fetch errors; from_url's ga= fetch is
+    meant to also blank out already-fetched lessons on failure)."""
+
+    def test_fetches_and_parses(self):
+        with patch("urllib.request.urlopen", return_value=_make_resp(b'{"a": 1}')):
+            assert _fetch_json_url("https://example.com/x.json") == {"a": 1}
+
+    def test_rewrites_codeberg_url(self):
+        seen_urls = []
+
+        def fake_urlopen(url, timeout=None):
+            seen_urls.append(url)
+            return _make_resp(b'{"a": 1}')
+
+        with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+            _fetch_json_url("https://codeberg.org/EEE-project/eee-project/raw/branch/main/ga.json")
+        assert seen_urls == ["https://codeberg.org/api/v1/repos/EEE-project/eee-project/raw/ga.json?ref=main"]
+
+    def test_fetch_failure_returns_none(self):
+        with patch("urllib.request.urlopen", side_effect=OSError("network down")):
+            assert _fetch_json_url("https://example.com/x.json") is None
+
+    def test_malformed_json_returns_none(self):
+        with patch("urllib.request.urlopen", return_value=_make_resp(b"not json{{{")):
+            assert _fetch_json_url("https://example.com/x.json") is None
 
 
 class TestFetchUrlBytesAsync:

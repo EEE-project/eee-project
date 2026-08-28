@@ -17,7 +17,7 @@ from eee_project._tag_registry import register_tag_type
 from eee_project._grammar_fmt import fmt_ud_feats
 from eee_project.notebook_utils import (
     GreekUtils, GreekConfig, MODERN_GREEK, ANCIENT_GREEK,
-    eee_topbar, eee_footer, magnify_image, strip_diacritics, greek_compare,
+    eee_topbar, eee_ga_tracker, eee_footer, magnify_image, strip_diacritics, greek_compare,
     language_bridge, language_selector, save_language_selection,
     load_ga_config, ConfigStore,
     build_grc_paradigm_table, build_modern_paradigm_table, build_grc_lexicon_tabs,
@@ -28,7 +28,7 @@ from eee_project.notebook_utils import (
     _INC as increment_counter,
 )
 
-__version__ = "1.10.2"
+__version__ = "1.10.3"
 
 _UNSET = object()  # sentinel distinguishing "not provided" from explicit None
 
@@ -78,6 +78,7 @@ __all__ = [
     "MODERN_GREEK",
     "ANCIENT_GREEK",
     "eee_topbar",
+    "eee_ga_tracker",
     "eee_footer",
     "magnify_image",
     "strip_diacritics",

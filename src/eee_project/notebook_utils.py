@@ -124,32 +124,40 @@ def load_ga_config(path=None) -> "dict | None":
     Args:
         path: Pass ``__file__`` from a notebook cell to look for ``ga.json``
               next to the notebook. Pass a directory path or an explicit
-              ``ga.json`` path for other layouts. Pass ``None`` (default) to
-              search in the current working directory.
+              ``ga.json`` path for other local layouts. Pass an
+              ``http(s)://`` URL to fetch ``ga.json`` remotely instead — the
+              pattern a real deployed WASM notebook needs, since it has no
+              local filesystem to read from at runtime (see below). Pass
+              ``None`` (default) to search the current working directory.
 
     Returns a dict such as ``{"measurement_id": "G-XXXXXXXXXX"}``, or
-    ``None`` if the file is not found — GA is silently disabled.
+    ``None`` if the file is not found/fetchable — GA is silently disabled.
 
-    Example cell::
+    Example cell (local dev)::
 
         _ga = load_ga_config(__file__)
         eee_topbar(mo, back_url="...", lang=lang, titles=TITLES, ga_config=_ga)
 
-    For **local-only** use (this function read directly, no WASM/molab
-    deployment), keep ``ga.json`` out of the repository — add it to
-    ``.gitignore``. But a WASM-exported notebook has no real local
-    filesystem to read from at runtime, so :class:`ConfigStore`'s
-    ``from_url``/``from_file_or_url`` (the pattern actual course notebooks
-    use) instead *fetch* ``ga.json`` over HTTPS from the repo's own raw-
-    content URL when deployed — which only works if the file **is**
-    committed. A GA measurement ID isn't a secret (every page load exposes
-    it in plain network requests anyway), so committing it for that case is
-    correct, not an oversight. Minimal content::
+    Example cell (deployed WASM export, no navigation/index.tsv needed —
+    for that case use :class:`ConfigStore`'s ``from_url``/``from_file_or_url``
+    instead, which fetch ``ga.json`` the same way alongside real lessons)::
+
+        _ga = load_ga_config(f"{_ROOT}/ga.json")  # _ROOT: repo's raw-content URL
+
+    For **local-only** use (this function read directly off disk, no
+    WASM/molab deployment), keep ``ga.json`` out of the repository — add it
+    to ``.gitignore``. For the URL form, ``ga.json`` must be committed for
+    the fetch to succeed. A GA measurement ID isn't a secret (every page
+    load exposes it in plain network requests anyway), so committing it for
+    that case is correct, not an oversight. Minimal content::
 
         {"measurement_id": "G-XXXXXXXXXX"}
     """
     import json as _json
     from pathlib import Path as _Path
+
+    if isinstance(path, str) and path.startswith(("http://", "https://")):
+        return _fetch_json_url(path)
 
     if path is None:
         p = _Path.cwd() / "ga.json"
@@ -269,6 +277,23 @@ def _fetch_url_bytes(url: str, timeout: "int | float") -> bytes:
     import urllib.request
     with urllib.request.urlopen(url, timeout=timeout) as _resp:
         return _resp.read()
+
+
+def _fetch_json_url(url: str, timeout: "int | float" = 5) -> "dict | None":
+    """Fetch *url* (CORS-rewritten) and parse it as JSON; ``None`` on any
+    fetch/parse failure. Used by :func:`load_ga_config`'s URL branch.
+
+    :meth:`ConfigStore.from_url` fetches its own ``ga=<url>`` the same way
+    but keeps its own inline copy rather than calling this: there, a ga-fetch
+    failure is meant to also blank out already-fetched lessons (one shared
+    try/except covers both), which swallowing the error in here would break.
+    """
+    import json as _json
+
+    try:
+        return _json.loads(_fetch_url_bytes(_cors_safe_raw_url(url), timeout).decode("utf-8"))
+    except Exception:
+        return None
 
 
 async def _fetch_url_bytes_async(url: str, timeout: "int | float") -> bytes:
@@ -596,6 +621,18 @@ def eee_topbar(mo, back_url: str, lang: str, titles: "dict | str", *, style: str
   {_BADGE}
 </div>""")
     return mo.vstack([bar, ga_widget], gap=0) if ga_widget is not None else bar
+
+
+def eee_ga_tracker(mo, ga_config: "dict | None"):
+    """Fire a GA4 pageview with no visible UI, or ``None`` if GA is unset.
+
+    For a notebook with no topbar/back-link chrome at all (a standalone
+    library-usage demo, say) -- routing that case through :func:`eee_topbar`
+    would mean passing dummy ``back_url``/``lang``/``titles`` purely to reach
+    its own no-back-url short-circuit. Must be the last expression in a
+    marimo cell, same as :func:`eee_topbar`.
+    """
+    return _make_ga_widget(mo, ga_config)
 
 
 @functools.lru_cache(maxsize=32)
