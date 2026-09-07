@@ -1,25 +1,49 @@
-Case	Number	Gender	label
-Nom	Sing	Masc	Nom. Sg. m.
-Nom	Sing	Fem	Nom. Sg. f.
-Nom	Sing	Neut	Nom. Sg. n.
-Nom	Plur	Masc	Nom. Pl. m.
-Nom	Plur	Fem	Nom. Pl. f.
-Nom	Plur	Neut	Nom. Pl. n.
-Gen	Sing	Masc	Gen. Sg. m.
-Gen	Sing	Fem	Gen. Sg. f.
-Gen	Sing	Neut	Gen. Sg. n.
-Gen	Plur	Masc	Gen. Pl. m.
-Gen	Plur	Fem	Gen. Pl. f.
-Gen	Plur	Neut	Gen. Pl. n.
-Acc	Sing	Masc	Acc. Sg. m.
-Acc	Sing	Fem	Acc. Sg. f.
-Acc	Sing	Neut	Acc. Sg. n.
-Acc	Plur	Masc	Acc. Pl. m.
-Acc	Plur	Fem	Acc. Pl. f.
-Acc	Plur	Neut	Acc. Pl. n.
-Voc	Sing	Masc	Voc. Sg. m.
-Voc	Sing	Fem	Voc. Sg. f.
-Voc	Sing	Neut	Voc. Sg. n.
-Voc	Plur	Masc	Voc. Pl. m.
-Voc	Plur	Fem	Voc. Pl. f.
-Voc	Plur	Neut	Voc. Pl. n.
+Case	Number	Gender	Clitic	label
+Nom	Sing	Masc		Nom. Sg. m.
+Nom	Sing	Fem		Nom. Sg. f.
+Nom	Sing	Neut		Nom. Sg. n.
+Nom	Plur	Masc		Nom. Pl. m.
+Nom	Plur	Fem		Nom. Pl. f.
+Nom	Plur	Neut		Nom. Pl. n.
+Gen	Sing	Masc		Gen. Sg. m.
+Gen	Sing	Fem		Gen. Sg. f.
+Gen	Sing	Neut		Gen. Sg. n.
+Gen	Plur	Masc		Gen. Pl. m.
+Gen	Plur	Fem		Gen. Pl. f.
+Gen	Plur	Neut		Gen. Pl. n.
+Acc	Sing	Masc		Acc. Sg. m.
+Acc	Sing	Fem		Acc. Sg. f.
+Acc	Sing	Neut		Acc. Sg. n.
+Acc	Plur	Masc		Acc. Pl. m.
+Acc	Plur	Fem		Acc. Pl. f.
+Acc	Plur	Neut		Acc. Pl. n.
+Voc	Sing	Masc		Voc. Sg. m.
+Voc	Sing	Fem		Voc. Sg. f.
+Voc	Sing	Neut		Voc. Sg. n.
+Voc	Plur	Masc		Voc. Pl. m.
+Voc	Plur	Fem		Voc. Pl. f.
+Voc	Plur	Neut		Voc. Pl. n.
+Nom	Sing	Masc	Yes	Nom. Sg. m. Weak.
+Nom	Sing	Fem	Yes	Nom. Sg. f. Weak.
+Nom	Sing	Neut	Yes	Nom. Sg. n. Weak.
+Nom	Plur	Masc	Yes	Nom. Pl. m. Weak.
+Nom	Plur	Fem	Yes	Nom. Pl. f. Weak.
+Nom	Plur	Neut	Yes	Nom. Pl. n. Weak.
+Gen	Sing	Masc	Yes	Gen. Sg. m. Weak.
+Gen	Sing	Fem	Yes	Gen. Sg. f. Weak.
+Gen	Sing	Neut	Yes	Gen. Sg. n. Weak.
+Gen	Plur	Masc	Yes	Gen. Pl. m. Weak.
+Gen	Plur	Fem	Yes	Gen. Pl. f. Weak.
+Gen	Plur	Neut	Yes	Gen. Pl. n. Weak.
+Acc	Sing	Masc	Yes	Acc. Sg. m. Weak.
+Acc	Sing	Fem	Yes	Acc. Sg. f. Weak.
+Acc	Sing	Neut	Yes	Acc. Sg. n. Weak.
+Acc	Plur	Masc	Yes	Acc. Pl. m. Weak.
+Acc	Plur	Fem	Yes	Acc. Pl. f. Weak.
+Acc	Plur	Neut	Yes	Acc. Pl. n. Weak.
+Voc	Sing	Masc	Yes	Voc. Sg. m. Weak.
+Voc	Sing	Fem	Yes	Voc. Sg. f. Weak.
+Voc	Sing	Neut	Yes	Voc. Sg. n. Weak.
+Voc	Plur	Masc	Yes	Voc. Pl. m. Weak.
+Voc	Plur	Fem	Yes	Voc. Pl. f. Weak.
+Voc	Plur	Neut	Yes	Voc. Pl. n. Weak.

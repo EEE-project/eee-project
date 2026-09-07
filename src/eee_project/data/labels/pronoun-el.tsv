@@ -1,25 +1,49 @@
-Case	Number	Gender	label
-Nom	Sing	Masc	Ονομ. εν. αρ.
-Nom	Sing	Fem	Ονομ. εν. θηλ.
-Nom	Sing	Neut	Ονομ. εν. ουδ.
-Nom	Plur	Masc	Ονομ. πλ. αρ.
-Nom	Plur	Fem	Ονομ. πλ. θηλ.
-Nom	Plur	Neut	Ονομ. πλ. ουδ.
-Gen	Sing	Masc	Γεν. εν. αρ.
-Gen	Sing	Fem	Γεν. εν. θηλ.
-Gen	Sing	Neut	Γεν. εν. ουδ.
-Gen	Plur	Masc	Γεν. πλ. αρ.
-Gen	Plur	Fem	Γεν. πλ. θηλ.
-Gen	Plur	Neut	Γεν. πλ. ουδ.
-Acc	Sing	Masc	Αιτ. εν. αρ.
-Acc	Sing	Fem	Αιτ. εν. θηλ.
-Acc	Sing	Neut	Αιτ. εν. ουδ.
-Acc	Plur	Masc	Αιτ. πλ. αρ.
-Acc	Plur	Fem	Αιτ. πλ. θηλ.
-Acc	Plur	Neut	Αιτ. πλ. ουδ.
-Voc	Sing	Masc	Κλητ. εν. αρ.
-Voc	Sing	Fem	Κλητ. εν. θηλ.
-Voc	Sing	Neut	Κλητ. εν. ουδ.
-Voc	Plur	Masc	Κλητ. πλ. αρ.
-Voc	Plur	Fem	Κλητ. πλ. θηλ.
-Voc	Plur	Neut	Κλητ. πλ. ουδ.
+Case	Number	Gender	Clitic	label
+Nom	Sing	Masc		Ονομ. εν. αρ.
+Nom	Sing	Fem		Ονομ. εν. θηλ.
+Nom	Sing	Neut		Ονομ. εν. ουδ.
+Nom	Plur	Masc		Ονομ. πλ. αρ.
+Nom	Plur	Fem		Ονομ. πλ. θηλ.
+Nom	Plur	Neut		Ονομ. πλ. ουδ.
+Gen	Sing	Masc		Γεν. εν. αρ.
+Gen	Sing	Fem		Γεν. εν. θηλ.
+Gen	Sing	Neut		Γεν. εν. ουδ.
+Gen	Plur	Masc		Γεν. πλ. αρ.
+Gen	Plur	Fem		Γεν. πλ. θηλ.
+Gen	Plur	Neut		Γεν. πλ. ουδ.
+Acc	Sing	Masc		Αιτ. εν. αρ.
+Acc	Sing	Fem		Αιτ. εν. θηλ.
+Acc	Sing	Neut		Αιτ. εν. ουδ.
+Acc	Plur	Masc		Αιτ. πλ. αρ.
+Acc	Plur	Fem		Αιτ. πλ. θηλ.
+Acc	Plur	Neut		Αιτ. πλ. ουδ.
+Voc	Sing	Masc		Κλητ. εν. αρ.
+Voc	Sing	Fem		Κλητ. εν. θηλ.
+Voc	Sing	Neut		Κλητ. εν. ουδ.
+Voc	Plur	Masc		Κλητ. πλ. αρ.
+Voc	Plur	Fem		Κλητ. πλ. θηλ.
+Voc	Plur	Neut		Κλητ. πλ. ουδ.
+Nom	Sing	Masc	Yes	Ονομ. εν. αρ. αδύν.
+Nom	Sing	Fem	Yes	Ονομ. εν. θηλ. αδύν.
+Nom	Sing	Neut	Yes	Ονομ. εν. ουδ. αδύν.
+Nom	Plur	Masc	Yes	Ονομ. πλ. αρ. αδύν.
+Nom	Plur	Fem	Yes	Ονομ. πλ. θηλ. αδύν.
+Nom	Plur	Neut	Yes	Ονομ. πλ. ουδ. αδύν.
+Gen	Sing	Masc	Yes	Γεν. εν. αρ. αδύν.
+Gen	Sing	Fem	Yes	Γεν. εν. θηλ. αδύν.
+Gen	Sing	Neut	Yes	Γεν. εν. ουδ. αδύν.
+Gen	Plur	Masc	Yes	Γεν. πλ. αρ. αδύν.
+Gen	Plur	Fem	Yes	Γεν. πλ. θηλ. αδύν.
+Gen	Plur	Neut	Yes	Γεν. πλ. ουδ. αδύν.
+Acc	Sing	Masc	Yes	Αιτ. εν. αρ. αδύν.
+Acc	Sing	Fem	Yes	Αιτ. εν. θηλ. αδύν.
+Acc	Sing	Neut	Yes	Αιτ. εν. ουδ. αδύν.
+Acc	Plur	Masc	Yes	Αιτ. πλ. αρ. αδύν.
+Acc	Plur	Fem	Yes	Αιτ. πλ. θηλ. αδύν.
+Acc	Plur	Neut	Yes	Αιτ. πλ. ουδ. αδύν.
+Voc	Sing	Masc	Yes	Κλητ. εν. αρ. αδύν.
+Voc	Sing	Fem	Yes	Κλητ. εν. θηλ. αδύν.
+Voc	Sing	Neut	Yes	Κλητ. εν. ουδ. αδύν.
+Voc	Plur	Masc	Yes	Κλητ. πλ. αρ. αδύν.
+Voc	Plur	Fem	Yes	Κλητ. πλ. θηλ. αδύν.
+Voc	Plur	Neut	Yes	Κλητ. πλ. ουδ. αδύν.

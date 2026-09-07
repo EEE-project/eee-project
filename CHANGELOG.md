@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.11.0 - 2026-09-07
+- Modern Greek pronoun labels (`data/labels/pronoun-{en,ru,el}.tsv`) now cover
+  the weak/clitic forms (UD `Clitic=Yes`, e.g. weak τον vs. strong αυτόν) that
+  `modern-greek-backend-eee`'s `get_tags("pronoun")` enumerates as of its
+  1.1.0 release — previously these rows had no matching label and
+  `get_slot_templates()` fell back to the raw internal tag string
+  (e.g. `Gen|Sing|Masc|Clitic`) instead of a real label.
+
 ## 1.10.1 - 2026-08-26
 - Fixed `_cors_safe_raw_url()` double-encoding a non-ASCII filename when
   rewriting a GitLab raw-content URL. `ensure_file()`/`ensure_files()`

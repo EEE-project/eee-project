@@ -1,25 +1,49 @@
-Case	Number	Gender	label
-Nom	Sing	Masc	Именит. ед. м.
-Nom	Sing	Fem	Именит. ед. ж.
-Nom	Sing	Neut	Именит. ед. с.
-Nom	Plur	Masc	Именит. мн. м.
-Nom	Plur	Fem	Именит. мн. ж.
-Nom	Plur	Neut	Именит. мн. с.
-Gen	Sing	Masc	Родит. ед. м.
-Gen	Sing	Fem	Родит. ед. ж.
-Gen	Sing	Neut	Родит. ед. с.
-Gen	Plur	Masc	Родит. мн. м.
-Gen	Plur	Fem	Родит. мн. ж.
-Gen	Plur	Neut	Родит. мн. с.
-Acc	Sing	Masc	Вин. ед. м.
-Acc	Sing	Fem	Вин. ед. ж.
-Acc	Sing	Neut	Вин. ед. с.
-Acc	Plur	Masc	Вин. мн. м.
-Acc	Plur	Fem	Вин. мн. ж.
-Acc	Plur	Neut	Вин. мн. с.
-Voc	Sing	Masc	Зват. ед. м.
-Voc	Sing	Fem	Зват. ед. ж.
-Voc	Sing	Neut	Зват. ед. с.
-Voc	Plur	Masc	Зват. мн. м.
-Voc	Plur	Fem	Зват. мн. ж.
-Voc	Plur	Neut	Зват. мн. с.
+Case	Number	Gender	Clitic	label
+Nom	Sing	Masc		Именит. ед. м.
+Nom	Sing	Fem		Именит. ед. ж.
+Nom	Sing	Neut		Именит. ед. с.
+Nom	Plur	Masc		Именит. мн. м.
+Nom	Plur	Fem		Именит. мн. ж.
+Nom	Plur	Neut		Именит. мн. с.
+Gen	Sing	Masc		Родит. ед. м.
+Gen	Sing	Fem		Родит. ед. ж.
+Gen	Sing	Neut		Родит. ед. с.
+Gen	Plur	Masc		Родит. мн. м.
+Gen	Plur	Fem		Родит. мн. ж.
+Gen	Plur	Neut		Родит. мн. с.
+Acc	Sing	Masc		Вин. ед. м.
+Acc	Sing	Fem		Вин. ед. ж.
+Acc	Sing	Neut		Вин. ед. с.
+Acc	Plur	Masc		Вин. мн. м.
+Acc	Plur	Fem		Вин. мн. ж.
+Acc	Plur	Neut		Вин. мн. с.
+Voc	Sing	Masc		Зват. ед. м.
+Voc	Sing	Fem		Зват. ед. ж.
+Voc	Sing	Neut		Зват. ед. с.
+Voc	Plur	Masc		Зват. мн. м.
+Voc	Plur	Fem		Зват. мн. ж.
+Voc	Plur	Neut		Зват. мн. с.
+Nom	Sing	Masc	Yes	Именит. ед. м. слаб.
+Nom	Sing	Fem	Yes	Именит. ед. ж. слаб.
+Nom	Sing	Neut	Yes	Именит. ед. с. слаб.
+Nom	Plur	Masc	Yes	Именит. мн. м. слаб.
+Nom	Plur	Fem	Yes	Именит. мн. ж. слаб.
+Nom	Plur	Neut	Yes	Именит. мн. с. слаб.
+Gen	Sing	Masc	Yes	Родит. ед. м. слаб.
+Gen	Sing	Fem	Yes	Родит. ед. ж. слаб.
+Gen	Sing	Neut	Yes	Родит. ед. с. слаб.
+Gen	Plur	Masc	Yes	Родит. мн. м. слаб.
+Gen	Plur	Fem	Yes	Родит. мн. ж. слаб.
+Gen	Plur	Neut	Yes	Родит. мн. с. слаб.
+Acc	Sing	Masc	Yes	Вин. ед. м. слаб.
+Acc	Sing	Fem	Yes	Вин. ед. ж. слаб.
+Acc	Sing	Neut	Yes	Вин. ед. с. слаб.
+Acc	Plur	Masc	Yes	Вин. мн. м. слаб.
+Acc	Plur	Fem	Yes	Вин. мн. ж. слаб.
+Acc	Plur	Neut	Yes	Вин. мн. с. слаб.
+Voc	Sing	Masc	Yes	Зват. ед. м. слаб.
+Voc	Sing	Fem	Yes	Зват. ед. ж. слаб.
+Voc	Sing	Neut	Yes	Зват. ед. с. слаб.
+Voc	Plur	Masc	Yes	Зват. мн. м. слаб.
+Voc	Plur	Fem	Yes	Зват. мн. ж. слаб.
+Voc	Plur	Neut	Yes	Зват. мн. с. слаб.

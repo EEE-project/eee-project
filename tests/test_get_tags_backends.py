@@ -181,6 +181,19 @@ def test_modern_greek_noun_no_dative():
     assert "Dat" not in cases
 
 
+def test_modern_greek_pronoun_tags_all_have_label():
+    """Modern Greek pronoun tags -- including the Clitic=Yes weak-form rows --
+    all resolve to a label. Not parametrized over ALL_BACKENDS like the noun/adj
+    tests above: ancient-greek's pronoun tags come from its own separate
+    pronoun-tags.tsv (Case x Number x Person, no Gender), an entirely different
+    feature vocabulary than eee_project.data.labels/pronoun-*.tsv, so a shared
+    cross-backend check does not apply here."""
+    labels = _labels("pronoun")
+    for row in ModernGreekBackend().get_tags("pronoun"):
+        key = _tag_feats(row)
+        assert key in labels, f"modern-greek pronoun tag has no label: {dict(row)}"
+
+
 def test_all_backends_noun_labels_are_nonempty_strings():
     """Label lookup returns a non-empty string for every tag in every backend."""
     noun_labels = _labels("noun")
