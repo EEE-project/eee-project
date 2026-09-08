@@ -195,6 +195,15 @@ def _raw_base_from_url(url: str) -> str:
     return url.rsplit("/", 1)[0]
 
 
+def _parse_codeberg_raw_url(url: str) -> "tuple[str, str, str, str] | None":
+    """Parse a Codeberg raw-content URL into (owner, repo, branch, path).
+
+    Returns None if the URL is not Codeberg-shaped.
+    """
+    m = _re.match(r"^https://codeberg\.org/([^/]+)/([^/]+)/raw/branch/([^/]+)/(.+)$", url)
+    return m.groups() if m else None
+
+
 def _cors_safe_raw_url(url: str) -> str:
     """Rewrite a git-forge raw-content URL to a form that sends CORS headers.
 
@@ -211,16 +220,23 @@ def _cors_safe_raw_url(url: str) -> str:
     unchanged. Only called at an actual network-fetch site (never for a
     human-facing click-through link like :func:`magnify_image`'s
     ``raw_base``, which deliberately keeps the git-web form).
+
+    First rewrites the URL to match the actual serving host (if not Codeberg),
+    then applies CORS-safe transformations on top.
     """
-    import re
     import urllib.parse
 
-    m = re.match(r"^https://codeberg\.org/([^/]+)/([^/]+)/raw/branch/([^/]+)/(.+)$", url)
-    if m:
-        owner, repo, branch, path = m.groups()
+    # Rehost to the actual serving host first, if not already there
+    url = _rehost_raw_url(url)
+
+    # Codeberg raw → CORS-safe API form
+    parts = _parse_codeberg_raw_url(url)
+    if parts:
+        owner, repo, branch, path = parts
         return f"https://codeberg.org/api/v1/repos/{owner}/{repo}/raw/{path}?ref={branch}"
 
-    m = re.match(r"^https://gitlab\.com/([^/]+)/([^/]+)/-/raw/([^/]+)/(.+)$", url)
+    # GitLab raw → CORS-safe API form
+    m = _re.match(r"^https://gitlab\.com/([^/]+)/([^/]+)/-/raw/([^/]+)/(.+)$", url)
     if m:
         owner, repo, branch, path = m.groups()
         project = urllib.parse.quote(f"{owner}/{repo}", safe="")
@@ -233,6 +249,28 @@ def _cors_safe_raw_url(url: str) -> str:
         return f"https://gitlab.com/api/v4/projects/{project}/repository/files/{file_path}/raw?ref={branch}"
 
     return url
+
+
+def _rehost_raw_url(url: str) -> str:
+    """Rewrite a Codeberg-shaped raw-content URL to whichever host is
+    actually serving this page, if not Codeberg. Unrecognized URLs (already
+    GitHub/GitLab-shaped, or anything else) pass through unchanged.
+
+    ``owner``/``repo`` are wildcarded, not hardcoded to any one repo -- this
+    is what makes the rewrite apply identically to created_with_eee's own
+    fetches and to any second repo (e.g. greek-knowledge-eee) a notebook
+    fetches from, with no per-repo code path to add later.
+    """
+    parts = _parse_codeberg_raw_url(url)
+    if not parts:
+        return url
+    owner, repo, branch, path = parts
+    host_base = _source_host_base()
+    if host_base.startswith("https://github.com"):
+        return f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}"
+    if host_base.startswith("https://gitlab.com"):
+        return f"https://gitlab.com/{owner}/{repo}/-/raw/{branch}/{path}"
+    return url  # already Codeberg -- _cors_safe_raw_url handles CORS-safety next
 
 
 def _fetch_url_bytes(url: str, timeout: "int | float") -> bytes:
@@ -831,6 +869,7 @@ def eee_card_list(mo, cfg: "ConfigStore", lang: str, *, lang_fallback: str = "el
     return mo.Html(_CARD_LIST_CSS + "\n".join(cards))
 
 
+@functools.lru_cache(maxsize=1)
 def _source_host_base() -> str:
     """Return the EEE org URL for whichever host is actually serving this page.
 
@@ -842,6 +881,9 @@ def _source_host_base() -> str:
     global scope and still exposes ``location``. Falls back to Codeberg
     (the canonical dev host) for local ``marimo edit``/``marimo run`` and
     any other environment without that bridge.
+
+    Cached with maxsize=1 since the hostname is invariant for the life of
+    the running page/kernel.
     """
     try:
         from js import self as _self

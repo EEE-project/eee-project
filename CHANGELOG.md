@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.11.1 - 2026-09-08
+- `ensure_file()` and `ensure_files()` now fetch course materials from whichever
+  host is actually serving the page (Codeberg, GitHub, or GitLab), instead of
+  always from Codeberg. This makes course deployments more resilient to hosting
+  changes — a course can move from Codeberg to GitHub without breaking any file
+  fetches, and courses deployed to multiple hosts automatically fetch from the
+  correct one, with no code changes needed.
+
 ## 1.11.0 - 2026-09-07
 - Modern Greek pronoun labels (`data/labels/pronoun-{en,ru,el}.tsv`) now cover
   the weak/clitic forms (UD `Clitic=Yes`, e.g. weak τον vs. strong αυτόν) that
