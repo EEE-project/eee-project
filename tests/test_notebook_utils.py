@@ -50,6 +50,7 @@ from eee_project.notebook_utils import (
     _PARA_ESM,
     _ITEXT_ESM,
     _cors_safe_raw_url,
+    _rehost_raw_url,
     _fetch_url_bytes,
     _fetch_url_bytes_async,
     _fetch_json_url,
@@ -1663,10 +1664,12 @@ class TestSourceHostBase:
         monkeypatch.setitem(sys.modules, "js", fake_js)
 
     def test_github_pages_host(self, monkeypatch):
+        _source_host_base.cache_clear()
         self._install_fake_js(monkeypatch, "eee-project.github.io")
         assert _source_host_base() == "https://github.com/EEE-project"
 
     def test_gitlab_pages_host(self, monkeypatch):
+        _source_host_base.cache_clear()
         self._install_fake_js(monkeypatch, "eee-project.gitlab.io")
         assert _source_host_base() == "https://gitlab.com/EEE-project"
 
@@ -1674,23 +1677,28 @@ class TestSourceHostBase:
         # A split course lives on the same eee-project.gitlab.io domain,
         # just a different path -- hostname-only detection must not need
         # special-casing per split project.
+        _source_host_base.cache_clear()
         self._install_fake_js(monkeypatch, "eee-project.gitlab.io")
         assert _source_host_base() == "https://gitlab.com/EEE-project"
 
     def test_codeberg_pages_host(self, monkeypatch):
+        _source_host_base.cache_clear()
         self._install_fake_js(monkeypatch, "eee-project.codeberg.page")
         assert _source_host_base() == "https://codeberg.org/EEE-project"
 
     def test_no_js_module_falls_back_to_codeberg(self, monkeypatch):
+        _source_host_base.cache_clear()
         import sys
         monkeypatch.delitem(sys.modules, "js", raising=False)
         assert _source_host_base() == "https://codeberg.org/EEE-project"
 
     def test_unrecognized_hostname_falls_back_to_codeberg(self, monkeypatch):
+        _source_host_base.cache_clear()
         self._install_fake_js(monkeypatch, "localhost")
         assert _source_host_base() == "https://codeberg.org/EEE-project"
 
     def test_eee_footer_links_to_detected_host(self, monkeypatch):
+        _source_host_base.cache_clear()
         self._install_fake_js(monkeypatch, "eee-project.github.io")
         result = eee_footer(_StubHtmlMo(), lang="en")
         assert 'href="https://github.com/EEE-project"' in result.s
@@ -1840,6 +1848,7 @@ class TestConfigStore:
         # Codeberg API form, not the plain git-web raw URL, since from_url()
         # is the exact "molab pattern" that also runs under a self-hosted
         # WASM export where CORS is enforced.
+        _source_host_base.cache_clear()
         _tsv = "nb_id\ticon\tgreek\tlabel\ttitle\tdesc\tindex_url\n"
         seen_urls = []
 
@@ -3189,6 +3198,7 @@ class TestEnsureFile:
         # API form, not the plain git-web raw URL (which sends no
         # Access-Control-Allow-Origin header and is silently blocked by a
         # browser fetch inside a self-hosted WASM export).
+        _source_host_base.cache_clear()
         seen = {}
 
         def fake_urlopen(url, timeout=None):
@@ -3284,6 +3294,7 @@ class TestEnsureFiles:
 
     def test_codeberg_remote_base_rewritten_before_fetch(self, gu_marimo, tmp_path):
         import asyncio
+        _source_host_base.cache_clear()
         seen = []
 
         def fake_urlopen(url, timeout=None):
@@ -3304,11 +3315,13 @@ class TestCorsSafeRawUrl:
     """_cors_safe_raw_url: rewrite CORS-blind git-forge raw URLs at fetch time."""
 
     def test_codeberg_raw_branch_url_rewritten(self):
+        _source_host_base.cache_clear()
         assert _cors_safe_raw_url(
             "https://codeberg.org/EEE-project/eee-project/raw/branch/main/examples/vocab.tsv"
         ) == "https://codeberg.org/api/v1/repos/EEE-project/eee-project/raw/examples/vocab.tsv?ref=main"
 
     def test_codeberg_nested_path_preserved(self):
+        _source_host_base.cache_clear()
         assert _cors_safe_raw_url(
             "https://codeberg.org/EEE-project/created_with_eee/raw/branch/main/"
             "ancient_greek/palaestra/index.tsv"
@@ -3318,11 +3331,13 @@ class TestCorsSafeRawUrl:
         )
 
     def test_codeberg_non_main_branch_preserved(self):
+        _source_host_base.cache_clear()
         assert _cors_safe_raw_url(
             "https://codeberg.org/EEE-project/eee-project/raw/branch/dev/x.tsv"
         ) == "https://codeberg.org/api/v1/repos/EEE-project/eee-project/raw/x.tsv?ref=dev"
 
     def test_gitlab_raw_url_rewritten_with_percent_encoded_path(self):
+        _source_host_base.cache_clear()
         assert _cors_safe_raw_url(
             "https://gitlab.com/EEE-project/created_with_eee/-/raw/main/"
             "ancient_greek/palaestra/index.tsv"
@@ -3332,6 +3347,7 @@ class TestCorsSafeRawUrl:
         )
 
     def test_gitlab_flat_filename(self):
+        _source_host_base.cache_clear()
         assert _cors_safe_raw_url(
             "https://gitlab.com/EEE-project/eee-project/-/raw/main/README.md"
         ) == (
@@ -3341,17 +3357,155 @@ class TestCorsSafeRawUrl:
 
     def test_github_raw_url_unchanged(self):
         # raw.githubusercontent.com already sends Access-Control-Allow-Origin.
+        _source_host_base.cache_clear()
         url = "https://raw.githubusercontent.com/EEE-project/eee-project/main/README.md"
         assert _cors_safe_raw_url(url) == url
 
     def test_already_codeberg_api_form_unchanged(self):
         # Idempotent: a URL already in the CORS-safe form must not be rewritten again.
+        _source_host_base.cache_clear()
         url = "https://codeberg.org/api/v1/repos/EEE-project/eee-project/raw/examples/vocab.tsv"
         assert _cors_safe_raw_url(url) == url
 
     def test_unrelated_url_unchanged(self):
+        _source_host_base.cache_clear()
         url = "https://example.com/some/file.tsv"
         assert _cors_safe_raw_url(url) == url
+
+    def test_github_host_rewrites_codeberg_then_cors(self, monkeypatch):
+        # _cors_safe_raw_url now rehosts Codeberg URLs internally, then applies CORS transform.
+        # GitHub raw URLs already have CORS headers, so no API transform needed.
+        _source_host_base.cache_clear()
+        TestSourceHostBase._install_fake_js(monkeypatch, "eee-project.github.io")
+        assert _cors_safe_raw_url(
+            "https://codeberg.org/EEE-project/greek-knowledge-eee/raw/branch/main/vocab.tsv"
+        ) == "https://raw.githubusercontent.com/EEE-project/greek-knowledge-eee/main/vocab.tsv"
+
+    def test_gitlab_host_rewrites_codeberg_then_cors(self, monkeypatch):
+        # _cors_safe_raw_url now rehosts Codeberg URLs to GitLab form, then applies GitLab API CORS transform.
+        _source_host_base.cache_clear()
+        TestSourceHostBase._install_fake_js(monkeypatch, "eee-project.gitlab.io")
+        assert _cors_safe_raw_url(
+            "https://codeberg.org/EEE-project/greek-knowledge-eee/raw/branch/main/vocab.tsv"
+        ) == (
+            "https://gitlab.com/api/v4/projects/EEE-project%2Fgreek-knowledge-eee/"
+            "repository/files/vocab.tsv/raw?ref=main"
+        )
+
+    def test_codeberg_host_no_rehost_still_cors_transforms(self, monkeypatch):
+        # When running on Codeberg, rehost is a no-op, but CORS transform still applies.
+        _source_host_base.cache_clear()
+        TestSourceHostBase._install_fake_js(monkeypatch, "eee-project.codeberg.page")
+        assert _cors_safe_raw_url(
+            "https://codeberg.org/EEE-project/eee-project/raw/branch/main/README.md"
+        ) == "https://codeberg.org/api/v1/repos/EEE-project/eee-project/raw/README.md?ref=main"
+
+
+class TestRehostRawUrl:
+    """_rehost_raw_url: rewrite a Codeberg-shaped raw URL to whichever host
+    is actually serving the page -- see the host-resilience design doc."""
+
+    _CODEBERG_URL = (
+        "https://codeberg.org/EEE-project/greek-knowledge-eee/raw/branch/main/"
+        "texts/odyssey/translations_en.md"
+    )
+
+    def test_github_host_rewrites_to_raw_githubusercontent(self, monkeypatch):
+        _source_host_base.cache_clear()
+        TestSourceHostBase._install_fake_js(monkeypatch, "eee-project.github.io")
+        assert _rehost_raw_url(self._CODEBERG_URL) == (
+            "https://raw.githubusercontent.com/EEE-project/greek-knowledge-eee/"
+            "main/texts/odyssey/translations_en.md"
+        )
+
+    def test_gitlab_host_rewrites_to_gitlab_raw(self, monkeypatch):
+        _source_host_base.cache_clear()
+        TestSourceHostBase._install_fake_js(monkeypatch, "eee-project.gitlab.io")
+        assert _rehost_raw_url(self._CODEBERG_URL) == (
+            "https://gitlab.com/EEE-project/greek-knowledge-eee/-/raw/main/"
+            "texts/odyssey/translations_en.md"
+        )
+
+    def test_codeberg_host_unchanged(self, monkeypatch):
+        _source_host_base.cache_clear()
+        TestSourceHostBase._install_fake_js(monkeypatch, "eee-project.codeberg.page")
+        assert _rehost_raw_url(self._CODEBERG_URL) == self._CODEBERG_URL
+
+    def test_local_dev_fallback_unchanged(self, monkeypatch):
+        _source_host_base.cache_clear()
+        import sys
+        monkeypatch.delitem(sys.modules, "js", raising=False)
+        assert _rehost_raw_url(self._CODEBERG_URL) == self._CODEBERG_URL
+
+    def test_non_codeberg_shaped_url_passes_through(self, monkeypatch):
+        _source_host_base.cache_clear()
+        TestSourceHostBase._install_fake_js(monkeypatch, "eee-project.github.io")
+        url = "https://raw.githubusercontent.com/EEE-project/eee-project/main/README.md"
+        assert _rehost_raw_url(url) == url
+
+    def test_non_ancient_greek_repo_also_works(self, monkeypatch):
+        # Confirms owner/repo are genuinely wildcarded, not hardcoded to
+        # created_with_eee -- greek-knowledge-eee (or any future repo) gets
+        # the identical treatment with no repo-specific code path.
+        _source_host_base.cache_clear()
+        TestSourceHostBase._install_fake_js(monkeypatch, "eee-project.gitlab.io")
+        url = "https://codeberg.org/EEE-project/created_with_eee/raw/branch/main/greek.md"
+        assert _rehost_raw_url(url) == (
+            "https://gitlab.com/EEE-project/created_with_eee/-/raw/main/greek.md"
+        )
+
+    def test_ensure_file_integration_github_host(self, gu_marimo, tmp_path, monkeypatch):
+        # Integration test: ensure_file wiring calls _rehost_raw_url before fetch,
+        # and the rewritten URL is actually used, not the original Codeberg one.
+        _source_host_base.cache_clear()
+        TestSourceHostBase._install_fake_js(monkeypatch, "eee-project.github.io")
+        seen = {}
+
+        def fake_urlopen(url, timeout=None):
+            seen["url"] = url
+            return _make_resp(b"fetched")
+
+        with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+            result = gu_marimo.ensure_file(
+                "vocab.tsv",
+                nb_dir=tmp_path,
+                remote_base="https://codeberg.org/EEE-project/greek-knowledge-eee/raw/branch/main/texts",
+            )
+        assert result == tmp_path / "vocab.tsv"
+        # URL must be rewritten to raw.githubusercontent.com (GitHub), not Codeberg
+        assert "raw.githubusercontent.com" in seen["url"]
+        assert "EEE-project/greek-knowledge-eee" in seen["url"]
+        assert "codeberg.org" not in seen["url"]
+
+    def test_ensure_files_integration_gitlab_host(self, gu_marimo, tmp_path, monkeypatch):
+        # Integration test: ensure_files (async) wiring calls _rehost_raw_url before fetch.
+        # After _rehost_raw_url rewrites to gitlab.com format, _cors_safe_raw_url
+        # converts it to the GitLab API form for CORS safety.
+        import asyncio
+
+        _source_host_base.cache_clear()
+        TestSourceHostBase._install_fake_js(monkeypatch, "eee-project.gitlab.io")
+        seen = []
+
+        def fake_urlopen(url, timeout=None):
+            seen.append(url)
+            return _make_resp(b"fetched")
+
+        with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+            result = asyncio.run(gu_marimo.ensure_files(
+                "vocab.tsv", "greek.md",
+                nb_dir=tmp_path,
+                remote_base="https://codeberg.org/EEE-project/created_with_eee/raw/branch/main/materials",
+            ))
+        assert result["vocab.tsv"] == tmp_path / "vocab.tsv"
+        assert result["greek.md"] == tmp_path / "greek.md"
+        # Both URLs must be rewritten to gitlab.com (GitLab API form after CORS transform),
+        # not Codeberg
+        assert len(seen) == 2
+        for url in seen:
+            assert "gitlab.com" in url
+            assert "api/v4" in url  # CORS-safe form
+            assert "codeberg.org" not in url
 
 
 class TestFetchUrlBytes:
@@ -3429,6 +3583,7 @@ class TestFetchJsonUrl:
             assert _fetch_json_url("https://example.com/x.json") == {"a": 1}
 
     def test_rewrites_codeberg_url(self):
+        _source_host_base.cache_clear()
         seen_urls = []
 
         def fake_urlopen(url, timeout=None):
@@ -5704,6 +5859,28 @@ class TestDiacriticsEsmPasteFix:
 # ──────────────────────────────── ConfigStore additions ──
 
 class TestConfigStoreAdditional:
+    def test_from_url_github_host_rewrites_fetch_url(self, monkeypatch):
+        # Verify ConfigStore.from_url() benefits from host-rewriting: when served from
+        # GitHub, a Codeberg-shaped index URL is rewritten to GitHub before fetch.
+        _source_host_base.cache_clear()
+        TestSourceHostBase._install_fake_js(monkeypatch, "eee-project.github.io")
+        seen = []
+
+        def fake_urlopen(url, timeout=None):
+            seen.append(url)
+            return _make_resp(b"nb_id\ticon\tgreek\tlabel\ttitle\tdesc\tindex_url\n")
+
+        with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+            cfg = ConfigStore.from_url(
+                "https://codeberg.org/EEE-project/created_with_eee/raw/branch/main/index.tsv"
+            )
+        assert cfg.lessons() == []  # No lessons (empty TSV after header)
+        # Verify the URL was rewritten from Codeberg to raw.githubusercontent.com before fetching
+        assert len(seen) == 1
+        assert "raw.githubusercontent.com" in seen[0]
+        assert "EEE-project/created_with_eee" in seen[0]
+        assert "codeberg.org" not in seen[0]
+
     def test_from_url_exception_empties_lessons(self):
         with patch("urllib.request.urlopen", side_effect=Exception("timeout")):
             cfg = ConfigStore.from_url("https://example.com/index.tsv")
