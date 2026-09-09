@@ -6577,6 +6577,19 @@ _GRC_LEX_PERIOD = {
     "unimorph": "Koine / NT",
     "byzantine": "Byzantine Greek · 4th–15th c. CE",
 }
+# Short label for a real mo.ui.dropdown's options (see grc_period_options) --
+# the full name/dates above stay in the rendered table's own header/caption.
+# lxx and unimorph deliberately share "Koine": the two are told apart by
+# their table's own caption text, not by the dropdown label.
+_GRC_LEX_PERIOD_SHORT = {
+    "homer":    "Epic",
+    "lsj":      "Attic",
+    "lxx":      "Koine",
+    "morphgnt": "NT",
+    "modern":   "Modern",
+    "unimorph": "Koine",
+    "byzantine": "Byzantine",
+}
 # Tab caption — the backend/lexicon detail (the secondary "comment" under the buttons).
 _GRC_LEX_DESCR = {
     "homer":    "homer lexicon · 2,335 stems · Epic/Ionic",
@@ -7219,6 +7232,109 @@ def build_grc_lexicon_tabs(
         return f'<div>{style}{radios}{widget}{descrs}{panels}</div>'
 
     return build_lexicon_tabs
+
+
+def build_grc_period_tables(
+    ag_backend: Any,
+    um_backend: Any,
+    *,
+    lexicons: "dict[str, Any]",
+    el_backend: "Any | None" = None,
+    lang: str = "ru",
+    require_lexicon: "str | None" = None,
+) -> Any:
+    """Return a ``build_period_tables(w)`` closure -- same lexicon/period
+    resolution as :func:`build_grc_lexicon_tabs` (same arguments, same
+    ``require_lexicon``/Modern-rung/error-isolation semantics), but returns
+    the raw ``[(period_key, table_html), ...]`` list instead of a single
+    HTML blob with a CSS-only radio/details picker baked in.
+
+    Use this when you want a real ``mo.ui.dropdown`` for period selection
+    (a genuine browser ``<select>``, which correctly closes on pick) rather
+    than build_grc_lexicon_tabs's own picker -- pair with
+    :func:`grc_period_options` (build the dropdown's ``options=``) and
+    :func:`render_grc_period_table` (render the chosen period, in a second
+    cell reacting to the dropdown's value). Returns ``None`` when no
+    lexicon attests the exact form (same "hide entirely" semantics as
+    build_grc_lexicon_tabs).
+    """
+    _build_paradigm = build_grc_paradigm_table(ag_backend, um_backend, lang=lang)
+    _build_modern = (build_modern_paradigm_table(el_backend, lang=lang)
+                     if el_backend is not None else None)
+
+    def _strip_cap(h: str) -> str:
+        return _re.sub(r'<caption[^>]*>.*?</caption>', '', h)
+
+    def build_period_tables(w: dict) -> "list[tuple[str, str]] | None":
+        _req_table = None
+        if require_lexicon is not None:
+            _req_backend = lexicons.get(require_lexicon)
+            if _req_backend is None:
+                return None
+            try:
+                _req_table = _build_paradigm(w, _backend=_req_backend, hide_if_absent=True)
+            except Exception:
+                _req_table = None
+            if not _req_table:
+                return None
+
+        tag = w.get("lexicon_tag", "")
+        available = [(n, b) for n, b in lexicons.items()
+                     if f'"{n}"' in tag and n != require_lexicon]
+
+        tables = []
+        if _req_table:
+            tables.append((require_lexicon, _strip_cap(_req_table)))
+        for name, backend in available:
+            tbl = _build_paradigm(w, _backend=backend, hide_if_absent=True)
+            if tbl:
+                tables.append((name, _strip_cap(tbl)))
+
+        if len(tables) == 0:
+            raw = _build_paradigm(w, hide_if_absent=True) or ""
+            if "unimorph" not in raw:
+                return None
+            tables.append(("unimorph", _strip_cap(raw)))
+
+        if _build_modern is not None:
+            try:
+                m = _build_modern(w, hide_if_absent=True)
+            except Exception:
+                m = None
+            if m:
+                tables.append(("modern", _strip_cap(m)))
+
+        return tables
+
+    return build_period_tables
+
+
+def grc_period_options(tables: "list[tuple[str, str]]") -> "dict[str, str]":
+    """Display-label -> period-key options for a real
+    ``mo.ui.dropdown(options=grc_period_options(tables), ...)``, from
+    :func:`build_grc_period_tables`'s ``tables`` result. Short labels
+    (``_GRC_LEX_PERIOD_SHORT``) keep the dropdown compact -- the full
+    name/dates render in :func:`render_grc_period_table`'s own output."""
+    return {_GRC_LEX_PERIOD_SHORT.get(n, n): n for n, _ in tables}
+
+
+def render_grc_period_table(tables: "list[tuple[str, str]]", period: "str | None" = None) -> str:
+    """Render one period's header + description + table from *tables* (a
+    :func:`build_grc_period_tables` result). *period* is a period key (a
+    real ``mo.ui.dropdown``'s ``.value``, built from
+    :func:`grc_period_options`); falls back to *tables*' first entry when
+    *period* is ``None`` or not present in *tables* (e.g. a stale value
+    left over from a previously-selected word with different periods)."""
+    if not tables:
+        return ""
+    _by_key = dict(tables)
+    if period not in _by_key:
+        period = tables[0][0]
+    _DSTYLE = "font-size:.72em;color:#9ca3af;margin-bottom:5px"
+    _HDR_ST = "font-size:.82em;color:#374151;font-weight:600;margin-top:10px;margin-bottom:1px"
+    hdr = f'<div style="{_HDR_ST}">{_GRC_LEX_PERIOD.get(period, period)}</div>'
+    dsc = f'<div style="{_DSTYLE}">{_GRC_LEX_DESCR.get(period, "")}</div>'
+    return f"<div>{hdr}{dsc}{_by_key[period]}</div>"
 
 
 def norm_grc_surface(s: str) -> str:

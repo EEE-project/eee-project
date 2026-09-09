@@ -35,6 +35,9 @@ from eee_project.notebook_utils import (
     build_grc_paradigm_table,
     build_modern_paradigm_table,
     build_grc_lexicon_tabs,
+    build_grc_period_tables,
+    grc_period_options,
+    render_grc_period_table,
     make_paradigm_form,
     interactive_text,
     _InteractiveTextWidget,
@@ -375,6 +378,118 @@ class TestRequireLexicon:
              "lexicon_tag": 'ancient-greek["homer"]'}
         tabs = build_grc_lexicon_tabs(ag, um, lexicons={"homer": ag}, require_lexicon="nonexistent")
         assert tabs(w) is None
+
+
+# ────────── build_grc_period_tables / grc_period_options / render_grc_period_table ──
+# Data-returning siblings of build_grc_lexicon_tabs, for callers that want a
+# real mo.ui.dropdown (native <select>, correctly closes on pick) instead of
+# its CSS-only radio/details picker -- see each function's own docstring.
+
+class TestBuildGrcPeriodTables:
+    def _backends(self):
+        from ancient_greek_backend_eee import AncientGreekBackend
+        from unimorph_backend_eee import UniMorphBackend
+        return AncientGreekBackend(lexicons=["homer"]), UniMorphBackend(language="grc")
+
+    def test_returns_callable(self):
+        fn = build_grc_period_tables(_EmptyGrcBackend(), _EmptyGrcBackend(), lexicons={})
+        assert callable(fn)
+
+    def test_no_lexicon_tag_returns_none(self):
+        fn = build_grc_period_tables(_EmptyGrcBackend(), _EmptyGrcBackend(), lexicons={})
+        w = {"lemma": "θεός", "pos": "noun", "form": "θεόν", "lexicon_tag": ""}
+        assert fn(w) is None
+
+    def test_single_lexicon_returns_one_entry(self):
+        # Ἄνδρα (ἀνήρ): confirmed-attested Homer form, same fixture as
+        # TestRequireLexicon.test_shown_when_required_lexicon_has_exact_form.
+        ag, um = self._backends()
+        fn = build_grc_period_tables(ag, um, lexicons={"homer": ag})
+        w = {"lemma": "ἀνήρ", "form": "Ἄνδρα", "pos": "noun",
+             "lexicon_tag": 'ancient-greek["homer"]'}
+        result = fn(w)
+        assert result is not None
+        assert [n for n, _ in result] == ["homer"]
+        assert "<table" in result[0][1]
+
+    def test_modern_rung_appended(self):
+        from modern_greek_backend_eee import ModernGreekBackend
+        ag, um = self._backends()
+        fn = build_grc_period_tables(ag, um, lexicons={"homer": ag}, el_backend=ModernGreekBackend())
+        w = {"lemma": "ἀνήρ", "form": "Ἄνδρα", "pos": "noun",
+             "lexicon_tag": 'ancient-greek["homer"]'}
+        names = [n for n, _ in fn(w)]
+        assert names == ["homer", "modern"]
+
+    def test_require_lexicon_hides_when_absent(self):
+        # Same fixture as TestRequireLexicon.test_hidden_when_required_lexicon_lacks_exact_form.
+        from ancient_greek_backend_eee import AncientGreekBackend
+        from modern_greek_backend_eee import ModernGreekBackend
+        ag, um = self._backends()
+        ag_lsj = AncientGreekBackend(lexicons=["lsj"])
+        w = {"lemma": "ἄνθρωπος", "form": "ἀνθρώπων", "pos": "noun",
+             "lexicon_tag": 'ancient-greek["lsj"]'}
+        fn = build_grc_period_tables(ag, um, lexicons={"homer": ag, "lsj": ag_lsj},
+                                      el_backend=ModernGreekBackend(), require_lexicon="homer")
+        assert fn(w) is None
+
+    def test_public_api(self):
+        import eee_project as eee
+        assert hasattr(eee, "build_grc_period_tables")
+        assert callable(eee.build_grc_period_tables)
+
+
+class TestGrcPeriodOptions:
+    def test_maps_short_labels_to_period_keys(self):
+        tables = [("homer", "<table>1</table>"), ("lsj", "<table>2</table>"),
+                  ("modern", "<table>3</table>")]
+        assert grc_period_options(tables) == {"Epic": "homer", "Attic": "lsj", "Modern": "modern"}
+
+    def test_lxx_and_unimorph_both_map_to_koine(self):
+        tables = [("lxx", "<table>1</table>"), ("unimorph", "<table>2</table>")]
+        opts = grc_period_options(tables)
+        assert set(opts) == {"Koine"}
+        # last one wins the shared label under dict construction -- fine,
+        # since render_grc_period_table keys off the underlying period
+        # string (the dropdown's VALUE), never off this display label.
+        assert opts["Koine"] in {"lxx", "unimorph"}
+
+    def test_empty_tables(self):
+        assert grc_period_options([]) == {}
+
+    def test_public_api(self):
+        import eee_project as eee
+        assert hasattr(eee, "grc_period_options")
+        assert callable(eee.grc_period_options)
+
+
+class TestRenderGrcPeriodTable:
+    _TABLES = [("homer", "<table>HOMER</table>"), ("lsj", "<table>LSJ</table>")]
+
+    def test_renders_chosen_period_only(self):
+        html = render_grc_period_table(self._TABLES, "lsj")
+        assert "LSJ" in html and "HOMER" not in html
+
+    def test_defaults_to_first_when_period_is_none(self):
+        html = render_grc_period_table(self._TABLES, None)
+        assert "HOMER" in html
+
+    def test_defaults_to_first_when_period_unknown(self):
+        html = render_grc_period_table(self._TABLES, "nonexistent")
+        assert "HOMER" in html
+
+    def test_includes_period_label_and_description(self):
+        html = render_grc_period_table(self._TABLES, "homer")
+        assert "Epic Greek" in html  # from _GRC_LEX_PERIOD
+        assert "homer lexicon" in html  # from _GRC_LEX_DESCR
+
+    def test_empty_tables_returns_empty_string(self):
+        assert render_grc_period_table([], None) == ""
+
+    def test_public_api(self):
+        import eee_project as eee
+        assert hasattr(eee, "render_grc_period_table")
+        assert callable(eee.render_grc_period_table)
 
 
 # ────────────────────────────────────────── add_labels ──

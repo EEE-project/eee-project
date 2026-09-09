@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.13.0 - 2026-09-10
+- `build_grc_period_tables()`, `grc_period_options()`, and
+  `render_grc_period_table()` — a data-returning alternative to
+  `build_grc_lexicon_tabs()`'s CSS-only period picker, for callers that
+  want a real `mo.ui.dropdown` (a genuine browser `<select>`, which
+  correctly closes on pick) instead.
+
 ## 1.12.0 - 2026-09-09
 - `ui_label()` (`data/labels/ui-{en,ru,el}.tsv`) gains 14 new keys for
   a stanza-and-translation reading UI: stanza/translation selector labels,

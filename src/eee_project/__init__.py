@@ -21,6 +21,7 @@ from eee_project.notebook_utils import (
     language_bridge, language_selector, save_language_selection,
     load_ga_config, ConfigStore,
     build_grc_paradigm_table, build_modern_paradigm_table, build_grc_lexicon_tabs,
+    build_grc_period_tables, grc_period_options, render_grc_period_table,
     make_paradigm_form, interactive_text, setup_ancient_greek, add_labels,
     filter_grc_quiz_words, grc_coverage_words, grc_lexicon_sources, norm_grc_surface, resolve_clicked_word,
     parse_stanza_text, parse_stanza_translations,
@@ -28,7 +29,7 @@ from eee_project.notebook_utils import (
     _INC as increment_counter,
 )
 
-__version__ = "1.11.0"
+__version__ = "1.13.0"
 
 _UNSET = object()  # sentinel distinguishing "not provided" from explicit None
 
@@ -92,6 +93,9 @@ __all__ = [
     "build_grc_paradigm_table",
     "build_modern_paradigm_table",
     "build_grc_lexicon_tabs",
+    "build_grc_period_tables",
+    "grc_period_options",
+    "render_grc_period_table",
     "make_paradigm_form",
     "interactive_text",
     "setup_ancient_greek",

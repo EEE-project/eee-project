@@ -1283,6 +1283,81 @@ build_lexicon_tabs(w) -> str | None
 Both closures cache slot templates internally — call the factory once at
 notebook startup, not once per word.
 
+#### A real dropdown instead of `build_grc_lexicon_tabs`'s CSS picker
+
+`build_grc_lexicon_tabs`'s multi-lexicon picker is CSS-only (no JS runs in
+`mo.Html()` output at all in this codebase — not `<script>` tags, not
+inline `onXXX` attributes either), built from hidden radios plus a
+`<details>`/`<summary>` dropdown. That means it can never *auto-close* on
+pick — clicking one of its `<label>` options only changes which radio is
+`:checked`, with nothing available to also close the `<details>` the way a
+real dropdown would. For a genuinely closing dropdown, use these three
+functions instead — same lexicon/period resolution, but returning data
+instead of a pre-rendered CSS-hack string, so the caller builds a real
+`mo.ui.dropdown` (an actual browser `<select>`):
+
+```python
+from eee_project import build_grc_period_tables, grc_period_options, render_grc_period_table
+
+# Factory — same construction-time arguments as build_grc_lexicon_tabs,
+# called once at notebook startup:
+build_period_tables = eee.build_grc_period_tables(
+    ag_backend, um_backend,
+    lexicons={"homer": ag_homer, "lxx": ag_lxx, "morphgnt": ag_morphgnt},
+)
+
+# Cell 1 — resolve the clicked word, compute its available periods, build
+# the dropdown. Depends on whatever drives word selection (e.g.
+# text_widget.widget.selected_word) so it reruns on a new word:
+w = eee.resolve_clicked_word(QUIZ_WORDS_RAW, text_widget.widget.selected_word)
+if w is not None:
+    w2 = dict(w)
+    eee.add_labels([w2])
+    period_tables = build_period_tables(w2)
+else:
+    w2, period_tables = None, None
+
+if period_tables and len(period_tables) > 1:
+    _opts = eee.grc_period_options(period_tables)
+    period_selector = mo.ui.dropdown(options=_opts, value=next(iter(_opts)), label="period")
+else:
+    period_selector = None
+period_selector
+
+# Cell 2 — render the chosen period's table. Depends on period_selector
+# (not just w2/period_tables) so it reruns the moment the dropdown changes:
+if period_tables:
+    mo.Html(eee.render_grc_period_table(
+        period_tables, period_selector.value if period_selector else None,
+    ))
+```
+
+`build_grc_period_tables(ag_backend, um_backend, *, lexicons, el_backend=None, lang="ru", require_lexicon=None)`
+returns a closure:
+
+```python
+build_period_tables(w) -> list[tuple[str, str]] | None
+```
+
+Same arguments, same `require_lexicon`/Modern-rung/error-isolation
+semantics as `build_grc_lexicon_tabs` — returns `[(period_key, table_html), ...]`
+(e.g. `[("homer", "<table>...</table>"), ("modern", "<table>...</table>")]`)
+instead of one HTML blob, or `None` when no lexicon attests the exact form.
+
+`grc_period_options(tables) -> dict[str, str]` — display-label → period-key,
+for the dropdown's `options=` (e.g. `{"Epic": "homer", "Modern": "modern"}`).
+Labels are short by design (`lxx`/`unimorph` both show as `"Koine"`) — the
+full name/dates render in `render_grc_period_table`'s own output, not the
+dropdown.
+
+`render_grc_period_table(tables, period=None) -> str` — the chosen period's
+header + description + table. Falls back to `tables`' first entry when
+`period` is `None` or isn't present in `tables` (e.g. a stale dropdown value
+left over from a previously-selected word with different periods — a fresh
+`mo.ui.dropdown` from Cell 1 always resets `.value` to its own new default
+when the word changes, so this fallback is a defensive belt-and-braces, not
+something normal usage hits).
+
 ### Filtering `QUIZ_WORDS_RAW` and coverage highlighting
 
 For inflected-text lessons (Odyssey-style) offering a lexicon filter
