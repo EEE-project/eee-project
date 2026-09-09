@@ -125,3 +125,17 @@ phrases_too_few	_Select at least 4 phrases for a real multiple-choice quiz._
 phrase_mode_label	Quiz mode:
 quiz_mode_choice	Multiple choice
 quiz_mode_type	Type the answer
+stanza_label	Stanza
+trans_selector_label	Translation
+interlinear_label	interlinear
+interlinear_description	**interlinear** · a literal word-for-word translation preserving the original word order
+stanza_match_section_heading	### Exercise: match the stanza and translation
+stanza_match_direction_label	**Direction:**
+stanza_match_toggle_grc_to_tr	Stanza → translation
+stanza_match_toggle_tr_to_grc	Translation → stanza
+lesson_materials_label	**Lesson materials:**
+exercises_section_heading	## Exercises
+presence_exercise_heading	### Exercise: word in the translation
+word_find_exercise_heading	### Exercise: find the word
+eee_note_load_error	*(could not load the EEE engine description)*
+form_check_accordion_label	About form-checking (EEE)

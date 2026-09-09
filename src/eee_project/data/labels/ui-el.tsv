@@ -125,3 +125,17 @@ phrases_too_few	_Επιλέξτε τουλάχιστον 4 φράσεις για
 phrase_mode_label	Λειτουργία τεστ:
 quiz_mode_choice	Πολλαπλή επιλογή
 quiz_mode_type	Πληκτρολόγηση απάντησης
+stanza_label	Στροφή
+trans_selector_label	Μετάφραση
+interlinear_label	λέξη-λέξη
+interlinear_description	**λέξη-λέξη** · κυριολεκτική μετάφραση λέξη προς λέξη με διατήρηση της σειράς του πρωτοτύπου
+stanza_match_section_heading	### Άσκηση: αντιστοίχισε τη στροφή με τη μετάφραση
+stanza_match_direction_label	**Κατεύθυνση:**
+stanza_match_toggle_grc_to_tr	Στροφή → μετάφραση
+stanza_match_toggle_tr_to_grc	Μετάφραση → στροφή
+lesson_materials_label	**Υλικό μαθήματος:**
+exercises_section_heading	## Ασκήσεις
+presence_exercise_heading	### Άσκηση: η λέξη στη μετάφραση
+word_find_exercise_heading	### Άσκηση: βρες τη λέξη
+eee_note_load_error	*(δεν ήταν δυνατή η φόρτωση της περιγραφής της μηχανής EEE)*
+form_check_accordion_label	Σχετικά με τον έλεγχο τύπων (EEE)

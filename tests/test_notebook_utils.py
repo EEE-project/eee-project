@@ -879,6 +879,42 @@ class TestUiLabel:
         gu = GreekUtils(mo_module=_StubMo())
         assert gu.ui_label('check_label', 'el') == 'Έλεγχος'
 
+    def test_odyssey_lang_switcher_keys_present_in_all_3_languages(self):
+        # New keys added for created_with_eee's Odyssey lang_sel wiring --
+        # asserts real translated text, not just non-echoed presence (that's
+        # already covered by test_every_known_key_present_in_all_3_languages).
+        gu = GreekUtils(mo_module=_StubMo())
+        expected = {
+            'stanza_label': {'en': 'Stanza', 'ru': 'Строфа', 'el': 'Στροφή'},
+            'trans_selector_label': {'en': 'Translation', 'ru': 'Перевод', 'el': 'Μετάφραση'},
+            'interlinear_label': {'en': 'interlinear', 'ru': 'подстрочник', 'el': 'λέξη-λέξη'},
+            'stanza_match_section_heading': {
+                'en': '### Exercise: match the stanza and translation',
+                'ru': '### Упражнение: сопоставь строфу и перевод',
+                'el': '### Άσκηση: αντιστοίχισε τη στροφή με τη μετάφραση',
+            },
+            'stanza_match_direction_label': {'en': '**Direction:**', 'ru': '**Направление:**', 'el': '**Κατεύθυνση:**'},
+            'stanza_match_toggle_grc_to_tr': {'en': 'Stanza → translation', 'ru': 'Строфа → перевод', 'el': 'Στροφή → μετάφραση'},
+            'stanza_match_toggle_tr_to_grc': {'en': 'Translation → stanza', 'ru': 'Перевод → строфа', 'el': 'Μετάφραση → στροφή'},
+            'lesson_materials_label': {'en': '**Lesson materials:**', 'ru': '**Материалы занятия:**', 'el': '**Υλικό μαθήματος:**'},
+            'exercises_section_heading': {'en': '## Exercises', 'ru': '## Упражнения', 'el': '## Ασκήσεις'},
+            'presence_exercise_heading': {
+                'en': '### Exercise: word in the translation', 'ru': '### Упражнение: слово в переводе',
+                'el': '### Άσκηση: η λέξη στη μετάφραση',
+            },
+            'word_find_exercise_heading': {
+                'en': '### Exercise: find the word', 'ru': '### Упражнение: найди слово',
+                'el': '### Άσκηση: βρες τη λέξη',
+            },
+            'form_check_accordion_label': {
+                'en': 'About form-checking (EEE)', 'ru': 'О проверке форм (EEE)',
+                'el': 'Σχετικά με τον έλεγχο τύπων (EEE)',
+            },
+        }
+        for key, per_lang in expected.items():
+            for lang, text in per_lang.items():
+                assert gu.ui_label(key, lang) == text, f"{key!r}/{lang!r}"
+
     def test_lang_none_falls_back_to_english(self):
         gu = GreekUtils(mo_module=_StubMo())
         assert gu.ui_label('check_label', None) == gu.ui_label('check_label', 'en')

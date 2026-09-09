@@ -125,3 +125,17 @@ phrases_too_few	_Выберите минимум 4 фразы, иначе выб
 phrase_mode_label	Режим теста:
 quiz_mode_choice	Выбор варианта
 quiz_mode_type	Ввод ответа
+stanza_label	Строфа
+trans_selector_label	Перевод
+interlinear_label	подстрочник
+interlinear_description	**подстрочник** · буквальный перевод слово-в-слово с сохранением порядка оригинала
+stanza_match_section_heading	### Упражнение: сопоставь строфу и перевод
+stanza_match_direction_label	**Направление:**
+stanza_match_toggle_grc_to_tr	Строфа → перевод
+stanza_match_toggle_tr_to_grc	Перевод → строфа
+lesson_materials_label	**Материалы занятия:**
+exercises_section_heading	## Упражнения
+presence_exercise_heading	### Упражнение: слово в переводе
+word_find_exercise_heading	### Упражнение: найди слово
+eee_note_load_error	*(не удалось загрузить описание движка EEE)*
+form_check_accordion_label	О проверке форм (EEE)

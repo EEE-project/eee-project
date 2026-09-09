@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.12.0 - 2026-09-09
+- `ui_label()` (`data/labels/ui-{en,ru,el}.tsv`) gains 14 new keys for
+  a stanza-and-translation reading UI: stanza/translation selector labels,
+  an interlinear-translation label and description, exercise section
+  headings (general, stanza-matching, word-in-translation, find-the-word),
+  a stanza-matching direction toggle, a lesson-materials label, an
+  EEE-note load-failure message, and a form-checking accordion label.
+
 ## 1.11.1 - 2026-09-08
 - `ensure_file()` and `ensure_files()` now fetch course materials from whichever
   host is actually serving the page (Codeberg, GitHub, or GitLab), instead of
