@@ -1,11 +1,14 @@
 # Changelog
 
 ## 1.13.0 - 2026-09-10
-- `build_grc_period_tables()`, `grc_period_options()`, and
-  `render_grc_period_table()` — a data-returning alternative to
-  `build_grc_lexicon_tabs()`'s CSS-only period picker, for callers that
-  want a real `mo.ui.dropdown` (a genuine browser `<select>`, which
-  correctly closes on pick) instead.
+- `GreekUtils.render_gloss_selector()`/`.render_gloss_table()` — a
+  two-cell alternative to `render_gloss_panel()` for a real
+  `mo.ui.dropdown` period picker (a genuine browser `<select>`, which
+  correctly closes on pick) instead of `build_grc_lexicon_tabs()`'s
+  CSS-only one. Built on three new lower-level functions,
+  `build_grc_period_tables()`, `grc_period_options()`, and
+  `render_grc_period_table()`, for callers that need the tables/dropdown
+  themselves instead of the two methods above.
 
 ## 1.12.0 - 2026-09-09
 - `ui_label()` (`data/labels/ui-{en,ru,el}.tsv`) gains 14 new keys for

@@ -83,6 +83,7 @@ homer_lexicon_note	Words from the Homeric lexicon, for which the EEE engine buil
 eee_engine_accordion_label	About the EEE morphological engine
 gloss_panel_empty	*Select a word in the text to see its translation and word forms from the Homeric lexicon…*
 gloss_panel_era_caption	*Word forms by era — only the simplest morphological correspondence by lemma, meaning may vary*
+period_selector_label	Period
 word_missing_in_paradigm	{word} — missing in the paradigm of {lemma}
 card_list_soon	coming soon
 card_list_load_error	Couldn't load file: {url}<br><br>Check that it's accessible at that link.

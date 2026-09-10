@@ -3934,26 +3934,97 @@ class GreekUtils:
             align="stretch", gap=0.5,
         )
 
-    def render_gloss_panel(self, quiz_words_raw: list, selected_word: str,
-                            build_lexicon_tabs: Any, lang: str = "ru") -> Any:
-        """Word-click gloss panel: resolve *selected_word* against
-        *quiz_words_raw*, show its translation/grammar label, and (if any
-        curated lexicon attests the exact form) a per-lexicon paradigm-table
-        caption via *build_lexicon_tabs*."""
+    def _resolve_gloss_word(self, quiz_words_raw: list, selected_word: str) -> "tuple[dict, str] | None":
+        """Resolve *selected_word* against *quiz_words_raw* and build its
+        gloss markdown line (``**form** — translation`` + grammar line, if
+        any). Returns ``None`` when the word isn't found. Shared by
+        :meth:`render_gloss_panel` and :meth:`render_gloss_selector`."""
         w = resolve_clicked_word(quiz_words_raw, selected_word)
         if w is None:
-            return self._mo.md(self.ui_label('gloss_panel_empty', lang))
+            return None
         w2 = dict(w)
         add_labels([w2])
         gloss = f"**{w2.get('form', selected_word)}** — {w2['_label']}"
         grammar = w2.get("grammar_label", "")
         if grammar:
             gloss += f"  \n_{grammar}_"
+        return w2, gloss
+
+    def render_gloss_panel(self, quiz_words_raw: list, selected_word: str,
+                            build_lexicon_tabs: Any, lang: str = "ru") -> Any:
+        """Word-click gloss panel: resolve *selected_word* against
+        *quiz_words_raw*, show its translation/grammar label, and (if any
+        curated lexicon attests the exact form) a per-lexicon paradigm-table
+        caption via *build_lexicon_tabs*."""
+        resolved = self._resolve_gloss_word(quiz_words_raw, selected_word)
+        if resolved is None:
+            return self._mo.md(self.ui_label('gloss_panel_empty', lang))
+        w2, gloss = resolved
         tables = build_lexicon_tabs(w2) or ""
         if not tables:
             return self._mo.md(gloss)
         caption = self._mo.md(self.ui_label('gloss_panel_era_caption', lang))
         return self._mo.vstack([self._mo.md(gloss), caption, self._mo.Html(tables)])
+
+    def render_gloss_selector(self, quiz_words_raw: list, selected_word: str,
+                               build_period_tables: Any, lang: str = "ru") -> "tuple[list | None, Any, Any]":
+        """Cell 1 of the real-dropdown gloss panel (see
+        :func:`build_grc_period_tables`): resolve *selected_word*, show
+        its translation/grammar label, and (if 2+ periods attest the
+        exact form) a real ``mo.ui.dropdown`` period picker.
+
+        Returns ``(period_tables, period_selector, panel)``. Call from a
+        cell shaped like this (matching this codebase's own
+        ``bridge``/``lang_sel`` convention: a plain assignment displays
+        nothing on its own, so *panel* needs its own bare-expression
+        line to actually render)::
+
+            period_tables, period_selector, panel = gu.render_gloss_selector(
+                QUIZ_WORDS_RAW, text_widget.widget.selected_word, build_period_tables, lang=lang_sel.value,
+            )
+            panel
+            return period_tables, period_selector
+
+        Pass *period_tables*/*period_selector* straight to
+        :meth:`render_gloss_table`, called from a SEPARATE cell. That
+        cell must take *period_selector* as one of its own parameters
+        (not just *period_tables*) for marimo to rerun it -- and only
+        it -- the moment the dropdown's value changes; this cell never
+        depends on its own dropdown's value, so it correctly does not
+        rerun on a pick."""
+        resolved = self._resolve_gloss_word(quiz_words_raw, selected_word)
+        if resolved is None:
+            return None, None, self._mo.md(self.ui_label('gloss_panel_empty', lang))
+        w2, gloss = resolved
+        tables = build_period_tables(w2)
+
+        period_selector = None
+        if tables and len(tables) > 1:
+            opts = grc_period_options(tables)
+            period_selector = self._mo.ui.dropdown(
+                options=opts, value=next(iter(opts)),
+                label=self.ui_label('period_selector_label', lang),
+            )
+
+        parts = [self._mo.md(gloss)]
+        if tables:
+            parts.append(self._mo.md(self.ui_label('gloss_panel_era_caption', lang)))
+            if period_selector is not None:
+                parts.append(period_selector)
+        panel = self._mo.vstack(parts)
+        return tables, period_selector, panel
+
+    def render_gloss_table(self, period_tables: "list | None", period_selector: Any) -> Any:
+        """Cell 2 of the real-dropdown gloss panel -- call as this cell's
+        own bare last expression (no assignment needed, same as
+        :meth:`render_gloss_panel`); see :meth:`render_gloss_selector`'s
+        own docstring for why this must be a separate cell taking
+        *period_selector* as a parameter."""
+        if not period_tables:
+            return None
+        return self._mo.Html(render_grc_period_table(
+            period_tables, period_selector.value if period_selector is not None else None,
+        ))
 
     @staticmethod
     def reset_quiz_state(renew_btn: Any, set_cv, set_remaining, set_score,
@@ -6577,19 +6648,6 @@ _GRC_LEX_PERIOD = {
     "unimorph": "Koine / NT",
     "byzantine": "Byzantine Greek · 4th–15th c. CE",
 }
-# Short label for a real mo.ui.dropdown's options (see grc_period_options) --
-# the full name/dates above stay in the rendered table's own header/caption.
-# lxx and unimorph deliberately share "Koine": the two are told apart by
-# their table's own caption text, not by the dropdown label.
-_GRC_LEX_PERIOD_SHORT = {
-    "homer":    "Epic",
-    "lsj":      "Attic",
-    "lxx":      "Koine",
-    "morphgnt": "NT",
-    "modern":   "Modern",
-    "unimorph": "Koine",
-    "byzantine": "Byzantine",
-}
 # Tab caption — the backend/lexicon detail (the secondary "comment" under the buttons).
 _GRC_LEX_DESCR = {
     "homer":    "homer lexicon · 2,335 stems · Epic/Ionic",
@@ -7033,6 +7091,92 @@ def build_modern_paradigm_table(el_backend: Any, *, lang: str = "ru") -> Any:
     return build_paradigm_table
 
 
+def _strip_grc_caption(h: str) -> str:
+    return _re.sub(r'<caption[^>]*>.*?</caption>', '', h)
+
+
+_GRC_PERIOD_HDR_STYLE = "font-size:.82em;color:#374151;font-weight:600;margin-top:10px;margin-bottom:1px"
+_GRC_PERIOD_DESC_STYLE = "font-size:.72em;color:#9ca3af;margin-bottom:5px"
+
+
+def _wrap_grc_period_html(label: str, descr_key: str, raw: str) -> str:
+    hdr = f'<div style="{_GRC_PERIOD_HDR_STYLE}">{label}</div>'
+    dsc = f'<div style="{_GRC_PERIOD_DESC_STYLE}">{_GRC_LEX_DESCR.get(descr_key, "")}</div>'
+    return f"<div>{hdr}{dsc}{raw}</div>"
+
+
+def _resolve_grc_period_tables(
+    w: dict, *, require_lexicon: "str | None", lexicons: "dict[str, Any]",
+    build_paradigm: Any, build_modern: "Any | None",
+) -> "list[tuple[str, str]] | None":
+    """Resolve *w*'s attested lexicon/period tables. Shared by
+    :func:`build_grc_lexicon_tabs` (renders a CSS picker on top) and
+    :func:`build_grc_period_tables` (returns the raw list) -- see either
+    for the require_lexicon/Modern-rung/error-isolation semantics."""
+    _req_table = None
+    if require_lexicon is not None:
+        _req_backend = lexicons.get(require_lexicon)
+        if _req_backend is None:
+            return None
+        try:
+            _req_table = build_paradigm(w, _backend=_req_backend, hide_if_absent=True)
+        except Exception:
+            # isolate a require_lexicon backend hiccup the same way the Modern
+            # rung below is isolated -- one bad word/backend must not abort
+            # every call through this closure (Gemini R4-style isolation)
+            _req_table = None
+        if not _req_table:
+            return None
+
+    tag = w.get("lexicon_tag", "")
+    # require_lexicon's own confirmation (above) is authoritative and already
+    # computed -- exclude it here so the loop below never re-derives it (and
+    # can never silently disagree with the direct check just because
+    # lexicon_tag's string-membership happens not to name it).
+    available = [(n, b) for n, b in lexicons.items()
+                 if f'"{n}"' in tag and n != require_lexicon]
+
+    tables = []
+    if _req_table:
+        tables.append((require_lexicon, _strip_grc_caption(_req_table)))
+
+    # Keep only lexicons whose paradigm actually contains the tested form — no
+    # "form absent" tables (build_paradigm_table returns None when hide_if_absent).
+    for name, backend in available:
+        tbl = build_paradigm(w, _backend=backend, hide_if_absent=True)
+        if tbl:
+            tables.append((name, _strip_grc_caption(tbl)))
+
+    if len(tables) == 0:
+        # No curated AG lexicon attests this EXACT form (lexicon_tag can list a
+        # lexicon whose LEMMA has some paradigm even when this specific form
+        # isn't in it -- see _lexicon_tag's fallback). Try the unimorph
+        # fallback. Note this checks the DEFAULT combined ag_backend/um_backend
+        # (no _backend= override) and gates on its caption literally containing
+        # "unimorph" -- a real, non-unimorph confirmation from a lexicon not
+        # named in `tag` would also be missed here, not just a genuine absence;
+        # this is a pre-existing imprecision (relocated, not introduced, by
+        # this change), not a claim that every other possibility was ruled out.
+        raw = build_paradigm(w, hide_if_absent=True) or ""
+        if "unimorph" not in raw:
+            return None
+        tables.append(("unimorph", _strip_grc_caption(raw)))
+
+    # append the Modern rung last (Epic → … → Roman → Modern), gated by a
+    # non-empty Modern paradigm; isolated so a Modern-side failure never breaks
+    # the grc dropdown (Gemini R4). Only reached once at least one ancient rung
+    # (curated lexicon or unimorph) has already confirmed this exact form.
+    if build_modern is not None:
+        try:
+            m = build_modern(w, hide_if_absent=True)
+        except Exception:
+            m = None
+        if m:
+            tables.append(("modern", _strip_grc_caption(m)))
+
+    return tables
+
+
 def build_grc_lexicon_tabs(
     ag_backend: Any,
     um_backend: Any,
@@ -7072,82 +7216,17 @@ def build_grc_lexicon_tabs(
     _build_modern = (build_modern_paradigm_table(el_backend, lang=lang)
                      if el_backend is not None else None)
 
-    def _strip_cap(h: str) -> str:
-        return _re.sub(r'<caption[^>]*>.*?</caption>', '', h)
-
     def build_lexicon_tabs(w: dict, *, lang: "str | None" = None) -> "str | None":
-        _req_table = None
-        if require_lexicon is not None:
-            _req_backend = lexicons.get(require_lexicon)
-            if _req_backend is None:
-                return None
-            try:
-                _req_table = _build_paradigm(w, _backend=_req_backend, hide_if_absent=True)
-            except Exception:
-                # isolate a require_lexicon backend hiccup the same way the Modern
-                # rung below is isolated -- one bad word/backend must not abort
-                # every call through this closure (Gemini R4-style isolation)
-                _req_table = None
-            if not _req_table:
-                return None
-
-        tag = w.get("lexicon_tag", "")
-        # require_lexicon's own confirmation (above) is authoritative and already
-        # computed -- exclude it here so the loop below never re-derives it (and
-        # can never silently disagree with the direct check just because
-        # lexicon_tag's string-membership happens not to name it).
-        available = [(n, b) for n, b in lexicons.items()
-                     if f'"{n}"' in tag and n != require_lexicon]
-
-        _DSTYLE = "font-size:.72em;color:#9ca3af;margin-bottom:5px"
-        _HDR_ST = "font-size:.82em;color:#374151;font-weight:600;margin-top:10px;margin-bottom:1px"
-
-        def _wrap_with_header(label, descr_key, raw):
-            hdr = f'<div style="{_HDR_ST}">{label}</div>'
-            dsc = f'<div style="{_DSTYLE}">{_GRC_LEX_DESCR.get(descr_key, "")}</div>'
-            return f"<div>{hdr}{dsc}{_strip_cap(raw)}</div>"
-
-        tables = []
-        if _req_table:
-            tables.append((require_lexicon, _strip_cap(_req_table)))
-
-        # Keep only lexicons whose paradigm actually contains the tested form — no
-        # "form absent" tables (build_paradigm_table returns None when hide_if_absent).
-        for name, backend in available:
-            tbl = _build_paradigm(w, _backend=backend, hide_if_absent=True)
-            if tbl:
-                tables.append((name, _strip_cap(tbl)))
-
-        if len(tables) == 0:
-            # No curated AG lexicon attests this EXACT form (lexicon_tag can list a
-            # lexicon whose LEMMA has some paradigm even when this specific form
-            # isn't in it -- see _lexicon_tag's fallback). Try the unimorph
-            # fallback. Note this checks the DEFAULT combined ag_backend/um_backend
-            # (no _backend= override) and gates on its caption literally containing
-            # "unimorph" -- a real, non-unimorph confirmation from a lexicon not
-            # named in `tag` would also be missed here, not just a genuine absence;
-            # this is a pre-existing imprecision (relocated, not introduced, by
-            # this change), not a claim that every other possibility was ruled out.
-            raw = _build_paradigm(w, hide_if_absent=True) or ""
-            if "unimorph" not in raw:
-                return None
-            tables.append(("unimorph", _strip_cap(raw)))
-
-        # append the Modern rung last (Epic → … → Roman → Modern), gated by a
-        # non-empty Modern paradigm; isolated so a Modern-side failure never breaks
-        # the grc dropdown (Gemini R4). Only reached once at least one ancient rung
-        # (curated lexicon or unimorph) has already confirmed this exact form.
-        if _build_modern is not None:
-            try:
-                m = _build_modern(w, hide_if_absent=True)
-            except Exception:
-                m = None
-            if m:
-                tables.append(("modern", _strip_cap(m)))
+        tables = _resolve_grc_period_tables(
+            w, require_lexicon=require_lexicon, lexicons=lexicons,
+            build_paradigm=_build_paradigm, build_modern=_build_modern,
+        )
+        if tables is None:
+            return None
 
         if len(tables) == 1:
             name = tables[0][0]
-            return _wrap_with_header(_GRC_LEX_PERIOD.get(name, name), name, tables[0][1])
+            return _wrap_grc_period_html(_GRC_LEX_PERIOD.get(name, name), name, tables[0][1])
 
         names = [n for n, _ in tables]
         uid = abs(hash(w.get("lemma", "") + w.get("form", ""))) % 99999
@@ -7262,49 +7341,11 @@ def build_grc_period_tables(
     _build_modern = (build_modern_paradigm_table(el_backend, lang=lang)
                      if el_backend is not None else None)
 
-    def _strip_cap(h: str) -> str:
-        return _re.sub(r'<caption[^>]*>.*?</caption>', '', h)
-
     def build_period_tables(w: dict) -> "list[tuple[str, str]] | None":
-        _req_table = None
-        if require_lexicon is not None:
-            _req_backend = lexicons.get(require_lexicon)
-            if _req_backend is None:
-                return None
-            try:
-                _req_table = _build_paradigm(w, _backend=_req_backend, hide_if_absent=True)
-            except Exception:
-                _req_table = None
-            if not _req_table:
-                return None
-
-        tag = w.get("lexicon_tag", "")
-        available = [(n, b) for n, b in lexicons.items()
-                     if f'"{n}"' in tag and n != require_lexicon]
-
-        tables = []
-        if _req_table:
-            tables.append((require_lexicon, _strip_cap(_req_table)))
-        for name, backend in available:
-            tbl = _build_paradigm(w, _backend=backend, hide_if_absent=True)
-            if tbl:
-                tables.append((name, _strip_cap(tbl)))
-
-        if len(tables) == 0:
-            raw = _build_paradigm(w, hide_if_absent=True) or ""
-            if "unimorph" not in raw:
-                return None
-            tables.append(("unimorph", _strip_cap(raw)))
-
-        if _build_modern is not None:
-            try:
-                m = _build_modern(w, hide_if_absent=True)
-            except Exception:
-                m = None
-            if m:
-                tables.append(("modern", _strip_cap(m)))
-
-        return tables
+        return _resolve_grc_period_tables(
+            w, require_lexicon=require_lexicon, lexicons=lexicons,
+            build_paradigm=_build_paradigm, build_modern=_build_modern,
+        )
 
     return build_period_tables
 
@@ -7312,29 +7353,29 @@ def build_grc_period_tables(
 def grc_period_options(tables: "list[tuple[str, str]]") -> "dict[str, str]":
     """Display-label -> period-key options for a real
     ``mo.ui.dropdown(options=grc_period_options(tables), ...)``, from
-    :func:`build_grc_period_tables`'s ``tables`` result. Short labels
-    (``_GRC_LEX_PERIOD_SHORT``) keep the dropdown compact -- the full
-    name/dates render in :func:`render_grc_period_table`'s own output."""
-    return {_GRC_LEX_PERIOD_SHORT.get(n, n): n for n, _ in tables}
+    :func:`build_grc_period_tables`'s ``tables`` result. Uses the same
+    full ``_GRC_LEX_PERIOD`` name/dates as :func:`build_grc_lexicon_tabs`'s
+    own CSS picker did for its summary pill and menu options."""
+    return {_GRC_LEX_PERIOD.get(n, n): n for n, _ in tables}
 
 
 def render_grc_period_table(tables: "list[tuple[str, str]]", period: "str | None" = None) -> str:
-    """Render one period's header + description + table from *tables* (a
-    :func:`build_grc_period_tables` result). *period* is a period key (a
-    real ``mo.ui.dropdown``'s ``.value``, built from
-    :func:`grc_period_options`); falls back to *tables*' first entry when
-    *period* is ``None`` or not present in *tables* (e.g. a stale value
-    left over from a previously-selected word with different periods)."""
+    """Render one period's description + table from *tables* (a
+    :func:`build_grc_period_tables` result); includes the name/dates header
+    too when there's no dropdown to show it (a single attested period).
+    *period* is a period key (a real ``mo.ui.dropdown``'s ``.value``, built
+    from :func:`grc_period_options`); falls back to *tables*' first entry
+    when *period* is ``None`` or not present in *tables*."""
     if not tables:
         return ""
     _by_key = dict(tables)
     if period not in _by_key:
         period = tables[0][0]
-    _DSTYLE = "font-size:.72em;color:#9ca3af;margin-bottom:5px"
-    _HDR_ST = "font-size:.82em;color:#374151;font-weight:600;margin-top:10px;margin-bottom:1px"
-    hdr = f'<div style="{_HDR_ST}">{_GRC_LEX_PERIOD.get(period, period)}</div>'
-    dsc = f'<div style="{_DSTYLE}">{_GRC_LEX_DESCR.get(period, "")}</div>'
-    return f"<div>{hdr}{dsc}{_by_key[period]}</div>"
+    if len(tables) > 1:
+        # negative margin cancels marimo's own gap to the dropdown's cell above
+        dsc = f'<div style="{_GRC_PERIOD_DESC_STYLE};margin-top:-20px">{_GRC_LEX_DESCR.get(period, "")}</div>'
+        return f"<div>{dsc}{_by_key[period]}</div>"
+    return _wrap_grc_period_html(_GRC_LEX_PERIOD.get(period, period), period, _by_key[period])
 
 
 def norm_grc_surface(s: str) -> str:

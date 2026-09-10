@@ -1296,9 +1296,12 @@ functions instead — same lexicon/period resolution, but returning data
 instead of a pre-rendered CSS-hack string, so the caller builds a real
 `mo.ui.dropdown` (an actual browser `<select>`):
 
-```python
-from eee_project import build_grc_period_tables, grc_period_options, render_grc_period_table
+Two `GreekUtils` methods wrap the whole word-resolve → tables → dropdown →
+render flow, so a notebook's own cells stay short (the same relationship
+`render_gloss_panel` has to `build_grc_lexicon_tabs`) — don't hand-roll this
+per notebook:
 
+```python
 # Factory — same construction-time arguments as build_grc_lexicon_tabs,
 # called once at notebook startup:
 build_period_tables = eee.build_grc_period_tables(
@@ -1306,57 +1309,55 @@ build_period_tables = eee.build_grc_period_tables(
     lexicons={"homer": ag_homer, "lxx": ag_lxx, "morphgnt": ag_morphgnt},
 )
 
-# Cell 1 — resolve the clicked word, compute its available periods, build
-# the dropdown. Depends on whatever drives word selection (e.g.
-# text_widget.widget.selected_word) so it reruns on a new word:
-w = eee.resolve_clicked_word(QUIZ_WORDS_RAW, text_widget.widget.selected_word)
-if w is not None:
-    w2 = dict(w)
-    eee.add_labels([w2])
-    period_tables = build_period_tables(w2)
-else:
-    w2, period_tables = None, None
+# Cell 1 — depends on whatever drives word selection (e.g.
+# text_widget.widget.selected_word) so it reruns on a new word. A plain
+# assignment displays nothing on its own (same convention as this
+# codebase's own bridge/lang_sel cells) -- `panel` needs its own
+# bare-expression line to actually render:
+period_tables, period_selector, panel = gu.render_gloss_selector(
+    QUIZ_WORDS_RAW, text_widget.widget.selected_word, build_period_tables, lang=lang_sel.value,
+)
+panel
+return period_tables, period_selector
 
-if period_tables and len(period_tables) > 1:
-    _opts = eee.grc_period_options(period_tables)
-    period_selector = mo.ui.dropdown(options=_opts, value=next(iter(_opts)), label="period")
-else:
-    period_selector = None
-period_selector
-
-# Cell 2 — render the chosen period's table. Depends on period_selector
-# (not just w2/period_tables) so it reruns the moment the dropdown changes:
-if period_tables:
-    mo.Html(eee.render_grc_period_table(
-        period_tables, period_selector.value if period_selector else None,
-    ))
+# Cell 2 — takes period_selector as its own parameter (not just
+# period_tables) so marimo reruns THIS cell -- and only this one -- the
+# moment the dropdown's value changes. Call as the cell's own bare last
+# expression, same as render_gloss_panel:
+gu.render_gloss_table(period_tables, period_selector)
 ```
+
+`gu.render_gloss_selector(quiz_words_raw, selected_word, build_period_tables, lang="ru")`
+→ `(period_tables, period_selector, panel)`. `period_tables` the
+`build_grc_period_tables` result (below), or `None` when the word doesn't
+resolve or has no tables; `period_selector` a real `mo.ui.dropdown` when
+2+ periods attest the form, else `None`; `panel` the gloss text + era
+caption + dropdown, ready to display.
+
+`gu.render_gloss_table(period_tables, period_selector)` — the chosen
+period's header + description + table (or nothing, if the word has no
+tables at all).
+
+Lower-level, if a notebook genuinely needs to build the tables/dropdown/table
+itself instead of using the two methods above:
 
 `build_grc_period_tables(ag_backend, um_backend, *, lexicons, el_backend=None, lang="ru", require_lexicon=None)`
-returns a closure:
-
-```python
-build_period_tables(w) -> list[tuple[str, str]] | None
-```
-
-Same arguments, same `require_lexicon`/Modern-rung/error-isolation
-semantics as `build_grc_lexicon_tabs` — returns `[(period_key, table_html), ...]`
+returns a closure `build_period_tables(w) -> list[tuple[str, str]] | None`.
+Same arguments, same `require_lexicon`/Modern-rung/error-isolation semantics
+as `build_grc_lexicon_tabs` — returns `[(period_key, table_html), ...]`
 (e.g. `[("homer", "<table>...</table>"), ("modern", "<table>...</table>")]`)
 instead of one HTML blob, or `None` when no lexicon attests the exact form.
 
 `grc_period_options(tables) -> dict[str, str]` — display-label → period-key,
-for the dropdown's `options=` (e.g. `{"Epic": "homer", "Modern": "modern"}`).
-Labels are short by design (`lxx`/`unimorph` both show as `"Koine"`) — the
-full name/dates render in `render_grc_period_table`'s own output, not the
-dropdown.
+for the dropdown's `options=` (e.g. `{"Epic Greek · c. 800–700 BCE": "homer",
+"Modern Greek · 16th c.–present": "modern"}`). Same full `_GRC_LEX_PERIOD`
+name/dates `build_grc_lexicon_tabs`'s own CSS picker already used for its
+summary pill and menu options.
 
 `render_grc_period_table(tables, period=None) -> str` — the chosen period's
-header + description + table. Falls back to `tables`' first entry when
-`period` is `None` or isn't present in `tables` (e.g. a stale dropdown value
-left over from a previously-selected word with different periods — a fresh
-`mo.ui.dropdown` from Cell 1 always resets `.value` to its own new default
-when the word changes, so this fallback is a defensive belt-and-braces, not
-something normal usage hits).
+description + table (plus a name/dates header when there's only one period,
+since then there's no dropdown to show it elsewhere). Falls back to `tables`'
+first entry when `period` is `None` or isn't present in `tables`.
 
 ### Filtering `QUIZ_WORDS_RAW` and coverage highlighting
 

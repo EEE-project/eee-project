@@ -421,6 +421,38 @@ class TestBuildGrcPeriodTables:
         names = [n for n, _ in fn(w)]
         assert names == ["homer", "modern"]
 
+    def test_no_modern_rung_without_el_backend(self):
+        ag, um = self._backends()
+        fn = build_grc_period_tables(ag, um, lexicons={"homer": ag}, el_backend=None)
+        w = {"lemma": "ἀνήρ", "form": "Ἄνδρα", "pos": "noun",
+             "lexicon_tag": 'ancient-greek["homer"]'}
+        assert "modern" not in [n for n, _ in fn(w)]
+
+    def test_modern_rung_error_isolated(self):
+        # Same fixture as TestModernRung.test_modern_rung_error_isolated.
+        class _Boom:
+            def get_slot_templates(self, *a, **k):
+                raise RuntimeError("boom")
+        ag, um = self._backends()
+        fn = build_grc_period_tables(ag, um, lexicons={"homer": ag}, el_backend=_Boom())
+        w = {"lemma": "ἀνήρ", "form": "Ἄνδρα", "pos": "noun",
+             "lexicon_tag": 'ancient-greek["homer"]'}
+        # must not raise; Modern rung omitted, the homer side still returned
+        names = [n for n, _ in fn(w)]
+        assert names == ["homer"]
+
+    def test_no_table_when_form_unattested_anywhere(self):
+        # Same regression fixture as
+        # TestModernRung.test_no_modern_only_table_when_form_unattested_anywhere:
+        # a lemma-only tag match must not surface a Modern-only result when
+        # the tested FORM itself is attested nowhere, ancient or modern.
+        from modern_greek_backend_eee import ModernGreekBackend
+        ag, um = self._backends()
+        fn = build_grc_period_tables(ag, um, lexicons={"homer": ag}, el_backend=ModernGreekBackend())
+        w = {"lemma": "ἄλγος", "form": "ἄλγεα", "pos": "noun",
+             "lexicon_tag": 'ancient-greek["homer"]'}
+        assert fn(w) is None
+
     def test_require_lexicon_hides_when_absent(self):
         # Same fixture as TestRequireLexicon.test_hidden_when_required_lexicon_lacks_exact_form.
         from ancient_greek_backend_eee import AncientGreekBackend
@@ -433,6 +465,49 @@ class TestBuildGrcPeriodTables:
                                       el_backend=ModernGreekBackend(), require_lexicon="homer")
         assert fn(w) is None
 
+    def test_require_lexicon_shown_keeps_rest_of_progression(self):
+        # Same fixture as TestRequireLexicon.test_shown_when_required_lexicon_has_exact_form.
+        from modern_greek_backend_eee import ModernGreekBackend
+        ag, um = self._backends()
+        w = {"lemma": "ἀνήρ", "form": "Ἄνδρα", "pos": "noun",
+             "lexicon_tag": 'ancient-greek["homer"]'}
+        fn = build_grc_period_tables(ag, um, lexicons={"homer": ag},
+                                      el_backend=ModernGreekBackend(), require_lexicon="homer")
+        names = [n for n, _ in fn(w)]
+        # attested in the anchor lexicon -> the rest of the diachronic
+        # progression (here: Modern) still comes alongside it, unchanged
+        assert names == ["homer", "modern"]
+
+    def test_require_lexicon_default_none_preserves_tag_matched_behaviour(self):
+        # Same fixture as TestRequireLexicon.test_default_none_preserves_prior_behaviour
+        # -- that test's own comment claims this confirms the tag-matched lsj
+        # path rather than the unimorph fallback, but its assertion only
+        # checks "Modern Greek" in html, which is true either way; verified
+        # directly (see this function's docstring on _backend= overrides)
+        # that this exact fixture actually exercises the unimorph fallback,
+        # since slot templates stay bound to the factory-level ag_backend
+        # ("homer") even though the lookup itself is overridden to ag_lsj.
+        # What this test actually confirms: require_lexicon=None does NOT
+        # apply require_lexicon's hide-unless-attested gating.
+        from ancient_greek_backend_eee import AncientGreekBackend
+        from modern_greek_backend_eee import ModernGreekBackend
+        ag, um = self._backends()
+        ag_lsj = AncientGreekBackend(lexicons=["lsj"])
+        w = {"lemma": "ἄνθρωπος", "form": "ἀνθρώπων", "pos": "noun",
+             "lexicon_tag": 'ancient-greek["lsj"]'}
+        fn = build_grc_period_tables(ag, um, lexicons={"homer": ag, "lsj": ag_lsj},
+                                      el_backend=ModernGreekBackend())
+        names = [n for n, _ in fn(w)]
+        assert names == ["unimorph", "modern"]
+
+    def test_unknown_required_lexicon_key_hides(self):
+        # Same fixture as TestRequireLexicon.test_unknown_required_lexicon_key_hides.
+        ag, um = self._backends()
+        w = {"lemma": "ἀνήρ", "form": "Ἄνδρα", "pos": "noun",
+             "lexicon_tag": 'ancient-greek["homer"]'}
+        fn = build_grc_period_tables(ag, um, lexicons={"homer": ag}, require_lexicon="nonexistent")
+        assert fn(w) is None
+
     def test_public_api(self):
         import eee_project as eee
         assert hasattr(eee, "build_grc_period_tables")
@@ -440,19 +515,16 @@ class TestBuildGrcPeriodTables:
 
 
 class TestGrcPeriodOptions:
-    def test_maps_short_labels_to_period_keys(self):
+    def test_maps_full_labels_to_period_keys(self):
+        # same full _GRC_LEX_PERIOD labels build_grc_lexicon_tabs's own
+        # CSS picker already used for its summary pill and menu options.
         tables = [("homer", "<table>1</table>"), ("lsj", "<table>2</table>"),
                   ("modern", "<table>3</table>")]
-        assert grc_period_options(tables) == {"Epic": "homer", "Attic": "lsj", "Modern": "modern"}
-
-    def test_lxx_and_unimorph_both_map_to_koine(self):
-        tables = [("lxx", "<table>1</table>"), ("unimorph", "<table>2</table>")]
-        opts = grc_period_options(tables)
-        assert set(opts) == {"Koine"}
-        # last one wins the shared label under dict construction -- fine,
-        # since render_grc_period_table keys off the underlying period
-        # string (the dropdown's VALUE), never off this display label.
-        assert opts["Koine"] in {"lxx", "unimorph"}
+        assert grc_period_options(tables) == {
+            "Epic Greek · c. 800–700 BCE": "homer",
+            "Classical Attic · 5th–4th c. BCE": "lsj",
+            "Modern Greek · 16th c.–present": "modern",
+        }
 
     def test_empty_tables(self):
         assert grc_period_options([]) == {}
@@ -470,18 +542,20 @@ class TestRenderGrcPeriodTable:
         html = render_grc_period_table(self._TABLES, "lsj")
         assert "LSJ" in html and "HOMER" not in html
 
-    def test_defaults_to_first_when_period_is_none(self):
-        html = render_grc_period_table(self._TABLES, None)
+    @pytest.mark.parametrize("period", [None, "nonexistent"])
+    def test_defaults_to_first_when_period_missing_or_unknown(self, period):
+        html = render_grc_period_table(self._TABLES, period)
         assert "HOMER" in html
 
-    def test_defaults_to_first_when_period_unknown(self):
-        html = render_grc_period_table(self._TABLES, "nonexistent")
-        assert "HOMER" in html
-
-    def test_includes_period_label_and_description(self):
+    def test_multiple_periods_show_description_but_not_a_repeated_header(self):
         html = render_grc_period_table(self._TABLES, "homer")
-        assert "Epic Greek" in html  # from _GRC_LEX_PERIOD
-        assert "homer lexicon" in html  # from _GRC_LEX_DESCR
+        assert "Epic Greek" not in html
+        assert "homer lexicon" in html
+
+    def test_single_period_includes_header_and_description(self):
+        html = render_grc_period_table([("homer", "<table>HOMER</table>")], "homer")
+        assert "Epic Greek" in html
+        assert "homer lexicon" in html
 
     def test_empty_tables_returns_empty_string(self):
         assert render_grc_period_table([], None) == ""
@@ -1025,6 +1099,7 @@ class TestUiLabel:
                 'en': 'About form-checking (EEE)', 'ru': 'О проверке форм (EEE)',
                 'el': 'Σχετικά με τον έλεγχο τύπων (EEE)',
             },
+            'period_selector_label': {'en': 'Period', 'ru': 'Период', 'el': 'Περίοδος'},
         }
         for key, per_lang in expected.items():
             for lang, text in per_lang.items():
@@ -2371,6 +2446,9 @@ class _FormMo(_StubMoLayout):
         def switch(value=False):
             return _FakeBtn(value=value)
         @staticmethod
+        def dropdown(options=None, value=None, label=""):
+            return _FakeDropdown(options, value, label)
+        @staticmethod
         def anywidget(inst):
             return inst
     @staticmethod
@@ -2643,6 +2721,81 @@ class TestRenderGlossPanel:
         assert "word/reason" in panel[0]
         assert "Формы слова по эпохам" in panel[1]
         assert str(panel[2]) == "<table>...</table>"
+
+
+class TestRenderGlossSelector:
+    """render_gloss_selector -- Cell 1 of the real-dropdown gloss panel
+    (see build_grc_period_tables); pairs with TestRenderGlossTable below."""
+
+    def test_no_selection_returns_none_state_and_placeholder_panel(self, gu_form):
+        tables, selector, panel = gu_form.render_gloss_selector(
+            [{"form": "x", "lemma": "x"}], "not-there", lambda w: None,
+        )
+        assert (tables, selector) == (None, None)
+        assert "Выберите слово" in panel
+
+    def test_no_selection_placeholder_lang_en(self, gu_form):
+        _, _, panel = gu_form.render_gloss_selector(
+            [{"form": "x", "lemma": "x"}], "not-there", lambda w: None, lang="en",
+        )
+        assert "Select a word" in panel
+        assert "Выберите" not in panel
+
+    def test_word_with_no_tables_returns_none_selector_and_tables(self, gu_form):
+        words = [{"form": "λόγος", "lemma": "λόγος", "context": "word", "meaning": "word/reason"}]
+        tables, selector, panel = gu_form.render_gloss_selector(words, "λόγος", lambda w: None)
+        assert selector is None
+        assert tables is None
+        assert "λόγος" in panel[0]
+
+    def test_word_with_one_table_builds_no_selector(self, gu_form):
+        # a single period needs no picker at all
+        words = [{"form": "λόγος", "lemma": "λόγος", "context": "word", "meaning": "word/reason"}]
+        tables, selector, _ = gu_form.render_gloss_selector(
+            words, "λόγος", lambda w: [("homer", "<table>H</table>")],
+        )
+        assert selector is None
+        assert tables == [("homer", "<table>H</table>")]
+
+    def test_word_with_multiple_tables_builds_dropdown_defaulting_to_first(self, gu_form):
+        words = [{"form": "λόγος", "lemma": "λόγος", "context": "word", "meaning": "word/reason"}]
+        tables, selector, panel = gu_form.render_gloss_selector(
+            words, "λόγος",
+            lambda w: [("homer", "<table>H</table>"), ("lsj", "<table>A</table>")],
+        )
+        assert selector is not None
+        assert selector.value == "homer"
+        assert len(tables) == 2
+        assert selector in panel  # the dropdown itself is part of the displayed panel
+
+    def test_dropdown_label_from_ui_label(self, gu_form):
+        words = [{"form": "λόγος", "lemma": "λόγος", "context": "word", "meaning": "word/reason"}]
+        _, selector, _ = gu_form.render_gloss_selector(
+            words, "λόγος",
+            lambda w: [("homer", "<t>H</t>"), ("lsj", "<t>A</t>")],
+            lang="en",
+        )
+        assert selector.label == "Period"
+
+
+class TestRenderGlossTable:
+    """render_gloss_table -- Cell 2 of the real-dropdown gloss panel; must
+    be called from a cell taking period_selector as its own parameter, see
+    the method's own docstring."""
+
+    def test_no_tables_renders_nothing(self, gu_form):
+        assert gu_form.render_gloss_table(None, None) is None
+
+    def test_renders_the_selected_period(self, gu_form):
+        tables = [("homer", "<table>HOMER</table>"), ("lsj", "<table>LSJ</table>")]
+        selector = _FakeDropdown(options={"Attic": "lsj"}, value="Attic")
+        html = str(gu_form.render_gloss_table(tables, selector))
+        assert "LSJ" in html and "HOMER" not in html
+
+    def test_no_selector_falls_back_to_first_period(self, gu_form):
+        tables = [("homer", "<table>HOMER</table>")]
+        html = str(gu_form.render_gloss_table(tables, None))
+        assert "HOMER" in html
 
 
 class TestResetQuizState:
