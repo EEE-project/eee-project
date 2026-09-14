@@ -16,6 +16,7 @@ from eee_project.notebook_utils import (
     poly_to_mono,
     parse_stanza_text,
     parse_stanza_translations,
+    strip_comment_lines,
     load_ga_config,
     MODERN_GREEK,
     ANCIENT_GREEK,
@@ -785,6 +786,37 @@ class TestParseStanzaTranslations:
         greek = parse_stanza_text(greek_md)
         trans, _ = parse_stanza_translations(trans_md)
         assert len(greek["A"]) == len(trans["T"]["A"].split("\n"))
+
+
+# ──────────────────────────────────────── strip_comment_lines ──
+
+class TestStripCommentLines:
+    def test_comment_line_dropped(self):
+        text = "<!-- grc: εἶμ' Ὀδυσεὺς -->\nI-am Odysseus"
+        assert strip_comment_lines(text) == "I-am Odysseus"
+
+    def test_multiple_comment_lines(self):
+        text = "<!-- grc: x -->\ngloss-a\n<!-- grc: y -->\ngloss-b"
+        assert strip_comment_lines(text) == "gloss-a\ngloss-b"
+
+    def test_any_comment_tag_dropped_not_just_grc(self):
+        # generic by design -- a future note type uses the same mechanism
+        # without this function needing to know its tag.
+        text = "<!-- note: some future annotation -->\nreal content"
+        assert strip_comment_lines(text) == "real content"
+
+    def test_no_comment_lines_unchanged(self):
+        # plain prose (e.g. a translator with no embedded annotations)
+        # passes through unchanged -- a safe no-op.
+        text = "plain prose line one\nplain prose line two"
+        assert strip_comment_lines(text) == text
+
+    def test_empty_input(self):
+        assert strip_comment_lines("") == ""
+
+    def test_blank_lines_preserved(self):
+        text = "<!-- grc: x -->\ngloss-a\n\ngloss-b"
+        assert strip_comment_lines(text) == "gloss-a\n\ngloss-b"
 
 
 # ──────────────────────────────────────────────── GreekConfig ──
@@ -9060,6 +9092,25 @@ class TestStanzaMatchPickTranslation:
         picked = {gu_form._stanza_match_pick_translation(s)[0] for s in stanzas}
         assert picked == {"подстрочник", "Жуковский", "Вересаев"}
 
+    def test_valid_translators_filters_candidates(self, gu_form):
+        stanzas = [
+            {"ref": f"VLD.{i}", "lines": ["x"],
+             "translations": {"A": f"a{i}", "B": f"b{i}", "C": f"c{i}"}}
+            for i in range(20)
+        ]
+        picked = {gu_form._stanza_match_pick_translation(s, valid_translators=["A", "B"])[0]
+                  for s in stanzas}
+        assert picked == {"A", "B"}
+
+    def test_valid_translators_none_means_all_allowed(self, gu_form):
+        s = _SM_STANZAS[0]
+        assert (gu_form._stanza_match_pick_translation(s, valid_translators=None)
+                == gu_form._stanza_match_pick_translation(s))
+
+    def test_valid_translators_excluding_all_returns_none(self, gu_form):
+        s = {"ref": "S.1", "lines": ["x"], "translations": {"Т": "text"}}
+        assert gu_form._stanza_match_pick_translation(s, valid_translators=["Other"]) is None
+
 
 class TestStanzaMatchPromptAndCorrect:
     def test_grc_to_tr_prompt_is_greek_correct_is_translation(self, gu_form):
@@ -9089,6 +9140,12 @@ class TestStanzaMatchPromptAndCorrect:
         prompt, correct = gu_form._stanza_match_prompt_and_correct(s, "grc_to_tr")
         assert prompt == "λόγος"
         assert correct == ""
+
+    def test_valid_translators_restricts_pick(self, gu_form):
+        _, correct = gu_form._stanza_match_prompt_and_correct(
+            _SM_STANZAS[0], "grc_to_tr", valid_translators=["подстрочник"],
+        )
+        assert correct == "Мужа мне назови, Муза, многообразного, который очень много — подстрочник"
 
 
 class TestStanzaMatchDistractorPool:
@@ -9122,6 +9179,22 @@ class TestStanzaMatchDistractorPool:
         pool = gu_form._stanza_match_distractor_pool(_SM_STANZAS[0], _SM_STANZAS, "grc_to_tr")
         refs_34 = [t for ref, _, t in pool if ref == "I.3-4"]
         assert len(refs_34) == 3
+
+    def test_valid_translators_filters_grc_to_tr_pool(self, gu_form):
+        pool = gu_form._stanza_match_distractor_pool(
+            _SM_STANZAS[0], _SM_STANZAS, "grc_to_tr", valid_translators=["Жуковский"],
+        )
+        translators = {tr for _, tr, _ in pool}
+        assert translators == {"Жуковский"}
+
+    def test_valid_translators_does_not_affect_tr_to_grc_pool(self, gu_form):
+        # tr_to_grc distractors are plain Greek text, translator-agnostic --
+        # filtering by translator must not remove any of them.
+        pool_all = gu_form._stanza_match_distractor_pool(_SM_STANZAS[0], _SM_STANZAS, "tr_to_grc")
+        pool_filtered = gu_form._stanza_match_distractor_pool(
+            _SM_STANZAS[0], _SM_STANZAS, "tr_to_grc", valid_translators=["Жуковский"],
+        )
+        assert pool_all == pool_filtered
 
 
 class TestStanzaMatchRound:
@@ -9199,6 +9272,16 @@ class TestStanzaMatchRound:
             round_ = gu_form._stanza_match_round(_SM_STANZAS[0], stanzas, "grc_to_tr", random)
             assert dup_stanza["translations"]["Т"] + " — Т" not in round_["options"]
 
+    def test_valid_translators_restricts_whole_round(self, gu_form):
+        import random
+        for _ in range(20):
+            round_ = gu_form._stanza_match_round(
+                _SM_STANZAS[0], _SM_STANZAS, "grc_to_tr", random,
+                valid_translators=["Жуковский", "Вересаев"],
+            )
+            translators = {o.rsplit(" — ", 1)[-1] for o in round_["options"]}
+            assert translators <= {"Жуковский", "Вересаев"}
+
 
 class TestStanzaMatchQuestion:
     def test_stanza_none_calls_stop(self, gu_form):
@@ -9229,6 +9312,15 @@ class TestStanzaMatchQuestion:
         )
         assert radio.value == "Ἄνδρα μοι ἔννεπε, Μοῦσα, πολύτροπον, ὃς μάλα πολλὰ"
 
+    def test_valid_translators_threaded_through(self, gu_form):
+        import random
+        for _ in range(20):
+            radio, _ = gu_form.stanza_match_question(
+                _SM_STANZAS[0], _SM_STANZAS, "grc_to_tr", "ru", random,
+                valid_translators=["подстрочник"],
+            )
+            assert all(o.endswith("— подстрочник") for o in radio.options)
+
 
 class TestStanzaMatchWidgets:
     def test_no_cv_placeholder_radio(self, gu_form):
@@ -9238,6 +9330,13 @@ class TestStanzaMatchWidgets:
     def test_cv_gives_multiple_options(self, gu_form):
         radio, _, _ = gu_form.stanza_match_widgets(cv=_SM_STANZAS[0], remaining=_SM_STANZAS[1:], stanzas=_SM_STANZAS)
         assert len(radio.options) > 1
+
+    def test_valid_translators_threaded_through(self, gu_form):
+        radio, _, _ = gu_form.stanza_match_widgets(
+            cv=_SM_STANZAS[0], remaining=_SM_STANZAS[1:], stanzas=_SM_STANZAS,
+            valid_translators=["подстрочник"],
+        )
+        assert all(o.endswith("— подстрочник") for o in radio.options)
 
     def test_done_flag_changes_next_label(self, gu_form):
         _, next_btn, _ = gu_form.stanza_match_widgets(cv=None, remaining=[], stanzas=_SM_STANZAS)
@@ -9256,7 +9355,7 @@ class TestStanzaMatchForm:
         return _form_state(cv, rem, sc, rst, hist, fut)
 
     def _call(self, gu, state, radio=None, next_v=None, prev_v=None, stanzas=None,
-              direction="grc_to_tr", lang="ru", renew_btn=None):
+              direction="grc_to_tr", lang="ru", renew_btn=None, valid_translators=None):
         cv_g, cv_s, _, rem_g, rem_s, _, sc_g, sc_s, _, rst_g, rst_s, hist_g, hist_s, _, fut_g, fut_s = state
         return gu.stanza_match_form(
             cv_g, cv_s, rem_g, rem_s, sc_g, sc_s, rst_g, rst_s,
@@ -9266,6 +9365,7 @@ class TestStanzaMatchForm:
             direction=direction,
             lang=lang,
             renew_btn=renew_btn,
+            valid_translators=valid_translators,
         )
 
     def test_uninit_initializes(self, gu_form):
@@ -9377,6 +9477,19 @@ class TestStanzaMatchForm:
         state = self._state(cv=_SM_STANZAS[0], rem=_SM_STANZAS[1:])
         result = self._call(gu_form, state, radio=_FakeRadio(value=None))
         assert "правильно" in str(result)
+
+    def test_valid_translators_threaded_through_grading(self, gu_form):
+        # Widgets and grading must agree on the same valid_translators-filtered
+        # pick -- same setup as test_valid_translators_restricts_pick.
+        s = _SM_STANZAS[0]
+        correct = "Мужа мне назови, Муза, многообразного, который очень много — подстрочник"
+        state = self._state(cv=s, rem=_SM_STANZAS[1:])
+        sc_b = state[8]
+        self._call(
+            gu_form, state, radio=_FakeRadio(value=correct), next_v=1,
+            valid_translators=["подстрочник"],
+        )
+        assert sc_b[0]["correct"] == 1
 
 
 # ────────────────────────────────────────── translation-presence quiz (5b) ──
@@ -9575,6 +9688,25 @@ class TestBuildTranslationPresenceItems:
         rows = [{"lemma": "ἀνήρ", "form": "Ἄνδρα", "stanza_ref": "I.1-2",
                  "translator": "Жуковский", "reflected": ""}]
         assert gu_form.build_translation_presence_items(rows, _TP_VOCAB, _SM_STANZAS) == []
+
+    def test_valid_translators_filters_items(self, gu_form):
+        items = gu_form.build_translation_presence_items(
+            self._ROWS, _TP_VOCAB, _SM_STANZAS, valid_translators=["Жуковский"]
+        )
+        assert len(items) == 1
+        assert items[0]["translator"] == "Жуковский"
+
+    def test_valid_translators_none_means_all_allowed(self, gu_form):
+        items = gu_form.build_translation_presence_items(
+            self._ROWS, _TP_VOCAB, _SM_STANZAS, valid_translators=None
+        )
+        assert len(items) == 2
+
+    def test_valid_translators_excluding_all_returns_empty(self, gu_form):
+        items = gu_form.build_translation_presence_items(
+            self._ROWS, _TP_VOCAB, _SM_STANZAS, valid_translators=["NoSuchTranslator"]
+        )
+        assert items == []
 
 
 class TestSampleSessionItems:

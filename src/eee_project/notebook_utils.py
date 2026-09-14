@@ -2120,6 +2120,23 @@ def parse_stanza_translations(md: str, *, ref_prefix: str = "### ") -> "tuple[di
     return out, desc
 
 
+def strip_comment_lines(text: str) -> str:
+    """Drop any ``<!-- ... -->`` line from stanza text, keeping the rest.
+
+    Works on any translator's already-extracted text (from
+    :func:`parse_stanza_translations`, which doesn't strip mid-stanza
+    comments itself) -- a safe no-op for a translator with no such lines.
+    Lets a stanza body carry out-of-band annotations alongside its real
+    text (e.g. an interlinear translator's echoed Greek source line,
+    ``<!-- grc: ... -->``, or any future note tag) without callers needing
+    to know which tag is in use.
+    """
+    return "\n".join(
+        L for L in text.splitlines()
+        if not ((s := L.strip()).startswith("<!--") and s.endswith("-->"))
+    )
+
+
 def greek_compare(
     a: str,
     b: str,
@@ -5764,7 +5781,20 @@ class GreekUtils:
 
     # ------------------------------------------------------- stanza-match quiz (5a)
 
-    def _stanza_match_pick_translation(self, stanza: dict) -> "tuple[str, str] | None":
+    @staticmethod
+    def _translator_allowed(translator: str, valid_translators: "set[str] | None") -> bool:
+        """True if *translator* passes an optional allow-list (``None`` = allow all).
+
+        Shared by every ``valid_translators``-filtering call site in this
+        class. Callers should pass *valid_translators* as a ``set`` (or
+        ``None``), converted once up front rather than on each call, so
+        repeated membership tests here stay O(1).
+        """
+        return valid_translators is None or translator in valid_translators
+
+    def _stanza_match_pick_translation(self, stanza: dict,
+                                        valid_translators: "list[str] | set[str] | None" = None
+                                        ) -> "tuple[str, str] | None":
         """One non-placeholder ``(translator, text)`` pair for this stanza.
 
         Picked via a ref-seeded ``random.Random`` instance rather than always
@@ -5773,16 +5803,17 @@ class GreekUtils:
         instead of always the same one (e.g. always "подстрочник", the
         translator that happens to sort first in every stanza's dict).
 
-        Still a pure function of *stanza* alone — no external counter or
-        shared RNG state. Seeding a local ``Random`` with the ref string is
-        deterministic across processes (unlike Python's own salted `hash()`),
-        so the same stanza always yields the same pick, and
-        :meth:`stanza_match_widgets` (building options) and
-        :meth:`stanza_match_form` (grading) independently agree without
-        sharing any state.
+        *valid_translators*, when given, restricts candidates to that set
+        (e.g. a caller may only want translators matching the current UI
+        language). ``None`` allows every translator the stanza has.
+
+        Still a pure function of *stanza* alone -- deterministic, so
+        :meth:`stanza_match_widgets` and :meth:`stanza_match_form` agree
+        without sharing state.
         """
+        _valid = valid_translators if valid_translators is None else set(valid_translators)
         candidates = [(tr, txt) for tr, txt in stanza.get("translations", {}).items()
-                      if txt and txt != "—"]
+                      if txt and txt != "—" and self._translator_allowed(tr, _valid)]
         if not candidates:
             return None
         return _random.Random(stanza["ref"]).choice(candidates)
@@ -5809,19 +5840,23 @@ class GreekUtils:
         return f"{text} — {translator}"
 
     def _stanza_match_prompt_and_correct(self, stanza: dict, direction: str,
-                                          *, _picked: "tuple[str, str] | None" = ...) -> "tuple[str, str]":
+                                          *, _picked: "tuple[str, str] | None" = ...,
+                                          valid_translators: "list[str] | set[str] | None" = None
+                                          ) -> "tuple[str, str]":
         """Pure ``(prompt, correct_answer)`` pair for one stanza + direction.
 
-        No randomness: the same ``(stanza, direction)`` always yields the same
-        pair, so :meth:`stanza_match_widgets` (building the option list) and
-        :meth:`stanza_match_form` (grading) independently agree on the correct
-        answer without sharing any state — grading only ever needs this pair,
-        never the distractor set.
+        No randomness: the same ``(stanza, direction, valid_translators)``
+        always yields the same pair, so :meth:`stanza_match_widgets`
+        (building the option list) and :meth:`stanza_match_form` (grading)
+        independently agree on the correct answer without sharing any state
+        — grading only ever needs this pair, never the distractor set.
 
         Whichever side is a translation is attributed to its translator:
         the prompt (blockquote-cited) in ``"tr_to_grc"``, the correct answer
         (inline-suffixed, matching :meth:`_stanza_match_round`'s distractor
         formatting) in ``"grc_to_tr"``.
+
+        *valid_translators*: see :meth:`_stanza_match_pick_translation`.
 
         *_picked*: internal escape hatch for :meth:`_stanza_match_round`,
         which already needs :meth:`_stanza_match_pick_translation`'s raw
@@ -5829,27 +5864,37 @@ class GreekUtils:
         twice. Leave unset to have it computed here as usual.
         """
         grc_text = "\n".join(stanza["lines"])
-        picked = self._stanza_match_pick_translation(stanza) if _picked is ... else _picked
+        picked = (self._stanza_match_pick_translation(stanza, valid_translators)
+                  if _picked is ... else _picked)
         translator, tr_text = picked if picked else (None, "")
         if direction == "grc_to_tr":
             return grc_text, self._stanza_match_attribute_option(tr_text, translator)
         return self._stanza_match_attribute_prompt(tr_text, translator), grc_text
 
     def _stanza_match_distractor_pool(self, stanza: dict, all_stanzas: "list[dict]",
-                                       direction: str) -> "list[tuple[str, str | None, str]]":
+                                       direction: str,
+                                       valid_translators: "list[str] | set[str] | None" = None
+                                       ) -> "list[tuple[str, str | None, str]]":
         """``(ref, translator, candidate_text)`` triples from OTHER stanzas,
         answer-side of *direction* (their translations for ``grc_to_tr`` --
         *translator* is that candidate's own, since distractors are pooled
         across every translator, not just each stanza's picked one; their
-        Greek text for ``tr_to_grc``, *translator* always ``None``)."""
+        Greek text for ``tr_to_grc``, *translator* always ``None``).
+
+        *valid_translators* filters the ``grc_to_tr`` pool the same way as
+        :meth:`_stanza_match_pick_translation`; irrelevant to ``tr_to_grc``,
+        whose candidates are translator-agnostic Greek text."""
         others = [s for s in all_stanzas if s["ref"] != stanza["ref"]]
         if direction == "grc_to_tr":
+            _valid = valid_translators if valid_translators is None else set(valid_translators)
             return [(s["ref"], tr, txt) for s in others
-                    for tr, txt in s.get("translations", {}).items() if txt and txt != "—"]
+                    for tr, txt in s.get("translations", {}).items()
+                    if txt and txt != "—" and self._translator_allowed(tr, _valid)]
         return [(s["ref"], None, "\n".join(s["lines"])) for s in others]
 
     def _stanza_match_round(self, stanza: dict, all_stanzas: "list[dict]", direction: str,
-                             rng: Any, *, n_options: int = 3) -> dict:
+                             rng: Any, *, n_options: int = 3,
+                             valid_translators: "list[str] | set[str] | None" = None) -> dict:
         """Build one stanza-match round for display: a prompt + n_options
         candidate texts (1 correct + distractors from OTHER stanzas).
 
@@ -5859,14 +5904,16 @@ class GreekUtils:
         translator exactly once instead of favoring whichever translator
         happens to be listed first across the other stanzas.
 
+        *valid_translators*: see :meth:`_stanza_match_pick_translation`.
+
         Returns ``{"prompt": str, "options": list[str], "correct": str}``.
         Used by :meth:`stanza_match_question` only — grading in
         :meth:`stanza_match_form` uses :meth:`_stanza_match_prompt_and_correct`
         directly and never needs the distractor set.
         """
-        picked = self._stanza_match_pick_translation(stanza)
+        picked = self._stanza_match_pick_translation(stanza, valid_translators)
         prompt, correct = self._stanza_match_prompt_and_correct(stanza, direction, _picked=picked)
-        pool = self._stanza_match_distractor_pool(stanza, all_stanzas, direction)
+        pool = self._stanza_match_distractor_pool(stanza, all_stanzas, direction, valid_translators)
 
         def _norm(t: str) -> str:
             return " ".join(t.split()).strip().lower()
@@ -5918,8 +5965,11 @@ class GreekUtils:
 
     def stanza_match_question(self, stanza: "dict | None", all_stanzas: "list[dict]",
                                direction: str, lang: str, rng: Any, *, n_options: int = 3,
-                               initial_value: "str | None" = None) -> tuple:
+                               initial_value: "str | None" = None,
+                               valid_translators: "list[str] | set[str] | None" = None) -> tuple:
         """Build a radio-button question for one stanza-match round.
+
+        *valid_translators*: see :meth:`_stanza_match_pick_translation`.
 
         Returns ``(radio, stanza)``. Calls ``mo.stop`` when *stanza* is
         None so the cell halts cleanly without raising.
@@ -5927,7 +5977,8 @@ class GreekUtils:
         mo = self._mo
         if stanza is None:
             mo.stop(True, mo.md(""))
-        round_ = self._stanza_match_round(stanza, all_stanzas, direction, rng, n_options=n_options)
+        round_ = self._stanza_match_round(stanza, all_stanzas, direction, rng, n_options=n_options,
+                                           valid_translators=valid_translators)
         _kw = {"value": initial_value} if initial_value is not None and initial_value in round_["options"] else {}
         radio = mo.ui.radio(
             options=round_["options"],
@@ -5940,8 +5991,11 @@ class GreekUtils:
                               stanzas: "list[dict]",
                               direction: str = "grc_to_tr", n_options: int = 3,
                               restore_entry: "dict | None" = None,
-                              history_len: int = 0, lang: str = "ru") -> tuple:
+                              history_len: int = 0, lang: str = "ru",
+                              valid_translators: "list[str] | set[str] | None" = None) -> tuple:
         """Create widgets for a stanza↔translation matching exercise.
+
+        *valid_translators*: see :meth:`_stanza_match_pick_translation`.
 
         Returns ``(choice_radio, next_btn, prev_btn)``. Unpack in a single
         cell so marimo tracks ``choice_radio`` and re-runs the companion
@@ -5956,6 +6010,7 @@ class GreekUtils:
             _restore = restore_entry.get("answer") if restore_entry else None
             choice_radio, _ = self.stanza_match_question(
                 cv, stanzas, direction, lang, _random, n_options=n_options, initial_value=_restore,
+                valid_translators=valid_translators,
             )
         _done = self.word_drill_done(cv, remaining)
         next_btn, prev_btn = self._make_nav_buttons(done=_done, history_len=history_len, lang=lang)
@@ -5978,6 +6033,7 @@ class GreekUtils:
         title: str = "",
         lang: str = "ru",
         renew_btn: "Any | None" = None,
+        valid_translators: "list[str] | set[str] | None" = None,
     ) -> Any:
         """Standalone stanza↔translation matcher: initialization, navigation, display.
 
@@ -5992,7 +6048,9 @@ class GreekUtils:
         current stanza, so it always agrees with the options
         :meth:`stanza_match_widgets` built, without recomputing them.
         ``renew_btn``, if given, renders alongside prev/next (see
-        :meth:`word_quiz_form`).
+        :meth:`word_quiz_form`). *valid_translators* must match whatever
+        :meth:`stanza_match_widgets` was called with, so grading agrees with
+        the options actually shown — see :meth:`_stanza_match_pick_translation`.
         """
         mo = self._mo
         cv = get_cv()
@@ -6009,7 +6067,8 @@ class GreekUtils:
 
         _done = cv is None and len(remaining) == 0
         _ans = choice_radio.value
-        _correct = self._stanza_match_prompt_and_correct(cv, direction)[1] if cv else None
+        _correct = (self._stanza_match_prompt_and_correct(cv, direction, valid_translators=valid_translators)[1]
+                    if cv else None)
 
         if next_btn.value:
             _result = self._handle_quiz_next(
@@ -6166,7 +6225,9 @@ class GreekUtils:
         ]
 
     def build_translation_presence_items(self, presence_rows: "list[dict]", vocab: "list[dict]",
-                                          stanzas: "list[dict]") -> "list[dict]":
+                                          stanzas: "list[dict]",
+                                          valid_translators: "list[str] | set[str] | None" = None
+                                          ) -> "list[dict]":
         """Cross-reference *presence_rows* against *vocab* (for meaning) and
         *stanzas* (the translator's passage text, keyed by each row's own
         ``stanza_ref``) into ready-to-grade items for
@@ -6174,17 +6235,21 @@ class GreekUtils:
 
         A row is silently skipped — not an error — if its ``reflected`` hasn't
         been reviewed yet (not ``"yes"``/``"no"``), its word isn't in *vocab*,
-        its ``stanza_ref`` doesn't match any stanza, or that translator has no
-        real text for that stanza. Mirrors this exercise's existing "missing
-        row is tolerated" contract — an unreviewed row has no confident ground
-        truth, so it's treated the same as a missing one rather than silently
-        graded as "no".
+        its ``stanza_ref`` doesn't match any stanza, that translator has no
+        real text for that stanza, or its translator isn't in
+        *valid_translators* (when given). Mirrors this exercise's existing
+        "missing row is tolerated" contract — an unreviewed row has no
+        confident ground truth, so it's treated the same as a missing one
+        rather than silently graded as "no".
         """
         vocab_by_key = {(w.get("lemma") or w.get("form", ""), w.get("form", "")): w for w in vocab}
         stanzas_by_ref = {s["ref"]: s for s in stanzas}
+        _valid = valid_translators if valid_translators is None else set(valid_translators)
         items = []
         for row in presence_rows:
             if row.get("reflected") not in ("yes", "no"):
+                continue
+            if not self._translator_allowed(row["translator"], _valid):
                 continue
             w = vocab_by_key.get((row["lemma"], row["form"]))
             if w is None:

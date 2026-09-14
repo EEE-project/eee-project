@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.15.0 - 2026-09-14
+- `GreekUtils.build_translation_presence_items()` gains an optional
+  `valid_translators` parameter, restricting which translators' rows
+  become quiz items. Without it, every translator with reviewed rows was
+  included regardless of the session's own language.
+- New `strip_comment_lines()`: drops any `<!-- ... -->` line from a
+  stanza's already-extracted text (`parse_stanza_translations()` doesn't
+  strip mid-stanza comments itself). Generic — usable for any translator
+  whose text embeds out-of-band annotations, e.g. an interlinear
+  translator's echoed Greek source line (`<!-- grc: ... -->`).
+
+## 1.14.0 - 2026-09-10
+- `GreekUtils.stanza_match_widgets()`/`.stanza_match_form()` gain an
+  optional `valid_translators` parameter, restricting which translator a
+  round's prompt/correct-answer/distractors are drawn from. Without it,
+  a stanza with translations in multiple languages could pick any of
+  them regardless of the session's own language — callers that pass a
+  language-filtered list now get a round that only ever quotes
+  translators matching that language.
+
 ## 1.13.0 - 2026-09-10
 - `GreekUtils.render_gloss_selector()`/`.render_gloss_table()` — a
   two-cell alternative to `render_gloss_panel()` for a real
