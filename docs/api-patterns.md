@@ -729,6 +729,20 @@ extra setup needed). Prefer plain `ensure_file` for a single file, or for a
 loop over an unbounded/variable-length list where you don't want every fetch
 in flight at once.
 
+### Greek text input (`diacritics_text`)
+
+A text input with its own diacritics button bar (polytonic or monotonic mark
+set, from `GreekConfig.polytonic`). `.value` is the typed text as a plain
+string. Assigning `.label` or `.placeholder` later updates the rendered widget
+in place — no rebuild, so whatever the student already typed stays:
+
+```python
+answer = gu.diacritics_text(placeholder="γράψε τη λέξη", label="Απάντηση:")
+
+# later, e.g. from a button's on_click:
+answer.label = "Δεύτερη προσπάθεια:"
+```
+
 ### Drill exercises
 
 For custom exercise types — multiple fields per item, non-standard slots —

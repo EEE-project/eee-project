@@ -1196,7 +1196,7 @@ _DIA_CSS = _bar_css(".eee-dia-bar") + """\
   font-family:'GFS Didot','New Athena Unicode','Noto Serif',serif}
 """
 
-# Shared by both diacritics-bar ESM widgets (_DIA_ESM_TMPL, _PARA_ESM) --
+# Shared by both diacritics-bar ESM widgets (_DIA_ESM, _PARA_ESM) --
 # was duplicated verbatim in each until 2026-07-26. clearMarks/clearAllMarks/
 # getMarksFor take `activeMarks` as an explicit parameter rather than closing
 # over it, since each widget's render() owns its own per-instance Map and
@@ -1309,9 +1309,7 @@ function stripLastDiacritic(inp, pos) {
 
 # The input lives INSIDE the widget so beforeinput fires without crossing
 # the marimo-text shadow DOM boundary.
-# EEE_PLACEHOLDER and EEE_LABEL are replaced at runtime by _make_dia_esm().
-# Only `value` is synced so mo.ui.anywidget().value returns a plain string.
-_DIA_ESM_TMPL = _DIACRITIC_CORE_JS + """\
+_DIA_ESM = _DIACRITIC_CORE_JS + """\
 function render({ model, el }) {
   const activeMarks = new Map(); // cat → {dia, btn}
   let biSnapshot = null;         // {value, pos} saved in beforeinput for Android fix
@@ -1319,18 +1317,23 @@ function render({ model, el }) {
   const bar = document.createElement('div');
   bar.className = 'eee-dia-bar';
 
-  const lbl = EEE_LABEL;
-  if (lbl) {
-    const sp = document.createElement('span');
-    sp.className = 'dia-lbl';
+  const sp = document.createElement('span');
+  sp.className = 'dia-lbl';
+  const syncLabel = () => {
+    const lbl = model.get('label') || '';
     sp.textContent = lbl;
-    bar.appendChild(sp);
-  }
+    sp.style.display = lbl ? '' : 'none';
+  };
+  syncLabel();
+  model.on('change:label', syncLabel);
+  bar.appendChild(sp);
 
   const inp = document.createElement('input');
   inp.type = 'text';
   inp.className = 'eee-dia-inp';
-  inp.placeholder = EEE_PLACEHOLDER;
+  const syncPlaceholder = () => { inp.placeholder = model.get('placeholder') || ''; };
+  syncPlaceholder();
+  model.on('change:placeholder', syncPlaceholder);
 
   const MARKS = model.get('polytonic') ? ALL_MARKS : MONOTONIC_MARKS;
   for (const {ch, dia, label, cat} of MARKS) {
@@ -1422,22 +1425,15 @@ export default { render };
 """
 
 
-def _make_dia_esm(placeholder: str, label: str) -> str:
-    import json as _json
-    return (_DIA_ESM_TMPL
-            .replace("EEE_PLACEHOLDER", _json.dumps(placeholder))
-            .replace("EEE_LABEL", _json.dumps(label)))
-
-
-@functools.lru_cache(maxsize=8)
-def _make_dia_widget_class(placeholder: str, label: str):
-    return type("_DiacriticsTextWidget", (_anywidget.AnyWidget,), {
-        "_css": _DIA_CSS,
-        "_esm": _make_dia_esm(placeholder, label),
-        "value": _traitlets.Unicode("").tag(sync=True),
-        "enter_pressed": _traitlets.Int(0).tag(sync=True),
-        "polytonic": _traitlets.Bool(True).tag(sync=True),
-    })
+if _ANYWIDGET_OK:
+    class _DiacriticsTextWidget(_anywidget.AnyWidget):
+        _css = _DIA_CSS
+        _esm = _DIA_ESM
+        value = _traitlets.Unicode("").tag(sync=True)
+        enter_pressed = _traitlets.Int(0).tag(sync=True)
+        polytonic = _traitlets.Bool(True).tag(sync=True)
+        placeholder = _traitlets.Unicode("").tag(sync=True)
+        label = _traitlets.Unicode("").tag(sync=True)
 
 
 class _DiacriticsElement:
@@ -1457,6 +1453,24 @@ class _DiacriticsElement:
         (same convention as ``make_paradigm_form``'s ``.widget.submit_request["request_id"]``)."""
         return self._ui.widget.enter_pressed
 
+    @property
+    def label(self) -> str:
+        """Label text; assigning it updates the rendered widget in place."""
+        return self._ui.widget.label
+
+    @label.setter
+    def label(self, text: str) -> None:
+        self._ui.widget.label = text
+
+    @property
+    def placeholder(self) -> str:
+        """Placeholder text; assigning it updates the rendered widget in place."""
+        return self._ui.widget.placeholder
+
+    @placeholder.setter
+    def placeholder(self, text: str) -> None:
+        self._ui.widget.placeholder = text
+
     def _mime_(self) -> Any:
         return self._ui._mime_()
 
@@ -1466,7 +1480,8 @@ def diacritics_text(mo, *, placeholder: str = "", label: str = "", value: str = 
     """Combined diacritics bar + text input widget.
 
     Returns an element whose ``.value`` is the typed text as a plain string
-    (drop-in for ``mo.ui.text().value``).
+    (drop-in for ``mo.ui.text().value``); assigning its ``.label`` or
+    ``.placeholder`` updates the rendered widget in place.
     Buttons stay highlighted until pressed again (persistent diacritic mode).
     ``polytonic`` (default ``True``, matching this function's original
     Ancient-Greek-only behavior): ``False`` shows only the acute accent and
@@ -1481,9 +1496,10 @@ def diacritics_text(mo, *, placeholder: str = "", label: str = "", value: str = 
     if not _ANYWIDGET_OK:
         return mo.ui.text(placeholder=placeholder or "Greek word…", full_width=True,
                           value=value)
-    cls = _make_dia_widget_class(placeholder, label)
-    inst = cls()
+    inst = _DiacriticsTextWidget()
     inst.polytonic = polytonic
+    inst.placeholder = placeholder
+    inst.label = label
     if value:
         inst.value = value
     return _DiacriticsElement(mo.ui.anywidget(inst))

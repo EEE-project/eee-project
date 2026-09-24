@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.16.0 - 2026-09-24
+- `diacritics_text()`'s label and placeholder are now synced widget
+  properties instead of text baked into the widget's JavaScript. Assigning
+  `.label` or `.placeholder` on the returned element updates the rendered
+  widget in place, keeping whatever was already typed.
+
 ## 1.15.0 - 2026-09-14
 - `GreekUtils.build_translation_presence_items()` gains an optional
   `valid_translators` parameter, restricting which translators' rows

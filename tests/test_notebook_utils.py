@@ -50,7 +50,7 @@ from eee_project.notebook_utils import (
     norm_grc_surface,
     resolve_clicked_word,
     _norm_grc,
-    _DIA_ESM_TMPL,
+    _DIA_ESM,
     _PARA_ESM,
     _ITEXT_ESM,
     _cors_safe_raw_url,
@@ -6176,7 +6176,7 @@ class TestCreateVerbTestUi:
 
 # ────────────────────────────────────────── paste fix in ESM strings ──
 
-@pytest.mark.parametrize("esm", [_DIA_ESM_TMPL, _PARA_ESM], ids=["dia", "para"])
+@pytest.mark.parametrize("esm", [_DIA_ESM, _PARA_ESM], ids=["dia", "para"])
 class TestDiacriticsEsmPasteFix:
     """Both diacritics ESM templates must allow only insertText/insertCompositionText."""
 
@@ -6440,6 +6440,30 @@ class TestDiacriticsText:
         result = _diacritics_text_fn(_FormMo(), polytonic=False)
         assert result._ui.polytonic is False
 
+    def test_placeholder_and_label_are_synced_traits(self):
+        import eee_project.notebook_utils as _nu
+        if not _nu._ANYWIDGET_OK:
+            pytest.skip("anywidget not installed")
+        result = _diacritics_text_fn(_FormMo(), placeholder="γράψε", label="Απάντηση:")
+        assert result._ui.placeholder == "γράψε"
+        assert result._ui.label == "Απάντηση:"
+        assert result._ui.trait_metadata("label", "sync") is True
+        assert result._ui.trait_metadata("placeholder", "sync") is True
+
+    def test_same_esm_for_any_label(self):
+        import eee_project.notebook_utils as _nu
+        if not _nu._ANYWIDGET_OK:
+            pytest.skip("anywidget not installed")
+        a = _diacritics_text_fn(_FormMo(), label="a", placeholder="x")
+        b = _diacritics_text_fn(_FormMo(), label="b", placeholder="y")
+        assert isinstance(a._ui, _nu._DiacriticsTextWidget)
+        assert a._ui._esm == b._ui._esm == _DIA_ESM
+
+    def test_esm_reads_label_and_placeholder_from_model(self):
+        assert "EEE_" not in _DIA_ESM
+        assert "model.on('change:label'" in _DIA_ESM
+        assert "model.on('change:placeholder'" in _DIA_ESM
+
 
 class TestDiacriticsElement:
     def _fake_ui(self, val="text", enter_pressed=0):
@@ -6450,6 +6474,14 @@ class TestDiacriticsElement:
             widget = _W()
             def _mime_(self): return ("text/html", "<div/>")
         return _UI()
+
+    def test_label_and_placeholder_setters_update_widget(self):
+        ui = self._fake_ui()
+        el = _DiacriticsElement(ui)
+        el.label = "Νέο:"
+        el.placeholder = "πληκτρολόγησε"
+        assert (ui.widget.label, ui.widget.placeholder) == ("Νέο:", "πληκτρολόγησε")
+        assert (el.label, el.placeholder) == ("Νέο:", "πληκτρολόγησε")
 
     def test_value_property(self):
         el = _DiacriticsElement(self._fake_ui("hello"))
