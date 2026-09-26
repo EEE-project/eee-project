@@ -483,11 +483,22 @@ class TestBuildGrcPeriodTables:
         # Same fixture as TestRequireLexicon.test_default_none_preserves_prior_behaviour
         # -- that test's own comment claims this confirms the tag-matched lsj
         # path rather than the unimorph fallback, but its assertion only
-        # checks "Modern Greek" in html, which is true either way; verified
-        # directly (see this function's docstring on _backend= overrides)
-        # that this exact fixture actually exercises the unimorph fallback,
-        # since slot templates stay bound to the factory-level ag_backend
-        # ("homer") even though the lookup itself is overridden to ag_lsj.
+        # checks "Modern Greek" in html, which is true either way.
+        #
+        # Historical note (accurate against ancient-greek-backend-eee 0.3.0,
+        # WRONG since 2.0.1, confirmed 2026-09-26): this fixture used to
+        # exercise the unimorph fallback instead of the tag-matched lsj path
+        # -- 0.3.0's lsj-scoped lookup failed to attest ἀνθρώπων (a common,
+        # basic noun form any reasonably complete AG engine should find),
+        # so `_resolve_grc_period_tables`'s `available` loop got an empty
+        # `tbl` and fell through to the `len(tables) == 0` unimorph branch.
+        # 2.0.1 (30+ releases of real lexicon/backend work later) correctly
+        # attests it directly via the tag-matched "lsj" backend -- this
+        # test's own NAME was already aspirational back then ("preserves
+        # tag_matched_behaviour" while actually observing the fallback);
+        # it's simply true now. `_resolve_grc_period_tables` itself is
+        # unchanged; only the backend's attestation improved.
+        #
         # What this test actually confirms: require_lexicon=None does NOT
         # apply require_lexicon's hide-unless-attested gating.
         from ancient_greek_backend_eee import AncientGreekBackend
@@ -499,7 +510,7 @@ class TestBuildGrcPeriodTables:
         fn = build_grc_period_tables(ag, um, lexicons={"homer": ag, "lsj": ag_lsj},
                                       el_backend=ModernGreekBackend())
         names = [n for n, _ in fn(w)]
-        assert names == ["unimorph", "modern"]
+        assert names == ["lsj", "modern"]
 
     def test_unknown_required_lexicon_key_hides(self):
         # Same fixture as TestRequireLexicon.test_unknown_required_lexicon_key_hides.

@@ -12,8 +12,8 @@ resolution-markers = [
 
 [[package]]
 name = "ancient-greek-backend-eee"
-version = "0.3.0"
-source = { git = "https://codeberg.org/EEE-project/ancient-greek-backend-eee.git#5e82c54ad43a3c2637b9bd44b9fa3bd908898ba1" }
+version = "2.0.1"
+source = { git = "https://codeberg.org/EEE-project/ancient-greek-backend-eee.git#c97fac08f687814300a84a4b49cffe33dd7ef066" }
 dependencies = [
     { name = "greek-inflexion-eee" },
 ]
@@ -306,12 +306,16 @@ wheels = [
 
 [[package]]
 name = "greek-inflexion-eee"
-version = "0.2.0"
-source = { git = "https://codeberg.org/EEE-project/greek-inflexion-eee.git#fc9719240c772563946e704627b1f95df288d01e" }
+version = "3.1.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "greek-accentuation" },
     { name = "inflexion" },
     { name = "pyyaml" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/19/4e/3ad994f5f9f98eac2e2924844910a91a5943faaf3345a457a36bcdbecbb1/greek_inflexion_eee-3.1.0.tar.gz", hash = "sha256:8adcc090f72b93ddb2cce1041c45fc435e262ac0e230d9ce7547f9591e7e0e81", size = 726195, upload-time = "2026-09-24T18:51:29.948Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6a/49/a3a2e409185a02d1ae0f1af086d8e16107d684061f589c2adbfe6aebf73c/greek_inflexion_eee-3.1.0-py3-none-any.whl", hash = "sha256:041cf8d5af62ec7f636702037f0cd46585fcd176a2a6a4f1f06d8cb9cd97d23c", size = 179775, upload-time = "2026-09-24T18:51:28.502Z" },
 ]
 
 [[package]]

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.16.1 - 2026-09-26
+- Relocked `ancient-greek-backend-eee`/`greek-inflexion-eee` in `uv.lock`
+  (0.3.0/0.2.0 → 2.0.1/3.1.0 — the pin had gone stale, so the test suite
+  was never actually exercising current backend behavior). One test's
+  hardcoded expectation was current-backend-stale as a result: tag-matched
+  lexicon lookup for a common word (ἄνθρωπος) now correctly resolves via
+  the tagged lexicon directly instead of falling back to unimorph, an
+  improvement in the backend, not a regression here.
+
 ## 1.16.0 - 2026-09-24
 - `diacritics_text()`'s label and placeholder are now synced widget
   properties instead of text baked into the widget's JavaScript. Assigning
