@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.17.0 - 2026-09-27
+- Added `find_stanza_translation(ref, translations)`, a companion to
+  `parse_stanza_text`/`parse_stanza_translations`: looks up a stanza ref in
+  a translator's `{ref: text}` dict, falling back to a coarser stored range
+  that fully contains it when there's no exact match (e.g. a translator
+  transcribed against wider "equivalent passage" spans than the source
+  text's own stanza boundaries). Needed for the Odyssey course's later
+  lessons, whose `greek.md` splits more finely than some KB translators do.
+
 ## 1.16.1 - 2026-09-26
 - Relocked `ancient-greek-backend-eee`/`greek-inflexion-eee` in `uv.lock`
   (0.3.0/0.2.0 → 2.0.1/3.1.0 — the pin had gone stale, so the test suite

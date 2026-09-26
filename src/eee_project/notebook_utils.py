@@ -2136,6 +2136,43 @@ def parse_stanza_translations(md: str, *, ref_prefix: str = "### ") -> "tuple[di
     return out, desc
 
 
+_STANZA_RANGE_RE = _re.compile(r"^([IVXLCDM]+)\.(\d+)[–-](\d+)")
+
+
+def _parse_stanza_range(ref: str) -> "tuple[str, int, int] | None":
+    m = _STANZA_RANGE_RE.match(ref)
+    if not m:
+        return None
+    book, start, end = m.groups()
+    return book, int(start), int(end)
+
+
+def find_stanza_translation(ref: str, translations: dict) -> str:
+    """Look up ``ref`` (a :func:`parse_stanza_text` key, e.g. ``"IX.39-42"``)
+    in a translator's ``{stanza_ref: text}`` dict (one value of
+    :func:`parse_stanza_translations`'s first return value), falling back to
+    a coarser stored range that fully contains it when there's no exact key
+    match -- e.g. a translator whose own line breaks don't match the source
+    text's stanza boundaries may be transcribed against wider spans instead
+    (``"IX.39-46 (equivalent passage)"`` covering what the source splits into
+    ``"IX.39-42"`` and ``"IX.43-46"``). Both ``ref`` and the stored keys must
+    start with ``<book>.<start>-<end>`` (ASCII hyphen or en dash); a ref that
+    doesn't parse this way, or has no matching or containing entry, returns
+    ``"—"``.
+    """
+    if ref in translations:
+        return translations[ref]
+    parsed = _parse_stanza_range(ref)
+    if parsed is None:
+        return "—"
+    book, start, end = parsed
+    for stored_ref, text in translations.items():
+        stored = _parse_stanza_range(stored_ref)
+        if stored and stored[0] == book and stored[1] <= start and end <= stored[2]:
+            return text
+    return "—"
+
+
 def strip_comment_lines(text: str) -> str:
     """Drop any ``<!-- ... -->`` line from stanza text, keeping the rest.
 

@@ -16,6 +16,7 @@ from eee_project.notebook_utils import (
     poly_to_mono,
     parse_stanza_text,
     parse_stanza_translations,
+    find_stanza_translation,
     strip_comment_lines,
     load_ga_config,
     MODERN_GREEK,
@@ -797,6 +798,45 @@ class TestParseStanzaTranslations:
         greek = parse_stanza_text(greek_md)
         trans, _ = parse_stanza_translations(trans_md)
         assert len(greek["A"]) == len(trans["T"]["A"].split("\n"))
+
+
+# ───────────────────────────────────── find_stanza_translation ──
+
+class TestFindStanzaTranslation:
+    def test_exact_match(self):
+        translations = {"IX.39-42": "text-a", "IX.43-46": "text-b"}
+        assert find_stanza_translation("IX.43-46", translations) == "text-b"
+
+    def test_falls_back_to_containing_coarser_range(self):
+        translations = {"IX.39-46 (equivalent passage)": "wide-text"}
+        assert find_stanza_translation("IX.39-42", translations) == "wide-text"
+        assert find_stanza_translation("IX.43-46", translations) == "wide-text"
+
+    def test_en_dash_and_ascii_hyphen_both_parse(self):
+        translations = {"IX.39–46": "wide-text"}
+        assert find_stanza_translation("IX.39-42", translations) == "wide-text"
+        assert find_stanza_translation("IX.39–42", translations) == "wide-text"
+
+    def test_no_containing_range_returns_dash(self):
+        translations = {"IX.100-110": "unrelated"}
+        assert find_stanza_translation("IX.39-42", translations) == "—"
+
+    def test_different_book_not_matched(self):
+        translations = {"I.39-46": "wrong-book"}
+        assert find_stanza_translation("IX.39-42", translations) == "—"
+
+    def test_partial_overlap_not_matched(self):
+        # a stored range that only partially covers ref must not match --
+        # only full containment counts.
+        translations = {"IX.40-46": "partial"}
+        assert find_stanza_translation("IX.39-42", translations) == "—"
+
+    def test_unparseable_ref_returns_dash(self):
+        assert find_stanza_translation("Ithaki 1-3", {"Ithaki 1-3": "x"}) == "x"
+        assert find_stanza_translation("prologue", {"IX.1-10": "x"}) == "—"
+
+    def test_empty_translations(self):
+        assert find_stanza_translation("IX.39-42", {}) == "—"
 
 
 # ──────────────────────────────────────── strip_comment_lines ──
