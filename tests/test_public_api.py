@@ -119,6 +119,13 @@ def test_find_stanza_translation_in_eee_namespace():
     assert "find_stanza_translation" in eee.__all__
 
 
+def test_interlinear_translator_key_in_eee_namespace():
+    from eee_project.notebook_utils import interlinear_translator_key
+    assert hasattr(eee, "interlinear_translator_key")
+    assert eee.interlinear_translator_key is interlinear_translator_key
+    assert "interlinear_translator_key" in eee.__all__
+
+
 # ── __version__ / pyproject.toml consistency ──────────────────────────────────
 
 

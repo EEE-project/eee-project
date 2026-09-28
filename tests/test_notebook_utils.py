@@ -17,6 +17,7 @@ from eee_project.notebook_utils import (
     parse_stanza_text,
     parse_stanza_translations,
     find_stanza_translation,
+    interlinear_translator_key,
     strip_comment_lines,
     load_ga_config,
     MODERN_GREEK,
@@ -837,6 +838,27 @@ class TestFindStanzaTranslation:
 
     def test_empty_translations(self):
         assert find_stanza_translation("IX.39-42", {}) == "—"
+
+
+# ───────────────────────────────────── interlinear_translator_key ──
+
+class TestInterlinearTranslatorKey:
+    def test_ru(self):
+        assert interlinear_translator_key("ru") == "interlinear_ru"
+
+    def test_en(self):
+        assert interlinear_translator_key("en") == "interlinear_en"
+
+    def test_el(self):
+        assert interlinear_translator_key("el") == "interlinear_el"
+
+    def test_matches_parse_stanza_translations_section_naming(self):
+        # The KB names its interlinear section "## interlinear_{lang}" --
+        # confirm the helper's output is a key parse_stanza_translations
+        # would actually produce from such a section.
+        md = "## interlinear_ru\n### IX.39-42\nline\n"
+        translations, _ = parse_stanza_translations(md)
+        assert interlinear_translator_key("ru") in translations
 
 
 # ──────────────────────────────────────── strip_comment_lines ──

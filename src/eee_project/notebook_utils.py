@@ -2173,6 +2173,22 @@ def find_stanza_translation(ref: str, translations: dict) -> str:
     return "—"
 
 
+def interlinear_translator_key(lang: str) -> str:
+    """The translator-dict key for *lang*'s word-for-word interlinear crib
+    -- ``"interlinear_ru"``, ``"interlinear_en"``, ``"interlinear_el"``, etc.
+
+    Matches ``greek-knowledge-eee``'s own ``## interlinear_{lang}`` section
+    naming convention (one value of :func:`parse_stanza_translations`'s
+    first return value). A caller building a language-aware translator
+    picker should use this instead of hardcoding the string, so a language
+    mismatch here (a notebook assuming a different name than the KB
+    actually uses) can't silently make the interlinear option show no
+    text -- this happened once with Russian, whose old pre-KB local file
+    called it ``"подстрочник"`` instead.
+    """
+    return f"interlinear_{lang}"
+
+
 def strip_comment_lines(text: str) -> str:
     """Drop any ``<!-- ... -->`` line from stanza text, keeping the rest.
 

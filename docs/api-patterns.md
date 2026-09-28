@@ -1412,6 +1412,60 @@ WORDS_COMBINED = eee.grc_coverage_words(
 - Both take the *same* `build_paradigm_table`/`lexicons` you already have in
   scope from Pattern B/setup — no new backend wiring needed.
 
+### Stanza translations & interactive poem text (Odyssey-style)
+
+For a lesson showing a Greek poem alongside a translator picker, with
+clickable vocabulary words in the Greek text:
+
+```python
+text_widget = eee.interactive_text(
+    mo,
+    lines=stanza["lines"],
+    clickable=CLICKABLE_FORMS,
+    homer_words=HOMER_WORDS if SHOW_HOMER.value else set(),
+    ictus_html=RHYTHM_HTML,
+    show_ictus=SHOW_ICTUS.value,
+)
+
+translation = eee.find_stanza_translation(stanza["ref"], translations[trans_selector.value])
+```
+
+- `interactive_text(mo, *, lines, clickable, homer_words=None, ictus_html=None, show_ictus=True)`
+  — returns a real `mo.ui.anywidget` rendering `lines` with vocabulary words
+  as permanent clickable spans. A panel cell that reacts to word clicks must
+  take the *widget*, not this call's return value, as a parameter and read
+  `.widget.selected_word` (bumped alongside `.widget.click_seq` on every
+  click, including repeat-clicks on the same word). `clickable`/`homer_words`
+  are iterables of normalized surface forms, e.g. from `grc_coverage_words`
+  (`mode="none"` for "all words", `mode="homer"` for the Homer-only subset).
+  Requires `anywidget`.
+- `parse_stanza_text(md, *, ref_prefix="### ")` / `parse_stanza_translations(md, *, ref_prefix="### ")`
+  — parse a `greek.md`-style poem file and a `translations.md`-style
+  translator file (`## <translator name>` sections, each holding
+  `<ref_prefix><ref>` stanza blocks) into `{ref: lines}` and
+  `({translator: {ref: text}}, {translator: description})` respectively. A
+  translator's stanza block must have exactly as many lines as the matching
+  Greek stanza — callers zip them positionally.
+- `find_stanza_translation(ref, translations)` — look up `ref` in one
+  translator's `{ref: text}` dict (a value from `parse_stanza_translations`'s
+  first return value), falling back to a coarser stored range that fully
+  contains it when there's no exact match. Needed because some translators
+  are transcribed against wider "equivalent passage" spans than a lesson's
+  own `greek.md` stanza split (e.g. Pope's couplets don't line-break the same
+  way the source text does) — a bare `translations.get(ref)` would silently
+  return nothing for those. Returns `"—"` when no match or containing range
+  exists.
+- `interlinear_translator_key(lang)` — the translator-dict key for `lang`'s
+  word-for-word interlinear crib (`"interlinear_ru"`, `"interlinear_en"`,
+  `"interlinear_el"`, ...), matching `greek-knowledge-eee`'s own
+  `## interlinear_{lang}` section naming. Use this instead of hardcoding the
+  string when building a language-aware translator picker — a mismatch here
+  (a notebook assuming a different name than the KB actually uses) silently
+  makes that option show no text instead of erroring.
+- `strip_comment_lines(text)` — drop any `<!-- ... -->` line from a
+  translator's stanza text (e.g. an interlinear translator's echoed Greek
+  source line); a no-op for text with no such lines.
+
 ---
 
 ## Pattern C — `make_paradigm_form` (paradigm drill notebooks)
