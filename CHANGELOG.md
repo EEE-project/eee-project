@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.17.1 - 2026-09-27
+- Fixed `find_stanza_translation` (added in 1.17.0) never actually being reachable as `eee_project.find_stanza_translation` -- it was defined in `notebook_utils.py` but not re-exported in `__init__.py`'s import list or `__all__`, so `eee.find_stanza_translation(...)` raised `AttributeError` for every caller. Also fixed `__version__` (was still "1.16.1", missed in the 1.17.0 bump) and added a regression test asserting it matches `pyproject.toml`.
+- Fixed `interactive_text`'s Greek-text column wrapping every line into 2-3 rows when a short sibling translator squeezed it -- only visible when translators vary sharply in rendered length for the same stanza (a `find_stanza_translation` coarse-range fallback can make this happen; every existing lesson's translators happen to be similar lengths, so this was never visible before). First attempt added a flat `min-width:30em`, which stopped the wrapping but created the opposite problem for short stanzas: a fixed-width box reserved far more space than a short passage's actual lines needed, leaving a large dead gap before the translator column. Replaced with `white-space:nowrap` (keeping `flex-shrink:0`): the box now shrinks to fit its own longest line instead of a guessed constant, closing the gap for short stanzas while still refusing to wrap long ones.
+
 ## 1.17.0 - 2026-09-27
 - Added `find_stanza_translation(ref, translations)`, a companion to
   `parse_stanza_text`/`parse_stanza_translations`: looks up a stanza ref in

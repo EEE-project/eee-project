@@ -24,12 +24,12 @@ from eee_project.notebook_utils import (
     build_grc_period_tables, grc_period_options, render_grc_period_table,
     make_paradigm_form, interactive_text, setup_ancient_greek, add_labels,
     filter_grc_quiz_words, grc_coverage_words, grc_lexicon_sources, norm_grc_surface, resolve_clicked_word,
-    parse_stanza_text, parse_stanza_translations, strip_comment_lines,
+    parse_stanza_text, parse_stanza_translations, find_stanza_translation, strip_comment_lines,
     LEXICON_TAG_POS, LEXICON_TAG_POS_ALIASES, TRANSLATION_PRESENCE_CONTENT_POS,
     _INC as increment_counter,
 )
 
-__version__ = "1.16.1"
+__version__ = "1.17.1"
 
 _UNSET = object()  # sentinel distinguishing "not provided" from explicit None
 
@@ -107,6 +107,7 @@ __all__ = [
     "resolve_clicked_word",
     "parse_stanza_text",
     "parse_stanza_translations",
+    "find_stanza_translation",
     "strip_comment_lines",
     "increment_counter",
     "LEXICON_TAG_POS",

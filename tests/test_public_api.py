@@ -107,3 +107,25 @@ def test_ambiguous_pos_error_in_eee_namespace():
     from eee_project._exceptions import AmbiguousPOSError
     assert hasattr(eee, "AmbiguousPOSError")
     assert eee.AmbiguousPOSError is AmbiguousPOSError
+
+
+def test_find_stanza_translation_in_eee_namespace():
+    # Regression guard: this was added to notebook_utils.py but not re-exported
+    # here or listed in __all__ until the next commit -- eee.find_stanza_translation
+    # raised AttributeError for every caller until caught.
+    from eee_project.notebook_utils import find_stanza_translation
+    assert hasattr(eee, "find_stanza_translation")
+    assert eee.find_stanza_translation is find_stanza_translation
+    assert "find_stanza_translation" in eee.__all__
+
+
+# ── __version__ / pyproject.toml consistency ──────────────────────────────────
+
+
+def test_version_matches_pyproject_toml():
+    import tomllib
+    from pathlib import Path
+
+    pyproject = Path(__file__).parent.parent / "pyproject.toml"
+    data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+    assert eee.__version__ == data["project"]["version"]

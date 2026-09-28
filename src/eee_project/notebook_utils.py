@@ -1806,7 +1806,7 @@ def make_paradigm_form(mo, labels, values=None, polytonic=True):
 # ════════════════════════════════════════ interactive text (clickable words) ══
 
 _ITEXT_CSS = """\
-.eee-itext{font-family:'Gentium Plus','GFS Didot',serif;font-size:1.15em;line-height:2}
+.eee-itext{font-family:'Gentium Plus','GFS Didot',serif;font-size:1.15em;line-height:2;white-space:nowrap;flex-shrink:0}
 .eee-itext .gk-word{cursor:pointer;border-bottom:1px dotted #7a7a7a;padding-bottom:0}
 .eee-itext .gk-word:hover{border-bottom-color:#003d82}
 .eee-itext .gk-word:focus{outline:2px solid #003d82;outline-offset:1px}
