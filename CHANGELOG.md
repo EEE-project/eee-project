@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.19.0 - 2026-09-28
+- Added `allow_coarse_fallback=True` keyword to `find_stanza_translation`. Discovered live on the deployed `2026_07_27` Odyssey lesson: `greek-knowledge-eee`'s `interlinear_en`/`interlinear_el` sections are split at coarser "equivalent passage" boundaries (matching Pope's own paragraphing), not at each lesson's own finer `greek.md` stanza split -- unlike `interlinear_ru`, which was re-split to match every lesson exactly. The existing coarse-range fallback (correct for Pope, whom it was designed for) silently pulled in extra lines from a neighboring stanza whenever an EN/EL lesson stanza didn't line up with the KB's wider block. Callers can now pass `allow_coarse_fallback=False` for a translator whose ranges are expected to already align with the course split (e.g. an interlinear crib), so a non-exact match returns `"—"` instead of wrong text.
+
 ## 1.18.0 - 2026-09-28
 - Added `interlinear_translator_key(lang)`, returning the translator-dict key for a language's word-for-word interlinear crib (`"interlinear_ru"`, `"interlinear_en"`, `"interlinear_el"`, ...) -- matches `greek-knowledge-eee`'s own `## interlinear_{lang}` section naming, so a notebook building a language-aware translator picker no longer needs to hardcode (and risk mismatching) that convention itself. Replaces the per-notebook hardcoding that caused the 1.17.1 Russian-interlinear bug in the first place.
 - Documented `find_stanza_translation`, `interlinear_translator_key`, and `interactive_text` in `docs/api-patterns.md` -- all three existed since 1.17.0 (or earlier, for `interactive_text`) but were never written up there.

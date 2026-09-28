@@ -839,6 +839,14 @@ class TestFindStanzaTranslation:
     def test_empty_translations(self):
         assert find_stanza_translation("IX.39-42", {}) == "—"
 
+    def test_allow_coarse_fallback_false_rejects_coarser_range(self):
+        translations = {"IX.39-46 (equivalent passage)": "wide-text"}
+        assert find_stanza_translation("IX.39-42", translations, allow_coarse_fallback=False) == "—"
+
+    def test_allow_coarse_fallback_false_still_allows_exact_match(self):
+        translations = {"IX.39-42": "text-a"}
+        assert find_stanza_translation("IX.39-42", translations, allow_coarse_fallback=False) == "text-a"
+
 
 # ───────────────────────────────────── interlinear_translator_key ──
 

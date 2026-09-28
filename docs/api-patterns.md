@@ -1446,15 +1446,24 @@ translation = eee.find_stanza_translation(stanza["ref"], translations[trans_sele
   `({translator: {ref: text}}, {translator: description})` respectively. A
   translator's stanza block must have exactly as many lines as the matching
   Greek stanza — callers zip them positionally.
-- `find_stanza_translation(ref, translations)` — look up `ref` in one
-  translator's `{ref: text}` dict (a value from `parse_stanza_translations`'s
-  first return value), falling back to a coarser stored range that fully
-  contains it when there's no exact match. Needed because some translators
-  are transcribed against wider "equivalent passage" spans than a lesson's
-  own `greek.md` stanza split (e.g. Pope's couplets don't line-break the same
-  way the source text does) — a bare `translations.get(ref)` would silently
-  return nothing for those. Returns `"—"` when no match or containing range
-  exists.
+- `find_stanza_translation(ref, translations, *, allow_coarse_fallback=True)`
+  — look up `ref` in one translator's `{ref: text}` dict (a value from
+  `parse_stanza_translations`'s first return value), falling back to a
+  coarser stored range that fully contains it when there's no exact match.
+  Needed because some translators are transcribed against wider "equivalent
+  passage" spans than a lesson's own `greek.md` stanza split (e.g. Pope's
+  couplets don't line-break the same way the source text does) — a bare
+  `translations.get(ref)` would silently return nothing for those. Returns
+  `"—"` when no match or containing range exists. Pass
+  `allow_coarse_fallback=False` for a translator whose stored ranges are
+  expected to already align with the course's own split (e.g. a
+  word-for-word interlinear crib) — for those, a coarse match means extra,
+  unrelated lines from a neighboring stanza, not a genuine equivalent
+  passage, so it's better to show `"—"` than the wrong text. Confirmed via
+  direct KB inspection: `interlinear_ru` is re-split per lesson stanza, but
+  `interlinear_en`/`interlinear_el` are not (they share Pope's own coarser
+  "equivalent passage" boundaries) — check each translator's actual KB
+  granularity before assuming "interlinear" means fine-grained.
 - `interlinear_translator_key(lang)` — the translator-dict key for `lang`'s
   word-for-word interlinear crib (`"interlinear_ru"`, `"interlinear_en"`,
   `"interlinear_el"`, ...), matching `greek-knowledge-eee`'s own
