@@ -2147,7 +2147,7 @@ def _parse_stanza_range(ref: str) -> "tuple[str, int, int] | None":
     return book, int(start), int(end)
 
 
-def find_stanza_translation(ref: str, translations: dict) -> str:
+def find_stanza_translation(ref: str, translations: dict, *, allow_coarse_fallback: bool = True) -> str:
     """Look up ``ref`` (a :func:`parse_stanza_text` key, e.g. ``"IX.39-42"``)
     in a translator's ``{stanza_ref: text}`` dict (one value of
     :func:`parse_stanza_translations`'s first return value), falling back to
@@ -2159,9 +2159,19 @@ def find_stanza_translation(ref: str, translations: dict) -> str:
     start with ``<book>.<start>-<end>`` (ASCII hyphen or en dash); a ref that
     doesn't parse this way, or has no matching or containing entry, returns
     ``"—"``.
+
+    Pass ``allow_coarse_fallback=False`` to require an exact key match and
+    return ``"—"`` otherwise. Use this for a translator whose stored ranges
+    are expected to already align with the course's own stanza split (e.g.
+    a word-for-word interlinear crib) -- a coarser match there means extra,
+    unrelated lines bleeding in from a neighboring stanza rather than a
+    genuine equivalent-passage transcription, so showing nothing is more
+    honest than showing the wrong text.
     """
     if ref in translations:
         return translations[ref]
+    if not allow_coarse_fallback:
+        return "—"
     parsed = _parse_stanza_range(ref)
     if parsed is None:
         return "—"
