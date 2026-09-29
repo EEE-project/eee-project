@@ -1459,11 +1459,13 @@ translation = eee.find_stanza_translation(stanza["ref"], translations[trans_sele
   expected to already align with the course's own split (e.g. a
   word-for-word interlinear crib) — for those, a coarse match means extra,
   unrelated lines from a neighboring stanza, not a genuine equivalent
-  passage, so it's better to show `"—"` than the wrong text. Confirmed via
-  direct KB inspection: `interlinear_ru` is re-split per lesson stanza, but
-  `interlinear_en`/`interlinear_el` are not (they share Pope's own coarser
-  "equivalent passage" boundaries) — check each translator's actual KB
-  granularity before assuming "interlinear" means fine-grained.
+  passage, so it's better to show `"—"` than the wrong text. `interlinear_ru`
+  was re-split per lesson stanza from the start; `interlinear_en`/
+  `interlinear_el` shared Pope's own coarser "equivalent passage" boundaries
+  until greek-knowledge-eee's KB was re-split to match (2026-09-28) — check
+  each translator's actual KB granularity before assuming "interlinear"
+  means fine-grained, since a future new translator or lesson could
+  reintroduce the same gap.
 - `interlinear_translator_key(lang)` — the translator-dict key for `lang`'s
   word-for-word interlinear crib (`"interlinear_ru"`, `"interlinear_en"`,
   `"interlinear_el"`, ...), matching `greek-knowledge-eee`'s own
