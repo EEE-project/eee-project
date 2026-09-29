@@ -19,8 +19,10 @@ make check     # ruff, curated rule set — see [tool.ruff.lint] in pyproject.to
 1. **Tests** — a passing suite isn't enough on its own if it was already
    passing before the change; that only proves nothing broke, not that new
    behavior is covered. Add a test that specifically exercises the new/fixed
-   code path (a regression would need to fail it). `tests/test_notebook_utils.py`'s
-   existing style: one class per function, one test per behavior. **Exception:**
+   code path (a regression would need to fail it). `tests/test_notebook_utils.py`
+   (for `notebook_utils.py`'s own widget/`GreekUtils` surface) and
+   `tests/test_content.py` (for `content.py`'s non-widget helpers) share the
+   same style: one class per function, one test per behavior. **Exception:**
    JS living inside an anywidget's `_esm` string — pytest can't reach it at
    all (no JS test runner in this repo); see the live-kernel-testing
    Convention below, which is the only check that exists for that code.
@@ -30,12 +32,19 @@ make check     # ruff, curated rule set — see [tool.ruff.lint] in pyproject.to
 3. **Version bump** — `pyproject.toml` and `src/eee_project/__init__.py`'s
    `__version__`, kept in sync. Patch for a fix, minor for a new
    capability/backend, major for a breaking change.
-4. **Lint** — `make check` on changed files.
+4. **`CHANGELOG.md`** — one entry per version bump, newest on top. Match the
+   existing entries' level of detail: what changed, why (the bug/gap that
+   motivated it, not just the mechanical diff), and the verification state
+   (test count, `ruff check` status).
+5. **Lint** — `make check` on changed files.
 
-`README.md` deliberately carries no changelog — one existed through v1.0.0 but
-was removed in the same commit as the PyPI-packaging README rework (`30fa087`)
-for being too noisy (dense multi-sentence entries per version). Don't re-add
-one; `docs/api-patterns.md` is the source of truth for current capability.
+`README.md` deliberately carries no changelog section of its own — one
+existed inline through v1.0.0 but was removed in the same commit as the
+PyPI-packaging README rework (`30fa087`) for being too noisy there. Don't
+re-add one to `README.md`; `CHANGELOG.md` (a separate top-level file,
+introduced shortly after `30fa087`) is where per-version detail lives now —
+`docs/api-patterns.md` stays the source of truth for current capability
+(what a function does today), not for change history (what changed and why).
 
 ## Conventions
 

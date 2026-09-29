@@ -108,3 +108,56 @@ class StubBackend:
 
     def paradigm(self, word, pos):
         return self._paradigm_fn(word, pos)
+
+
+# ── Shared fixtures used by both test_notebook_utils.py and test_content.py ───
+
+
+class FakeDropdown:
+    """Mirrors real marimo dropdown semantics: .value resolves through
+    *options* by the given label, not the label itself."""
+    def __init__(self, options=None, value=None, label=""):
+        self.options = options or {}
+        self.label = label
+        self.value = self.options.get(value)
+
+
+class LangMo(StubMoLayout):
+    class ui:
+        @staticmethod
+        def dropdown(options=None, value=None, label=""):
+            return FakeDropdown(options, value, label)
+        @staticmethod
+        def anywidget(inst):
+            return inst
+
+
+class FakeParadigmBackend:
+    """paradigm(lemma, pos) returns a fixed {tag: {forms}} dict for one lemma/pos,
+    or raises if `raises` is set — mirrors AncientGreekBackend.paradigm()'s shape."""
+    def __init__(self, table=None, *, raises=False):
+        self._table = table or {}
+        self._raises = raises
+
+    def paradigm(self, lemma, pos):
+        if self._raises:
+            raise ValueError("boom")
+        return self._table.get((lemma, pos), {})
+
+
+SAMPLE_GA = {"measurement_id": "G-TEST1234"}
+
+
+def make_resp(data: bytes):
+    r = MagicMock()
+    r.read.return_value = data
+    r.__enter__ = lambda s: s
+    r.__exit__ = MagicMock(return_value=False)
+    return r
+
+
+@pytest.fixture
+def gu_marimo():
+    from eee_project.notebook_utils import GreekUtils, ANCIENT_GREEK
+    import marimo as mo
+    return GreekUtils(mo_module=mo, config=ANCIENT_GREEK)

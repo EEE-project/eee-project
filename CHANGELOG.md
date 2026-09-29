@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.20.1 - 2026-09-29
+- Clarified the `find_stanza_translation` note in `docs/api-patterns.md`:
+  `interlinear_en`/`interlinear_el` are no longer coarser than
+  `interlinear_ru` -- `greek-knowledge-eee`'s KB was re-split to match on
+  2026-09-28, but the wording still described the pre-re-split gap as
+  current.
+- Split `notebook_utils.py`'s non-widget helper functions (`greek_compare`,
+  `build_grc_paradigm_table`, `parse_stanza_text`, and ~73 others) out into
+  a new `content.py`, re-exported unchanged from `notebook_utils.py`. No
+  public API change -- `from eee_project import X` and
+  `from eee_project.notebook_utils import X` both still resolve to the same
+  objects as before. Full suite 1581/1581 passing, `ruff check` clean.
+
 ## 1.20.0 - 2026-09-29
 - `word_quiz_form` now accepts `show_prev_when_done` (same opt-in
   convention as `word_drill_form`'s existing parameter of the same name --
