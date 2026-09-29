@@ -30,7 +30,7 @@ from eee_project.notebook_utils import (
     _INC as increment_counter,
 )
 
-__version__ = "1.19.0"
+__version__ = "1.20.0"
 
 _UNSET = object()  # sentinel distinguishing "not provided" from explicit None
 

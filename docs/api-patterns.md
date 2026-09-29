@@ -1001,6 +1001,12 @@ caller (Odyssey, and any `word_drill_form` call that doesn't pass it)
 working exactly as before. (1.10.0+) omitting it entirely resolves from
 `config.show_prev_when_done` the same way as `nav_icons` above.
 
+(1.20.0+) `word_quiz_form` accepts the same `show_prev_when_done` keyword,
+same convention (opt-in, default `False`, resolves from
+`config.show_prev_when_done` when omitted) — until 1.20.0 it had no way to
+keep Prev working on a finished quiz's done screen at all, unlike
+`word_drill_form`.
+
 ### Paradigm drill (3-cell API)
 
 For exercises where the student fills in an entire paradigm at once (every

@@ -3554,6 +3554,54 @@ class TestWordQuizForm:
         assert "correct" in str(result)
         assert "правильно" not in str(result)
 
+    def test_done_with_show_prev_when_done_includes_prev(self, gu_form):
+        next_btn = _FakeBtn(value=0, label="↺")
+        prev_btn = _FakeBtn(value=0, label="◀")
+        state = self._state(rem=[])
+        cv_g, cv_s, _, rem_g, rem_s, _, sc_g, sc_s, _, rst_g, rst_s, hist_g, hist_s, _, fut_g, fut_s = state
+        with pytest.raises(StopIteration) as exc_info:
+            gu_form.word_quiz_form(
+                cv_g, cv_s, rem_g, rem_s, sc_g, sc_s, rst_g, rst_s,
+                hist_g, hist_s, fut_g, fut_s,
+                _FakeRadio(), next_btn, prev_btn,
+                vocab=_WQ_VOCAB,
+                show_prev_when_done=True,
+            )
+        content = exc_info.value.args[0]
+        assert content[-1] == [prev_btn, next_btn]
+
+    def test_done_without_show_prev_when_done_keeps_next_btn_bare(self, gu_form):
+        # Default False -- every existing caller keeps today's exact shape
+        # (a bare next_btn, not wrapped in an hstack with anything).
+        next_btn = _FakeBtn(value=0, label="↺")
+        state = self._state(rem=[])
+        cv_g, cv_s, _, rem_g, rem_s, _, sc_g, sc_s, _, rst_g, rst_s, hist_g, hist_s, _, fut_g, fut_s = state
+        with pytest.raises(StopIteration) as exc_info:
+            gu_form.word_quiz_form(
+                cv_g, cv_s, rem_g, rem_s, sc_g, sc_s, rst_g, rst_s,
+                hist_g, hist_s, fut_g, fut_s,
+                _FakeRadio(), next_btn, _FakeBtn(value=0),
+                vocab=_WQ_VOCAB,
+            )
+        content = exc_info.value.args[0]
+        assert content[-1] is next_btn
+
+    def test_config_show_prev_when_done_true_used_with_no_explicit_kwarg(self):
+        gu = GreekUtils(mo_module=_FormMo(), config=_NAV_ICONS_CONFIG)
+        next_btn = _FakeBtn(value=0, label="↺")
+        prev_btn = _FakeBtn(value=0, label="◀")
+        state = self._state(rem=[])
+        cv_g, cv_s, _, rem_g, rem_s, _, sc_g, sc_s, _, rst_g, rst_s, hist_g, hist_s, _, fut_g, fut_s = state
+        with pytest.raises(StopIteration) as exc_info:
+            gu.word_quiz_form(
+                cv_g, cv_s, rem_g, rem_s, sc_g, sc_s, rst_g, rst_s,
+                hist_g, hist_s, fut_g, fut_s,
+                _FakeRadio(), next_btn, prev_btn,
+                vocab=_WQ_VOCAB,
+            )
+        content = exc_info.value.args[0]
+        assert content[-1] == [prev_btn, next_btn]
+
 
 # ────────────────────────────────────────── ensure_file ──
 

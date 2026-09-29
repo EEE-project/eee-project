@@ -155,6 +155,8 @@ def _(mo):
     ## Exercise 3 · Multiple Choice
 
     Pick the correct Ancient Greek word for the given translation.
+    Once finished, **Prev** still works on the done screen so you can
+    review past answers instead of only restarting.
     """)
     return
 
@@ -225,6 +227,7 @@ def _(
         meaning_key="meaning",
         form_key="form",
         lang="en",
+        show_prev_when_done=True,
     )
     return
 

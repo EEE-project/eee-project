@@ -5312,6 +5312,32 @@ class GreekUtils:
             mo.hstack(_row, justify="start"),
         ])
 
+    def _exercise_state_init(self, get_cv, get_remaining, get_score, get_restore,
+                             get_history, get_future, set_cv, set_remaining, vocab: list):
+        """Shared first-run/state-unpack step for :meth:`word_drill_form` and
+        :meth:`word_quiz_form`. On first run (``remaining`` is ``None``),
+        shuffle-starts ``vocab`` and returns ``None`` -- the caller must
+        return the placeholder (``mo.md("*...*")``) immediately. Otherwise
+        returns the unpacked ``(cv, remaining, score, restore_entry,
+        history, future)`` 6-tuple.
+        """
+        remaining = get_remaining()
+        if remaining is None:
+            if vocab:
+                self._shuffle_start(vocab, set_cv, set_remaining)
+            return None
+        return get_cv(), remaining, get_score(), get_restore(), get_history(), get_future()
+
+    def _record_answer(self, cv: dict, answer: Any, is_correct: bool, history: list, score: dict,
+                       set_history, set_score) -> None:
+        """Append one answered word to history and bump score -- the one
+        bookkeeping step every advance path (:meth:`word_drill_form` and
+        :meth:`word_quiz_form`, normal advance or replaying through future)
+        shares identically.
+        """
+        set_history(history + [{"word": cv, "answer": answer, "correct": is_correct}])
+        set_score({"correct": score["correct"] + int(is_correct), "total": score["total"] + 1})
+
     def word_drill_form(
         self,
         get_cv, set_cv,
@@ -5388,12 +5414,11 @@ class GreekUtils:
         if show_prev_when_done is None:
             show_prev_when_done = self._cfg.show_prev_when_done
         mo = self._mo
-        cv = get_cv()
-        remaining = get_remaining()
-        score = get_score()
-        restore_entry = get_restore()
-        history = get_history()
-        future = get_future()
+        _state = self._exercise_state_init(get_cv, get_remaining, get_score, get_restore,
+                                           get_history, get_future, set_cv, set_remaining, vocab)
+        if _state is None:
+            return mo.md("*...*")
+        cv, remaining, score, restore_entry, history, future = _state
 
         def _set_checked(value: "str | None") -> None:
             if set_checked is not None:
@@ -5401,18 +5426,11 @@ class GreekUtils:
 
         def _advance(typed: str, ok: bool) -> None:
             """Record this answer and move to the next word."""
-            set_history(history + [{"word": cv, "answer": typed, "correct": ok}])
-            set_score({"correct": score["correct"] + int(ok), "total": score["total"] + 1})
+            self._record_answer(cv, typed, ok, history, score, set_history, set_score)
             set_cv(remaining[0] if remaining else None)
             set_remaining(remaining[1:] if remaining else [])
             set_restore(None)
             _set_checked(None)
-
-        # Initialize on first run (remaining is None = not yet started)
-        if remaining is None:
-            if vocab:
-                self._shuffle_start(vocab, set_cv, set_remaining)
-            return mo.md("*...*")
 
         # Auto-advance on a correct Check (button click or Enter), mirroring
         # the paradigm-drill family's "correct -> immediately advance"
@@ -5460,8 +5478,7 @@ class GreekUtils:
                 _next = future[0]
                 _ans = (write_input.value.strip() or (_re.get("answer") or "")) if _re else write_input.value.strip()
                 _ok = self._ci(_ans, {cv[form_key]}) if _ans else False
-                set_history(history + [{"word": cv, "answer": _ans, "correct": _ok}])
-                set_score({"correct": score["correct"] + int(_ok), "total": score["total"] + 1})
+                self._record_answer(cv, _ans, _ok, history, score, set_history, set_score)
                 set_future(future[1:])
                 set_cv(_next["word"])
                 set_restore(
@@ -5725,6 +5742,7 @@ class GreekUtils:
         build_paradigm_table: "Any | None" = None,
         renew_btn: "Any | None" = None,
         nav_icons: "bool | None" = None,
+        show_prev_when_done: "bool | None" = None,
     ) -> Any:
         """Unified multiple-choice quiz: initialization, navigation, and display.
 
@@ -5767,22 +5785,21 @@ class GreekUtils:
                        from ``next_btn`` itself (built by
                        :meth:`word_quiz_widgets`), nothing extra needed here
                        for that part. Opt-in, default unchanged.
+            show_prev_when_done: ``True`` lets a finished quiz still be
+                       reviewed via Prev instead of only restarting —
+                       see :meth:`word_drill_form`'s own parameter of the
+                       same name for what it does and why it's safe.
         """
         if nav_icons is None:
             nav_icons = self._cfg.nav_icons
+        if show_prev_when_done is None:
+            show_prev_when_done = self._cfg.show_prev_when_done
         mo = self._mo
-        cv = get_cv()
-        remaining = get_remaining()
-        score = get_score()
-        restore_entry = get_restore()
-        history = get_history()
-        future = get_future()
-
-        # Initialize on first run
-        if remaining is None:
-            if vocab:
-                self._shuffle_start(vocab, set_cv, set_remaining)
+        _state = self._exercise_state_init(get_cv, get_remaining, get_score, get_restore,
+                                           get_history, get_future, set_cv, set_remaining, vocab)
+        if _state is None:
             return mo.md("*...*")
+        cv, remaining, score, restore_entry, history, future = _state
 
         _done = self.word_drill_done(cv, remaining)
         _ans = answer_radio.value
@@ -5798,8 +5815,7 @@ class GreekUtils:
                 _next = future[0]
                 _a = _ans if _ans is not None else (_re.get("answer") if _re else None)
                 _ok = (_a == cv[form_key]) if _a is not None else False
-                set_history(history + [{"word": cv, "answer": _a, "correct": _ok}])
-                set_score({"correct": score["correct"] + int(_ok), "total": score["total"] + 1})
+                self._record_answer(cv, _a, _ok, history, score, set_history, set_score)
                 set_future(future[1:])
                 set_cv(_next["word"])
                 set_restore(
@@ -5813,8 +5829,7 @@ class GreekUtils:
                 # (`_ans == cv[form_key]` is already correctly False when
                 # _ans is None, nothing else needed).
                 _ok = _ans == cv[form_key]
-                set_history(history + [{"word": cv, "answer": _ans, "correct": _ok}])
-                set_score({"correct": score["correct"] + int(_ok), "total": score["total"] + 1})
+                self._record_answer(cv, _ans, _ok, history, score, set_history, set_score)
                 set_cv(remaining[0] if remaining else None)
                 set_remaining(remaining[1:] if remaining else [])
                 set_restore(None)
@@ -5827,7 +5842,8 @@ class GreekUtils:
 
         # Display
         if _done:
-            self._quiz_done_stop(score, lang, next_btn=next_btn)
+            self._quiz_done_stop(score, lang, next_btn=next_btn,
+                                 prev_btn=prev_btn if show_prev_when_done else None)
 
         _fb_ans = _ans if _ans is not None else (restore_entry["answer"] if restore_entry else None)
         if _fb_ans is not None:
