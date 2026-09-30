@@ -51,6 +51,7 @@ import csv
 import functools
 import io
 import random as _random
+import re
 from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any
@@ -1514,7 +1515,8 @@ function render({ model, el }) {
   function draw() {
     const lines = model.get('lines') || [];
     const clickableSet = new Set(model.get('clickable') || []);
-    const homerSet = new Set(model.get('homer_words') || []);
+    const classSets = Object.entries(model.get('word_classes') || {})
+      .map(([cls, forms]) => [cls, new Set(forms)]);
     const showIctus = model.get('show_ictus');
     const ictusHtml = model.get('ictus_html') || {};
     const selected = model.get('selected_word') || '';
@@ -1532,8 +1534,9 @@ function render({ model, el }) {
         const display = trusted ? tok : escapeHtml(tok);
         if (!clickableSet.has(key)) return display;
         const activeCls = bare === selected ? ' active' : '';
-        const homerCls = homerSet.has(key) ? ' homer' : '';
-        return `<span class="gk-word${homerCls}${activeCls}" role="button" tabindex="0" data-w="${escapeHtml(bare)}">${display}</span>`;
+        const extraCls = classSets.filter(([, set]) => set.has(key))
+          .map(([cls]) => ' ' + cls).join('');
+        return `<span class="gk-word${extraCls}${activeCls}" role="button" tabindex="0" data-w="${escapeHtml(bare)}">${display}</span>`;
       });
       return parts.join(' ');
     });
@@ -1560,14 +1563,14 @@ function render({ model, el }) {
     activate(span);
   });
 
-  // Python swapping lines/clickable/homer_words/show_ictus/ictus_html must
+  // Python swapping lines/clickable/word_classes/show_ictus/ictus_html must
   // redraw so the new content (and the persisted .active highlight) render.
   // selected_word and click_seq are JS-write/Python-read only (set
   // exclusively by activate(), which already redraws explicitly) — no
   // listener needed for them, and adding one would double-draw every click.
   model.on('change:lines', draw);
   model.on('change:clickable', draw);
-  model.on('change:homer_words', draw);
+  model.on('change:word_classes', draw);
   model.on('change:show_ictus', draw);
   model.on('change:ictus_html', draw);
 
@@ -1578,20 +1581,24 @@ export default { render };
 """
 
 
+_ITEXT_CLASS_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_-]*")
+_ITEXT_RESERVED_CLASSES = frozenset({"gk-word", "active"})
+
+
 if _ANYWIDGET_OK:
     class _InteractiveTextWidget(_anywidget.AnyWidget):
         _css = _ITEXT_CSS
         _esm = _ITEXT_ESM
         lines = _traitlets.List(_traitlets.Unicode()).tag(sync=True)
         clickable = _traitlets.List(_traitlets.Unicode()).tag(sync=True)
-        homer_words = _traitlets.List(_traitlets.Unicode()).tag(sync=True)
+        word_classes = _traitlets.Dict(value_trait=_traitlets.List(_traitlets.Unicode())).tag(sync=True)
         ictus_html = _traitlets.Dict().tag(sync=True)
         show_ictus = _traitlets.Bool(True).tag(sync=True)
         selected_word = _traitlets.Unicode("").tag(sync=True)
         click_seq = _traitlets.Int(0).tag(sync=True)
 
 
-def interactive_text(mo, *, lines, clickable, homer_words=None, ictus_html=None, show_ictus=True) -> Any:
+def interactive_text(mo, *, lines, clickable, homer_words=None, word_classes=None, ictus_html=None, show_ictus=True) -> Any:
     """Render poem `lines` with vocabulary words as permanent clickable spans.
 
     Returns the real ``mo.ui.anywidget`` — a panel cell must reference
@@ -1612,6 +1619,16 @@ def interactive_text(mo, *, lines, clickable, homer_words=None, ictus_html=None,
     attested form is confirmed by the Homeric corpus lexicon specifically,
     not just reachable via some lexicon in the combined engine.
 
+    ``word_classes``: optional ``{css_class: iterable_of_normalized_forms}`` —
+    generalizes ``homer_words`` to any number of highlight sets. A clickable
+    token whose normalized form is in a set gets that CSS class on its
+    ``.gk-word`` span (a token in several sets gets all of them). Class names
+    must match ``[A-Za-z_][A-Za-z0-9_-]*`` and not be ``gk-word`` or
+    ``active``. The widget ships CSS only for ``.homer``; style any other
+    class from the notebook (e.g. ``mo.Html("<style>...</style>")``).
+    ``homer_words`` stays as shorthand for ``word_classes={"homer": ...}``
+    (an explicit ``word_classes["homer"]`` wins).
+
     ``ictus_html``: optional ``{raw_line: html_with_markup}`` map; shown per
     line when ``show_ictus`` is true, else the plain line text.
     """
@@ -1620,7 +1637,11 @@ def interactive_text(mo, *, lines, clickable, homer_words=None, ictus_html=None,
     w = _InteractiveTextWidget()
     w.lines = list(lines)
     w.clickable = list(clickable)
-    w.homer_words = list(homer_words) if homer_words else []
+    classes = {name: list(forms) for name, forms in {"homer": homer_words, **(word_classes or {})}.items() if forms}
+    for name in classes:
+        if name in _ITEXT_RESERVED_CLASSES or not _ITEXT_CLASS_RE.fullmatch(name):
+            raise ValueError(f"invalid word_classes key {name!r}")
+    w.word_classes = classes
     w.ictus_html = dict(ictus_html) if ictus_html else {}
     w.show_ictus = bool(show_ictus)
     return mo.ui.anywidget(w)

@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.21.0 - 2026-09-30
+- `interactive_text` gained `word_classes={css_class: forms}`, replacing the
+  widget's one-off `homer_words` traitlet (own `List` traitlet, JS `Set`,
+  class concat and `model.on()` listener duplicating `clickable`'s shape)
+  with a single `word_classes: Dict[str, List[str]]` traitlet. A further
+  highlight set now needs only a CSS rule, no widget/JS change. The
+  `homer_words=` argument still works (shorthand for
+  `word_classes={"homer": ...}`); the widget's `homer_words` attribute is
+  gone. Class names are validated (`ValueError` on reserved/unsafe names).
+  Tests: 5 new/updated; full suite unchanged apart from those (167
+  failures here are pre-existing, from backend packages missing in this
+  sandbox), `ruff check` clean. The JS change was NOT checked in a live
+  marimo kernel/browser (per AGENTS.md this is the only check for `_esm`).
+
 ## 1.20.1 - 2026-09-29
 - Clarified the `find_stanza_translation` note in `docs/api-patterns.md`:
   `interlinear_en`/`interlinear_el` are no longer coarser than

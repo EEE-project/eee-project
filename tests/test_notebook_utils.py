@@ -5013,14 +5013,32 @@ class TestInteractiveText:
         assert isinstance(w.clickable, list)
         assert set(w.clickable) == {"ανδρα", "μοι"}
 
-    def test_homer_words_defaults_empty_list_when_none(self):
+    def test_word_classes_defaults_empty_dict(self):
         w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set())
-        assert w.homer_words == []
+        assert w.word_classes == {}
 
-    def test_homer_words_stored_as_list_not_set(self):
+    def test_homer_words_becomes_homer_word_class(self):
         w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), homer_words={"ανδρα", "μοι"})
-        assert isinstance(w.homer_words, list)
-        assert set(w.homer_words) == {"ανδρα", "μοι"}
+        assert isinstance(w.word_classes["homer"], list)
+        assert set(w.word_classes["homer"]) == {"ανδρα", "μοι"}
+
+    def test_word_classes_stored_as_lists(self):
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(),
+                             word_classes={"lxx": {"ανδρα"}, "rare": ["μοι"]})
+        assert w.word_classes == {"lxx": ["ανδρα"], "rare": ["μοι"]}
+
+    def test_word_classes_merges_with_homer_words_and_overrides(self):
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(),
+                             homer_words={"a"}, word_classes={"lxx": {"b"}})
+        assert w.word_classes == {"homer": ["a"], "lxx": ["b"]}
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(),
+                             homer_words={"a"}, word_classes={"homer": {"c"}})
+        assert w.word_classes == {"homer": ["c"]}
+
+    def test_word_classes_rejects_bad_or_reserved_names(self):
+        for bad in ("active", "gk-word", "a b", "1x", ""):
+            with pytest.raises(ValueError):
+                interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), word_classes={bad: {"x"}})
 
     def test_show_ictus_defaults_true(self):
         w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set())

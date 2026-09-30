@@ -1436,7 +1436,7 @@ text_widget = eee.interactive_text(
 translation = eee.find_stanza_translation(stanza["ref"], translations[trans_selector.value])
 ```
 
-- `interactive_text(mo, *, lines, clickable, homer_words=None, ictus_html=None, show_ictus=True)`
+- `interactive_text(mo, *, lines, clickable, homer_words=None, word_classes=None, ictus_html=None, show_ictus=True)`
   — returns a real `mo.ui.anywidget` rendering `lines` with vocabulary words
   as permanent clickable spans. A panel cell that reacts to word clicks must
   take the *widget*, not this call's return value, as a parameter and read
@@ -1445,6 +1445,19 @@ translation = eee.find_stanza_translation(stanza["ref"], translations[trans_sele
   are iterables of normalized surface forms, e.g. from `grc_coverage_words`
   (`mode="none"` for "all words", `mode="homer"` for the Homer-only subset).
   Requires `anywidget`.
+  `word_classes={css_class: forms}` generalizes `homer_words` to any number
+  of highlight sets (`homer_words=X` is shorthand for
+  `word_classes={"homer": X}`); a clickable token in a set gets that CSS
+  class, so a third set needs no widget changes, only a style rule:
+
+  ```python
+  eee.interactive_text(
+      mo, lines=stanza["lines"], clickable=CLICKABLE_FORMS,
+      word_classes={"homer": HOMER_WORDS, "lxx": LXX_WORDS},
+  )
+  # and in a separate cell:
+  mo.Html("<style>.eee-itext .gk-word.lxx{background:#e3f0e3}</style>")
+  ```
 - `parse_stanza_text(md, *, ref_prefix="### ")` / `parse_stanza_translations(md, *, ref_prefix="### ")`
   — parse a `greek.md`-style poem file and a `translations.md`-style
   translator file (`## <translator name>` sections, each holding
