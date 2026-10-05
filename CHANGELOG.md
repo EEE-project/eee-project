@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.21.0 - 2026-10-05
+- `interactive_text` gained `word_classes={css_class: forms}`: any number
+  of named highlight sets. A clickable token whose normalized form is in a
+  set gets that CSS class on its `.gk-word` span; `homer_words=` keeps
+  working as shorthand for `word_classes={"homer": ...}`. Behind it, the
+  widget's separate `homer_words` traitlet -- its own `List`, JS `Set`,
+  class concatenation and `change:` listener, all duplicating
+  `clickable`'s shape -- is replaced by one `word_classes` dict traitlet,
+  so adding a highlight set no longer touches the widget or its JS (the
+  widget's `homer_words` attribute is gone). Class names must be plain CSS
+  identifiers and not `gk-word`/`active`; anything else raises
+  `ValueError`, also for an empty set, so an `X if SHOW.value else set()`
+  toggle fails on the first call rather than when it is switched on.
+- `interactive_text` also gained `css=`, extra stylesheet text inserted
+  into the widget's own CSS after the `.homer` rule and before the
+  selected-word rule (so a clicked word keeps its highlight). It is how a
+  notebook styles a new `word_classes` set: marimo mounts anywidgets in a
+  shadow root, so a `<style>` emitted from another cell never reaches them
+  (verified in a live marimo run).
+- Added `examples/interactive_text_notebook.py`, a runnable demo of
+  `interactive_text` with `word_classes` and `css=` (overlapping sets, the
+  `css=` switch, a click-reactive panel); `make -C examples notebook-itext`.
+- Raised the `marimo` floor to `>=0.25.1` (runtime dependency and dev group in
+  `pyproject.toml`, the examples' PEP 723 headers, `uv.lock`). 0.25.1 carries
+  marimo's fix for `mo.ui.radio` buttons that rendered squashed and mid-paragraph
+  beside a long wrapped option label (marimo-team/marimo#11031, found in the
+  Odyssey stanza-match exercise); a page exported with an older marimo keeps the
+  bug until it is re-exported.
+- 9 new tests, full suite 1621/1621 passing, `ruff check` clean.
+
 ## 1.20.1 - 2026-09-29
 - Clarified the `find_stanza_translation` note in `docs/api-patterns.md`:
   `interlinear_en`/`interlinear_el` are no longer coarser than

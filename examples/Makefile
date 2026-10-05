@@ -1,4 +1,4 @@
-.PHONY: help el grc unimorph backends chain hooks comparison notebook-el notebook-grc notebook notebook-unimorph notebook-exercise notebook-config notebook-drill export-drill export-greek export-ancient-greek export-modern-greek export-unimorph export-exercise export-all
+.PHONY: help el grc unimorph backends chain hooks comparison notebook-el notebook-grc notebook notebook-unimorph notebook-exercise notebook-config notebook-drill notebook-itext export-drill export-greek export-ancient-greek export-modern-greek export-unimorph export-exercise export-all
 
 help:
 	@echo "make el                run modern_greek.py"
@@ -15,6 +15,7 @@ help:
 	@echo "make notebook-exercise open greek_exercise_notebook.py (GreekUtils exercises + vocab quiz)"
 	@echo "make notebook-config   open config_store_notebook.py (ConfigStore — from_url / from_file / from_dict)"
 	@echo "make notebook-drill    open modern_greek_drill_notebook.py (paradigm drill — verb/noun/adj, TSV upload)"
+	@echo "make notebook-itext    open interactive_text_notebook.py (interactive_text — clickable words, word_classes sets, css=)"
 	@echo ""
 	@echo "make export-drill          export drill demo to dist/drill/"
 	@echo "make export-greek          export greek demo to dist/greek/"
@@ -72,6 +73,9 @@ notebook-config:
 
 notebook-drill:
 	cd .. && uv run marimo edit examples/modern_greek_drill_notebook.py --no-token
+
+notebook-itext:
+	cd .. && uv run marimo edit examples/interactive_text_notebook.py --no-token
 
 export-drill:
 	cd .. && uv run marimo export html-wasm examples/modern_greek_drill_notebook.py -o examples/dist/drill --mode run -f

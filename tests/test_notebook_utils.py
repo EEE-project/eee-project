@@ -29,6 +29,7 @@ from eee_project.notebook_utils import (
     _DIA_ESM,
     _PARA_ESM,
     _ITEXT_ESM,
+    _ITEXT_CSS,
     _UI_LABELS,
 )
 from conftest import (
@@ -592,6 +593,21 @@ class TestEeeTopbar:
         result = eee_topbar(_StubHtmlMo(), back_url="https://x.com", lang="en",
                             titles="T", ga_config={"other": "value"})
         assert "gtag" not in result.s
+
+
+class TestAnywidgetImportFallback:
+    def test_module_imports_and_skips_anywidget_features_when_it_is_missing(self, monkeypatch):
+        import importlib.util
+        import sys
+        import eee_project.notebook_utils as _nu
+        name = "_eee_notebook_utils_without_anywidget"
+        spec = importlib.util.spec_from_file_location(name, _nu.__file__)
+        fresh = importlib.util.module_from_spec(spec)
+        monkeypatch.setitem(sys.modules, "anywidget", None)  # makes `import anywidget` raise ImportError
+        monkeypatch.setitem(sys.modules, name, fresh)
+        spec.loader.exec_module(fresh)
+        assert fresh._ANYWIDGET_OK is False
+        assert fresh._make_ga_widget(None, {"measurement_id": "G-TEST123"}) is None
 
 
 class TestEeeGaTracker:
@@ -1699,6 +1715,17 @@ class TestRenderGlossPanel:
         panel = gu_form.render_gloss_panel(words, "λόγος", lambda w: "")
         assert "λόγος" in panel
         assert "word/reason" in panel
+
+    def test_grammar_label_becomes_an_italic_second_line(self, gu_form):
+        words = [{"form": "λόγος", "lemma": "λόγος", "context": "word", "meaning": "word/reason",
+                  "grammar_label": "ед. Им. м."}]
+        panel = gu_form.render_gloss_panel(words, "λόγος", lambda w: "")
+        assert "  \n_ед. Им. м._" in panel
+
+    def test_no_grammar_label_adds_no_second_line(self, gu_form):
+        words = [{"form": "λόγος", "lemma": "λόγος", "context": "word", "meaning": "word/reason"}]
+        panel = gu_form.render_gloss_panel(words, "λόγος", lambda w: "")
+        assert "\n" not in panel
 
     def test_selected_word_with_lexicon_tables(self, gu_form):
         words = [{"form": "λόγος", "lemma": "λόγος", "context": "word", "meaning": "word/reason"}]
@@ -3045,6 +3072,26 @@ class TestMakeParadigmDrillState:
         assert packed["restart_cnt"] == (state_tuple[18], state_tuple[19])
 
 
+class TestMakeErrorTrackingState:
+    """Unit tests for GreekUtils.make_error_tracking_state."""
+
+    @pytest.fixture
+    def gu(self):
+        return GreekUtils(_StubBackend(), _StateMo(), config=ANCIENT_GREEK)
+
+    def test_starts_with_no_mistakes_and_no_retries(self, gu):
+        errors, _, retry_cnt, _ = gu.make_error_tracking_state()
+        assert errors() == {}
+        assert retry_cnt() == 0
+
+    def test_each_setter_drives_its_own_getter(self, gu):
+        errors, set_errors, retry_cnt, set_retry_cnt = gu.make_error_tracking_state()
+        set_errors({"λύω": 2})
+        assert (errors(), retry_cnt()) == ({"λύω": 2}, 0)
+        set_retry_cnt(3)
+        assert (errors(), retry_cnt()) == ({"λύω": 2}, 3)
+
+
 # ────────────────────────────────────────── reset_paradigm_drill_state ──
 
 class TestResetParadigmDrillState:
@@ -3150,6 +3197,34 @@ class TestDirtyCheckButton:
             _pdform(["λύω", ""]), lambda: None, {"Word": "λύω"}, "verb_word", word_key="Word"
         )
         assert btn.kind == "warn"
+
+
+# ────────────────────────────────────────── retry_mistakes_button ──
+
+class TestRetryMistakesButton:
+    """Unit tests for GreekUtils.retry_mistakes_button."""
+
+    @pytest.fixture
+    def gu(self):
+        return GreekUtils(_StubBackend(), _StubMo(), config=ANCIENT_GREEK)
+
+    def test_disabled_until_a_mistake_is_recorded(self, gu):
+        assert gu.retry_mistakes_button({}).disabled is True
+        assert gu.retry_mistakes_button({"λύω": 1}).disabled is False
+
+    @pytest.mark.parametrize("kwargs, label", [
+        ({}, "Ошибки"), ({"lang": "ru"}, "Ошибки"), ({"lang": "en"}, "Errors"), ({"lang": "el"}, "Λάθη"),
+    ])
+    def test_default_label_follows_lang(self, gu, kwargs, label):
+        assert gu.retry_mistakes_button({}, **kwargs).label == label
+
+    def test_label_can_be_overridden(self, gu):
+        assert gu.retry_mistakes_button({}, label="Again").label == "Again"
+
+    def test_each_click_increments_the_counter(self, gu):
+        on_click = gu.retry_mistakes_button({"λύω": 1}).on_click
+        assert on_click(None) == 1
+        assert on_click(4) == 5
 
 
 # ────────────────────────────────────────── paradigm_drill_widgets ──
@@ -3488,6 +3563,16 @@ class TestVerbParadigmDrillForm(_ParadigmDrillFormBase):
         with patch.object(gu, "check_verb_test", return_value=(False, "")) as m:
             self._call(gu, state, cv, _pdform(["asd"]), self._meta(), check_v=1)
         assert m.call_args.kwargs.get("lang") == "ru"
+
+    def test_previous_words_confirmation_is_shown_with_the_next_word(self, gu):
+        state = self._state(words=[self._VOCAB[1]], hist=[self._VOCAB[0]], msg="✓ λύω — I loose")
+        result = self._call(gu, state, self._VOCAB[1], _pdform(["", ""]), self._meta())
+        assert "✓ λύω — I loose" in result
+
+    def test_no_confirmation_line_when_there_is_nothing_to_confirm(self, gu):
+        with_msg = self._call(gu, self._state(msg="✓ x"), self._VOCAB[0], _pdform(["", ""]), self._meta())
+        without = self._call(gu, self._state(), self._VOCAB[0], _pdform(["", ""]), self._meta())
+        assert len(with_msg) == len(without) + 1
 
     def test_enter_on_correct_slot_advances_focus(self, gu):
         cv = self._VOCAB[0]
@@ -4393,6 +4478,30 @@ class TestPluraliaTantumNeuterAccGeneralizesToAncientGreek:
         assert ok is True, feedback
 
 
+class TestPluraliaTantumGuards:
+    """The pluralia-tantum helpers must not guess a form they cannot vouch for."""
+
+    @pytest.fixture
+    def gu(self):
+        # "άνθ" would validate as the singular of "άνθη" if a candidate were ever guessed for an -η ending
+        backend = _FakeParadigmBackend({
+            ('άνθ', 'noun'): {"neut": {"sg": {"nom": {"άνθ"}},
+                                        "pl": {"nom": {"άνθη"}, "gen": {"άνθων"}}}},
+        })
+        return GreekUtils(backend, _StubMo(), config=MODERN_GREEK)
+
+    def test_word_without_an_article_is_never_answered_verbatim(self, gu):
+        # no plural article vouches that the word is itself the plural form
+        assert gu.noun_drill_meta("σκουπίδια").active_cases == []
+
+    def test_no_singular_candidate_unless_the_plural_ends_in_alpha(self, gu):
+        assert gu._noun_pt_candidate_lemma("άνθη") is None
+        assert gu._noun_pt_candidate_lemma("α") is None
+
+    def test_neuter_plural_without_a_candidate_singular_gets_no_genitive(self, gu):
+        assert gu.noun_drill_meta("τα άνθη").active_cases == [('pl', 'nom'), ('pl', 'acc')]
+
+
 class TestNounSlotLabels:
     def test_formats_number_and_case(self):
         gu = GreekUtils(mo_module=_StubMo())
@@ -5013,14 +5122,62 @@ class TestInteractiveText:
         assert isinstance(w.clickable, list)
         assert set(w.clickable) == {"ανδρα", "μοι"}
 
-    def test_homer_words_defaults_empty_list_when_none(self):
+    def test_word_classes_defaults_empty_dict(self):
         w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set())
-        assert w.homer_words == []
+        assert w.word_classes == {}
 
-    def test_homer_words_stored_as_list_not_set(self):
+    def test_homer_words_becomes_homer_word_class(self):
         w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), homer_words={"ανδρα", "μοι"})
-        assert isinstance(w.homer_words, list)
-        assert set(w.homer_words) == {"ανδρα", "μοι"}
+        assert isinstance(w.word_classes["homer"], list)
+        assert set(w.word_classes["homer"]) == {"ανδρα", "μοι"}
+
+    def test_word_classes_stored_as_lists(self):
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(),
+                             word_classes={"lxx": {"ανδρα"}, "rare": ["μοι"]})
+        assert w.word_classes == {"lxx": ["ανδρα"], "rare": ["μοι"]}
+
+    def test_word_classes_merges_with_homer_words_and_overrides(self):
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(),
+                             homer_words={"a"}, word_classes={"lxx": {"b"}})
+        assert w.word_classes == {"homer": ["a"], "lxx": ["b"]}
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(),
+                             homer_words={"a"}, word_classes={"homer": {"c"}})
+        assert w.word_classes == {"homer": ["c"]}
+
+    def test_word_classes_rejects_bad_or_reserved_names(self):
+        for bad in ("active", "gk-word", "a b", "1x", ""):
+            with pytest.raises(ValueError):
+                interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), word_classes={bad: {"x"}})
+
+    def test_word_classes_validates_names_even_when_the_set_is_empty(self):
+        # the `X if SHOW.value else set()` toggle pattern must fail on the
+        # first call, not only once the toggle is switched on
+        for bad in ("active", "gk-word", "a b", "1x", ""):
+            with pytest.raises(ValueError):
+                interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), word_classes={bad: set()})
+
+    def test_css_defaults_to_the_widget_stylesheet(self):
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set())
+        assert w._css == _ITEXT_CSS
+
+    def test_default_stylesheet_ends_with_the_selected_word_rule(self):
+        assert _ITEXT_CSS.rstrip().splitlines()[-1].startswith(".eee-itext .gk-word.active")
+
+    def test_css_is_inserted_before_the_selected_word_rule(self):
+        # equal specificity, so source order decides: the caller's rule must
+        # follow `.homer` (it may override it) yet precede `.active`, or a
+        # clicked word in a custom set would lose its selection highlight
+        rule = ".eee-itext .gk-word.lxx{background:#e3f0e3}"
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), css=rule)
+        assert w._css.count(rule) == 1
+        assert w._css.index(".gk-word.homer") < w._css.index(rule) < w._css.index(".gk-word.active")
+        assert w._css.replace(rule + "\n", "") == _ITEXT_CSS
+
+    def test_css_does_not_leak_into_other_widgets(self):
+        interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), css=".x{color:red}")
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set())
+        assert w._css == _ITEXT_CSS
+        assert _InteractiveTextWidget._css == _ITEXT_CSS
 
     def test_show_ictus_defaults_true(self):
         w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set())
@@ -5083,6 +5240,11 @@ class TestInteractiveTextEsm:
         assert "model.get('lines') || []" in _ITEXT_ESM
         assert "model.get('clickable') || []" in _ITEXT_ESM
         assert "model.get('ictus_html') || {}" in _ITEXT_ESM
+
+    def test_word_classes_read_with_fallback_and_redraw_listener(self):
+        assert "model.get('word_classes') || {}" in _ITEXT_ESM
+        assert "model.on('change:word_classes', draw)" in _ITEXT_ESM
+        assert "homer_words" not in _ITEXT_ESM
 
     def test_normalizes_like_norm_grc_surface(self):
         # Mirrors eee_project.notebook_utils.norm_grc_surface's algorithm so a
@@ -6759,6 +6921,12 @@ class TestStanzaMatchPromptAndCorrect:
         assert prompt == "λόγος"
         assert correct == ""
 
+    def test_tr_to_grc_without_translation_has_an_empty_prompt(self, gu_form):
+        s = {"ref": "X.1", "lines": ["λόγος"], "translations": {}}
+        prompt, correct = gu_form._stanza_match_prompt_and_correct(s, "tr_to_grc")
+        assert prompt == ""
+        assert correct == "λόγος"
+
     def test_valid_translators_restricts_pick(self, gu_form):
         _, correct = gu_form._stanza_match_prompt_and_correct(
             _SM_STANZAS[0], "grc_to_tr", valid_translators=["подстрочник"],
@@ -6874,6 +7042,23 @@ class TestStanzaMatchRound:
         round_ = gu_form._stanza_match_round(_SM_STANZAS[0], _SM_STANZAS, "tr_to_grc", random)
         assert round_["correct"] == "Ἄνδρα μοι ἔννεπε, Μοῦσα, πολύτροπον, ὃς μάλα πολλὰ"
         assert round_["correct"] in round_["options"]
+
+    def test_tr_to_grc_never_offers_a_normalized_duplicate_of_the_correct_text(self, gu_form):
+        import random
+        target = {"ref": "T.1", "lines": ["aaaa bbbb cccc"]}
+        dup = {"ref": "T.2", "lines": ["  AAAA   bbbb cccc "]}
+        other = {"ref": "T.3", "lines": ["dddd eeee ffff"]}
+        round_ = gu_form._stanza_match_round(target, [target, dup, other], "tr_to_grc", random, n_options=10)
+        assert sorted(round_["options"]) == ["aaaa bbbb cccc", "dddd eeee ffff"]
+
+    def test_tr_to_grc_offers_at_most_one_option_per_stanza_ref(self, gu_form):
+        import random
+        target = {"ref": "T.1", "lines": ["aaaa bbbb cccc"]}
+        twin_a = {"ref": "T.2", "lines": ["dddd eeee ffff"]}
+        twin_b = {"ref": "T.2", "lines": ["gggg hhhh iiii"]}
+        round_ = gu_form._stanza_match_round(target, [target, twin_a, twin_b], "tr_to_grc", random, n_options=10)
+        twins = [o for o in round_["options"] if o in ("dddd eeee ffff", "gggg hhhh iiii")]
+        assert len(twins) == 1
 
     def test_veto1_explicitly_excludes_normalized_duplicate(self, gu_form):
         # A different stanza whose translation differs from the correct answer
@@ -7109,6 +7294,43 @@ class TestStanzaMatchForm:
         )
         assert sc_b[0]["correct"] == 1
 
+    _FWD_CORRECT = "Мужа мне назови, Муза, многообразного, который очень много — подстрочник"
+
+    def _next_forward(self, gu_form, answer, *, restore=None, ahead=None):
+        """Press Next on the first stanza while a saved future entry exists (i.e. after Prev)."""
+        import types
+        ahead = ahead or {"word": _SM_STANZAS[1], "answer": "saved", "correct": True}
+        state = self._state(cv=_SM_STANZAS[0], rem=_SM_STANZAS[2:], fut=[ahead], rst=restore)
+        result = self._call(gu_form, state, radio=_FakeRadio(value=answer), next_v=1,
+                            valid_translators=["подстрочник"])
+        return types.SimpleNamespace(result=result, cv=state[0], score=state[6], restore=state[9],
+                                     history=state[11], future=state[14])
+
+    def test_next_forward_grades_the_stanza_it_leaves(self, gu_form):
+        out = self._next_forward(gu_form, self._FWD_CORRECT)
+        assert out.result == "*...*"
+        assert out.history() == [{"word": _SM_STANZAS[0], "answer": self._FWD_CORRECT, "correct": True}]
+        assert out.score() == {"correct": 1, "total": 1}
+        assert out.cv() == _SM_STANZAS[1]
+        assert out.future() == []  # the future entry is consumed
+        assert out.restore() == {"answer": "saved", "correct": True}  # restored for the stanza moved to
+
+    def test_next_forward_grades_the_restored_answer_when_nothing_is_reselected(self, gu_form):
+        out = self._next_forward(gu_form, None, restore={"answer": self._FWD_CORRECT, "correct": True})
+        assert out.history() == [{"word": _SM_STANZAS[0], "answer": self._FWD_CORRECT, "correct": True}]
+        assert out.score() == {"correct": 1, "total": 1}
+
+    def test_next_forward_without_any_answer_logs_the_stanza_as_wrong(self, gu_form):
+        out = self._next_forward(gu_form, None)
+        assert out.history() == [{"word": _SM_STANZAS[0], "answer": None, "correct": False}]
+        assert out.score() == {"correct": 0, "total": 1}
+
+    def test_next_forward_onto_an_unanswered_stanza_clears_the_restore(self, gu_form):
+        unanswered = {"word": _SM_STANZAS[1], "answer": None, "correct": None}
+        out = self._next_forward(gu_form, self._FWD_CORRECT, ahead=unanswered,
+                                 restore={"answer": "stale", "correct": False})
+        assert out.restore() is None
+
 
 # ────────────────────────────────────────── translation-presence quiz (5b) ──
 
@@ -7151,6 +7373,16 @@ class TestReadPresenceRows:
             encoding="utf-8",
         )
         assert len(gu_form._read_presence_rows(p)) == 1
+
+    def test_skips_rows_with_fewer_than_five_columns(self, gu_form, tmp_path):
+        p = tmp_path / "p.tsv"
+        p.write_text(
+            "lemma\tform\tstanza_ref\ttranslator\treflected\n"
+            "ἀνήρ\tἌνδρα\tI.1-2\n"
+            "μοῦσα\tΜοῦσα\tI.1-2\tЖуковский\tyes\n",
+            encoding="utf-8",
+        )
+        assert gu_form._read_presence_rows(p) == [["μοῦσα", "Μοῦσα", "I.1-2", "Жуковский", "yes"]]
 
 
 class TestStanzaWordOccurrences:

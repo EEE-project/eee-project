@@ -1,6 +1,6 @@
 [project]
 name = "eee-project"
-version = "1.20.1"
+version = "1.21.0"
 description = "Language-agnostic morphology umbrella for the EEE project"
 readme = "README.md"
 license = "Apache-2.0"
@@ -8,7 +8,7 @@ authors = [{name = "Oleg Sadov", email = "oleg.sadov@gmail.com"}]
 requires-python = ">=3.12"
 dependencies = [
     "anywidget>=0.9",
-    "marimo>=0.23.13",
+    "marimo>=0.25.1",
     "pyyaml>=6",
     "tomlkit>=0.15.0",
 ]
@@ -50,7 +50,7 @@ ancient-greek-backend-eee = { git = "https://codeberg.org/EEE-project/ancient-gr
 
 [dependency-groups]
 dev = [
-    "marimo>=0.23.13",
+    "marimo>=0.25.1",
     "pandas",
     "pytest>=8",
     "pytest-cov",

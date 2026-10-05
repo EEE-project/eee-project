@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
+from eee_project import SlotTemplate
 from eee_project.content import (
     load_ga_config,
     greek_compare,
@@ -101,6 +102,21 @@ class TestPolyToMono:
 
 # ──────────────────────────── build_modern_paradigm_table (el renderer) ──
 
+class _PassiveOnlyVerbBackend:
+    """Present-indicative slots for the passive voice only; every form is γράφω."""
+    def get_slot_templates(self, lang, pos, terms):
+        if pos != "verb":
+            return []
+        return [
+            SlotTemplate(label="", tag_type="ud",
+                         features={"Tense": "Pres", "Mood": "Ind", "Voice": "Pass", "Person": p, "Number": n})
+            for p in "123" for n in ("Sing", "Plur")
+        ]
+
+    def inflect(self, lemma, feats, pos, language=None, **k):
+        return {"γράφω"}
+
+
 class TestModernParadigmTable:
     """The el diachronic paradigm renderer (section-03); grc renderer untouched."""
 
@@ -173,6 +189,26 @@ class TestModernParadigmTable:
         # than a table repeating the same word 8 times.
         html = self._bt()({"lemma": "πού", "form": "πού", "pos": "pronoun"})
         assert html is None
+
+    def test_declinable_pronoun_without_modern_forms_returns_none(self):
+        # reaches the table builder (unlike the indeclinable case): no table, not a grid of dashes
+        bt = build_modern_paradigm_table(_EmptyGrcBackend())
+        assert bt({"lemma": "κανένας", "form": "κανένας", "pos": "pronoun"}) is None
+
+    def test_verb_with_only_passive_forms_renders_only_the_passive_table(self):
+        # a deponent verb has no Active forms: that table is skipped, not shown empty
+        bt = build_modern_paradigm_table(_PassiveOnlyVerbBackend(), lang="en")
+        html = bt({"lemma": "γράφω", "form": "γράφω", "pos": "verb"})
+        assert html and html.count("<table") == 1
+        assert "pass." in html and "act." not in html
+
+    def test_verb_without_modern_forms_returns_none(self):
+        bt = build_modern_paradigm_table(_EmptyGrcBackend())
+        assert bt({"lemma": "γράφω", "form": "γράφω", "pos": "verb"}) is None
+
+    def test_unsupported_pos_returns_none(self):
+        bt = build_modern_paradigm_table(_EmptyGrcBackend())
+        assert bt({"lemma": "και", "form": "και", "pos": "particle"}) is None
 
     def test_noun_case_labels_lang_en(self):
         # lang used to be accepted and silently ignored -- table labels
@@ -321,6 +357,15 @@ class TestRequireLexicon:
              "lexicon_tag": 'ancient-greek["homer"]'}
         tabs = build_grc_lexicon_tabs(ag, um, lexicons={"homer": ag}, require_lexicon="nonexistent")
         assert tabs(w) is None
+
+    def test_required_lexicon_backend_error_hides_table(self):
+        # a raising require_lexicon backend is isolated like the Modern rung: table hidden, nothing propagates
+        w = {"lemma": "θεος", "form": "θεος", "pos": "noun",
+             "lexicon_tag": 'ancient-greek["homer"]'}
+        tabs = build_grc_lexicon_tabs(_GrcNounBackend(), _EmptyGrcBackend(),
+                                       lexicons={"homer": object()}, require_lexicon="homer")
+        with patch("eee_project.inflect_slot", side_effect=RuntimeError("boom")):
+            assert tabs(w) is None
 
 
 # ────────── build_grc_period_tables / grc_period_options / render_grc_period_table ──
@@ -2000,6 +2045,13 @@ class TestBuildGrcParadigmTableWithData:
         assert result is not None
         assert "1 дв." in result
         assert "2 дв." in result
+
+    def test_pronoun_personal_no_forms_returns_none(self):
+        """Mirrors test_pronoun_demonstrative_no_forms_returns_none for the personal family."""
+        fn = build_grc_paradigm_table(_GrcPronPrsBackend(), _EmptyGrcBackend())
+        with patch("eee_project.inflect_slot", return_value=set()):
+            result = fn({"lemma": "ἐγώ", "pos": "pronoun", "form": "εγω"})
+        assert result is None
 
     def test_pronoun_no_forms_returns_none(self):
         """pos="pronoun" with a backend that has zero pronoun slot data

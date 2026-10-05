@@ -107,7 +107,7 @@ See each backend's own README for exact lexicon-level coverage within each perio
 
 ## Examples
 
-14 runnable scripts and notebooks in `examples/` — verbs/nouns/adjectives for
+15 runnable scripts and notebooks in `examples/` — verbs/nouns/adjectives for
 el and grc, UniMorph, named backends, chains, hooks, and interactive Marimo
 viewers. See [examples/README.md](examples/README.md) for the full catalog and
 how to run each one.
