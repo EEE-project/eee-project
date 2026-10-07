@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.22.1 - 2026-10-07
+- Added the interactive text demo (`examples/interactive_text_notebook.py`) to the
+  live demo site as a seventh page, `interactive-text/`, with its own card on the
+  hub page (in English, Russian and Greek): click the words of a poem, see named
+  highlight sets, then read it beside a translation with comment cards that
+  highlight the words they discuss. `make -C examples export-interactive-text`
+  builds it and `export-all` now builds all seven demos.
+- 7 new tests (the Makefile, the hub page and the README must list the same
+  demos), full suite 1677/1677 passing, `ruff check` clean.
+
 ## 1.22.0 - 2026-10-07
 - Added `mixed_language_notes(mo, *, stanzas, translator, notes, lang="en", heading=None, hint=None, block_id="mx")`:
   the poem next to one translation and, below them, every comment on its

@@ -23,7 +23,7 @@ rather than examples, see [../docs/api-patterns.md](../docs/api-patterns.md)
 | [`modern_greek_drill_notebook.py`](modern_greek_drill_notebook.py) | Modern Greek paradigm drill — verb/noun/adjective/pronoun, switchable, with personal vocab TSV upload |
 | [`interactive_text_notebook.py`](interactive_text_notebook.py) | `interactive_text` demo — clickable poem words, named highlight sets via `word_classes`, styling via `css=`, click-reactive panel; then `mixed_language_notes` — the poem beside a chosen translation with comment cards that highlight their words (Marimo) |
 
-**Live demos:** all 6 interactive notebooks below run in-browser via WebAssembly — no install needed, and each is mirrored on all 3 hosts. Start at a hub page — [GitHub](https://eee-project.github.io/eee-project/) · [GitLab](https://eee-project.gitlab.io/eee-project/) · [Codeberg](https://eee-project.codeberg.page/eee-project/) — or jump directly to a notebook:
+**Live demos:** all 7 interactive notebooks below run in-browser via WebAssembly — no install needed, and each is mirrored on all 3 hosts. Start at a hub page — [GitHub](https://eee-project.github.io/eee-project/) · [GitLab](https://eee-project.gitlab.io/eee-project/) · [Codeberg](https://eee-project.codeberg.page/eee-project/) — or jump directly to a notebook:
 
 - **Paradigm Drill** (`modern_greek_drill_notebook.py`) — [GitHub](https://eee-project.github.io/eee-project/drill/) · [GitLab](https://eee-project.gitlab.io/eee-project/drill/) · [Codeberg](https://eee-project.codeberg.page/eee-project/drill/)
 - **Greek Morphology Explorer** (`greek_notebook.py`) — [GitHub](https://eee-project.github.io/eee-project/greek/) · [GitLab](https://eee-project.gitlab.io/eee-project/greek/) · [Codeberg](https://eee-project.codeberg.page/eee-project/greek/)
@@ -31,6 +31,7 @@ rather than examples, see [../docs/api-patterns.md](../docs/api-patterns.md)
 - **Modern Greek Morphology** (`modern_greek_notebook.py`) — [GitHub](https://eee-project.github.io/eee-project/modern-greek/) · [GitLab](https://eee-project.gitlab.io/eee-project/modern-greek/) · [Codeberg](https://eee-project.codeberg.page/eee-project/modern-greek/)
 - **UniMorph Browser** (`unimorph_notebook.py`) — [GitHub](https://eee-project.github.io/eee-project/unimorph/) · [GitLab](https://eee-project.gitlab.io/eee-project/unimorph/) · [Codeberg](https://eee-project.codeberg.page/eee-project/unimorph/)
 - **Exercise & Quiz Demo** (`greek_exercise_notebook.py`) — [GitHub](https://eee-project.github.io/eee-project/exercise/) · [GitLab](https://eee-project.gitlab.io/eee-project/exercise/) · [Codeberg](https://eee-project.codeberg.page/eee-project/exercise/)
+- **Interactive Text** (`interactive_text_notebook.py`) — [GitHub](https://eee-project.github.io/eee-project/interactive-text/) · [GitLab](https://eee-project.gitlab.io/eee-project/interactive-text/) · [Codeberg](https://eee-project.codeberg.page/eee-project/interactive-text/)
 
 Run directly:
 
@@ -73,7 +74,7 @@ wraps it in the shared deploy shell — `deploy/shell_template.html` +
 ready to copy straight into the `pages`-branch worktree.
 
 `deploy/hub_index.html` is the landing hub — the card-list page linking to
-all 6 live demos, served as `index.html` at the `pages`-branch root (copied
+all 7 live demos, served as `index.html` at the `pages`-branch root (copied
 verbatim, no build step). Its 🌐 language switcher shares the `eee_lang`
 localStorage key with every demo's own `language_bridge()`/
 `language_selector()`, so a choice made on one carries into the other.

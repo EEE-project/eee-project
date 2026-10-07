@@ -1,4 +1,4 @@
-.PHONY: help el grc unimorph backends chain hooks comparison notebook-el notebook-grc notebook notebook-unimorph notebook-exercise notebook-config notebook-drill notebook-itext export-drill export-greek export-ancient-greek export-modern-greek export-unimorph export-exercise export-all
+.PHONY: help el grc unimorph backends chain hooks comparison notebook-el notebook-grc notebook notebook-unimorph notebook-exercise notebook-config notebook-drill notebook-itext export-drill export-greek export-ancient-greek export-modern-greek export-unimorph export-exercise export-interactive-text export-all
 
 help:
 	@echo "make el                run modern_greek.py"
@@ -17,13 +17,14 @@ help:
 	@echo "make notebook-drill    open modern_greek_drill_notebook.py (paradigm drill — verb/noun/adj, TSV upload)"
 	@echo "make notebook-itext    open interactive_text_notebook.py (interactive_text — clickable words, word_classes sets, css=; mixed_language_notes — comments tied to words)"
 	@echo ""
-	@echo "make export-drill          export drill demo to dist/drill/"
-	@echo "make export-greek          export greek demo to dist/greek/"
-	@echo "make export-ancient-greek  export ancient-greek demo to dist/ancient-greek/"
-	@echo "make export-modern-greek   export modern-greek demo to dist/modern-greek/"
-	@echo "make export-unimorph       export unimorph demo to dist/unimorph/"
-	@echo "make export-exercise       export exercise demo to dist/exercise/"
-	@echo "make export-all            export all 6 live demos to dist/<name>/"
+	@echo "make export-drill             export drill demo to dist/drill/"
+	@echo "make export-greek             export greek demo to dist/greek/"
+	@echo "make export-ancient-greek     export ancient-greek demo to dist/ancient-greek/"
+	@echo "make export-modern-greek      export modern-greek demo to dist/modern-greek/"
+	@echo "make export-unimorph          export unimorph demo to dist/unimorph/"
+	@echo "make export-exercise          export exercise demo to dist/exercise/"
+	@echo "make export-interactive-text  export interactive-text demo to dist/interactive-text/"
+	@echo "make export-all               export all 7 live demos to dist/<name>/"
 	@echo "  Each export-* target runs the marimo export, then wraps it in the"
 	@echo "  shared deploy shell (deploy/shell_template.html + build_shell.py) --"
 	@echo "  dist/<name>/ ends up index.html (shell) + notebook.html (app),"
@@ -101,5 +102,9 @@ export-exercise:
 	cd .. && uv run marimo export html-wasm examples/greek_exercise_notebook.py -o examples/dist/exercise --mode run -f
 	cd .. && uv run python3 examples/deploy/build_shell.py examples/dist/exercise "Exercise & Quiz Demo"
 
-export-all: export-drill export-greek export-ancient-greek export-modern-greek export-unimorph export-exercise
-	@echo "All 6 demos exported to examples/dist/ -- copy each into the pages-branch worktree and publish."
+export-interactive-text:
+	cd .. && uv run marimo export html-wasm examples/interactive_text_notebook.py -o examples/dist/interactive-text --mode run -f
+	cd .. && uv run python3 examples/deploy/build_shell.py examples/dist/interactive-text "Interactive Text"
+
+export-all: export-drill export-greek export-ancient-greek export-modern-greek export-unimorph export-exercise export-interactive-text
+	@echo "All 7 demos exported to examples/dist/ -- copy each into the pages-branch worktree and publish."
