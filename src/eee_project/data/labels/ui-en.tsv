@@ -140,3 +140,7 @@ presence_exercise_heading	### Exercise: word in the translation
 word_find_exercise_heading	### Exercise: find the word
 eee_note_load_error	*(could not load the EEE engine description)*
 form_check_accordion_label	About form-checking (EEE)
+mixed_language_heading	A mixed poetic language
+mixed_language_hint	Cavafy combines learned (katharevousa) and everyday (demotic) forms within one phrase: not one dialect, but his own mixed poetic language. Choose a comment and the words it is about are highlighted in the text.
+language_notes_heading	Language notes
+language_notes_hint	Choose a comment and the words it is about are highlighted in the text.

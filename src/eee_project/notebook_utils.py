@@ -105,7 +105,9 @@ from eee_project.content import (
     _grc_word_passes_filter as _grc_word_passes_filter,
     filter_grc_quiz_words as filter_grc_quiz_words,
     grc_coverage_words as grc_coverage_words,
-    grc_lexicon_sources as grc_lexicon_sources
+    grc_lexicon_sources as grc_lexicon_sources,
+    mixed_language_notes as mixed_language_notes,
+    language_notes_problems as language_notes_problems,
 )
 
 _INC: Any = lambda v: (v or 0) + 1  # shared on_click incrementer for mo.ui.button
@@ -6041,6 +6043,18 @@ class GreekUtils:
             with open(local, encoding="utf-8") as f:
                 result.extend(csv.DictReader(f, delimiter="\t"))
         return result
+
+    def load_language_notes(self, *, nb_dir: Any, remote_base: "str | None" = None) -> "list[dict]":
+        """Load ``language_notes.tsv`` -- one row per commented place of a poem --
+        for :func:`mixed_language_notes`.
+
+        Columns: ``fragments`` (the poem's own words the comment is about,
+        separated by `` | ``) and the comment in one column per UI language
+        (``ru``/``el``/``en``). Each row is returned as-is, read the way
+        :meth:`load_inflected_vocab_tsv` reads any header-carrying TSV. Missing
+        files are downloaded from *remote_base* when provided.
+        """
+        return self.load_inflected_vocab_tsv("language_notes.tsv", nb_dir=nb_dir, remote_base=remote_base)
 
     def word_write_question(self, word: "dict | None", lang: str) -> Any:
         """Return the diacritics_text widget for a write-the-word exercise.

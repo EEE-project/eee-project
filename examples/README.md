@@ -21,7 +21,7 @@ rather than examples, see [../docs/api-patterns.md](../docs/api-patterns.md)
 | [`greek_exercise_notebook.py`](greek_exercise_notebook.py) | `GreekUtils` full demo — verb drills, custom drill, `greek_compare`, vocab quiz (MG + AG) |
 | [`config_store_notebook.py`](config_store_notebook.py) | `ConfigStore` demo — `from_url`, `from_file`, `from_dict` with `eee_topbar` |
 | [`modern_greek_drill_notebook.py`](modern_greek_drill_notebook.py) | Modern Greek paradigm drill — verb/noun/adjective/pronoun, switchable, with personal vocab TSV upload |
-| [`interactive_text_notebook.py`](interactive_text_notebook.py) | `interactive_text` demo — clickable poem words, named highlight sets via `word_classes`, styling via `css=`, click-reactive panel (Marimo) |
+| [`interactive_text_notebook.py`](interactive_text_notebook.py) | `interactive_text` demo — clickable poem words, named highlight sets via `word_classes`, styling via `css=`, click-reactive panel; then `mixed_language_notes` — the poem beside a chosen translation with comment cards that highlight their words (Marimo) |
 
 **Live demos:** all 6 interactive notebooks below run in-browser via WebAssembly — no install needed, and each is mirrored on all 3 hosts. Start at a hub page — [GitHub](https://eee-project.github.io/eee-project/) · [GitLab](https://eee-project.gitlab.io/eee-project/) · [Codeberg](https://eee-project.codeberg.page/eee-project/) — or jump directly to a notebook:
 

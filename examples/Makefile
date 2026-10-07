@@ -15,7 +15,7 @@ help:
 	@echo "make notebook-exercise open greek_exercise_notebook.py (GreekUtils exercises + vocab quiz)"
 	@echo "make notebook-config   open config_store_notebook.py (ConfigStore — from_url / from_file / from_dict)"
 	@echo "make notebook-drill    open modern_greek_drill_notebook.py (paradigm drill — verb/noun/adj, TSV upload)"
-	@echo "make notebook-itext    open interactive_text_notebook.py (interactive_text — clickable words, word_classes sets, css=)"
+	@echo "make notebook-itext    open interactive_text_notebook.py (interactive_text — clickable words, word_classes sets, css=; mixed_language_notes — comments tied to words)"
 	@echo ""
 	@echo "make export-drill          export drill demo to dist/drill/"
 	@echo "make export-greek          export greek demo to dist/greek/"

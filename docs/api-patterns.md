@@ -1507,6 +1507,84 @@ translation = eee.find_stanza_translation(stanza["ref"], translations[trans_sele
   translator's stanza text (e.g. an interlinear translator's echoed Greek
   source line); a no-op for text with no such lines.
 
+### Comments tied to words of the poem (Kavafis-style language notes)
+
+For a lesson that comments on places of a poem and wants each comment to
+light up the words it is about, with every comment staying visible under the
+text:
+
+```python
+MIX_ROWS = gu.load_language_notes(nb_dir=notebook_dir, remote_base=RAW_BASE)
+```
+
+```python
+mo.vstack([trans_selector, eee.mixed_language_notes(
+    mo, stanzas=STANZAS, translator=trans_selector.value,
+    notes=MIX_ROWS, lang=language_selector.value,
+)])
+```
+
+- `language_notes.tsv` — one row per commented place: a `fragments` column
+  (the poem's own words the comment is about; several fragments separated
+  by ` | `) and the comment itself in one column per UI language:
+
+  ```
+  fragments	ru	el	en
+  θυμωμένο Ποσειδώνα | άγριο Ποσειδώνα	<comment in Russian>	<comment in Greek>	<comment in English>
+  ```
+
+- `GreekUtils.load_language_notes(*, nb_dir, remote_base=None)` — reads that
+  file into a list of row dicts, every column as written. Same
+  local-then-remote resolution as `load_vocab_tsv`: a missing file is
+  downloaded from `remote_base` when given, otherwise `FileNotFoundError`.
+- `mixed_language_notes(mo, *, stanzas, translator, notes, lang="en", heading=None, hint=None, block_id="mx")` —
+  returns a `mo.Html`: the Greek lines in a left column and the chosen
+  translation in a right one, then the block's heading and hint, then one
+  card per row (its fragments in bold, then its comment in `lang`). Choosing
+  a card highlights its fragments in the Greek text; all cards stay visible.
+  `stanzas` is the list the lesson notebooks build —
+  `[{"ref": ..., "lines": [...], "translations": {translator: "line\nline"}}]`;
+  a stanza the `translator` lacks shows `"—"`, and a version with fewer lines
+  than the Greek is padded so the next stanza stays level.
+  - **Matching** compares `norm_grc_surface` forms: accents, breathings and
+    edge punctuation don't matter, case does. Every occurrence of a fragment
+    in the text is highlighted. A word belongs to one comment only: when a
+    fragment overlaps words an earlier row (or earlier fragment) already
+    holds, it claims nothing — so give the rows disjoint fragments
+    (`language_notes_problems`, below, tells you which ones).
+  - **Plain HTML/CSS** (hidden radio inputs + sibling selectors): the
+    highlight is instant, there is no widget, and the choice survives
+    redrawing the block with another translation or language.
+  - **`block_id`** (default `"mx"`) prefixes the element ids (`mxr0`, ...) and
+    the radio group's name. Two blocks on one page need different ones, or
+    their radios join one group and their ids collide; it must be a plain
+    identifier (letters, digits, `-`, `_`; starting with a letter), else
+    `ValueError`. The default reproduces the markup of a single block exactly.
+  - **Heading and hint** default to the generic `language_notes_heading` /
+    `language_notes_hint` rows of `ui-{lang}.tsv` ("Language notes" and
+    "Choose a comment and the words it is about are highlighted in the
+    text.", in en/ru/el). A lesson with its own wording passes `heading=` and
+    `hint=` (markdown): the Kavafis lessons pass
+    `gu.ui_label("mixed_language_heading", lang)` and
+    `gu.ui_label("mixed_language_hint", lang)`, rows whose text is about
+    Cavafy's mixed learned (katharevousa) and everyday (demotic) language.
+- `language_notes_problems(lines, notes)` — the fragments the block would show
+  as nothing. `lines` is every line of the poem, `notes` the rows of
+  `language_notes.tsv`. `[]` means every fragment occurs in the poem and none
+  is refused; otherwise one dict per problem,
+  `{"row": i, "fragment": text, "problem": "not in the text" | "overlaps", "holder": j}`
+  (`row` and `holder` are 0-based indexes into `notes`; `holder` is the note
+  that already held a word of an overlapping fragment — the same note for an
+  earlier fragment of its own, `None` for "not in the text"). It runs the very
+  matcher the block uses, so a lesson's data checker or a test calls it
+  instead of re-implementing the rule, e.g.
+  `assert not eee.language_notes_problems([ln for s in STANZAS for ln in s["lines"]], MIX_ROWS)`.
+
+  Runnable demo (Odyssey 1.1–2 with two renderings and three notes in
+  en/ru/el, a translation picker and a UI-language picker): the second half
+  of `examples/interactive_text_notebook.py`, or
+  `make -C examples notebook-itext`.
+
 ---
 
 ## Pattern C — `make_paradigm_form` (paradigm drill notebooks)

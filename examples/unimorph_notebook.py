@@ -169,8 +169,8 @@ def _(corpus_table, lang_selector, mo, pos_list, pos_selector):
         }
         _default = _DEFAULTS.get((lang_selector.value, _pos), "")
         lemma_input = mo.ui.text(value=_default, placeholder="type a lemma…", label="Lemma")
-    if corpus_table is None:
-        lemma_input
+    _out = lemma_input if corpus_table is None else None
+    _out
     return (lemma_input,)
 
 

@@ -2,7 +2,9 @@
 notebook_utils.py (see that module's own docstring for the shared
 navigation/GreekUtils surface still tested in test_notebook_utils.py)."""
 import json
+import re
 import unicodedata
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -42,9 +44,14 @@ from eee_project.content import (
     _fetch_json_url,
     _UI_LANGS,
     _load_ui_labels,
+    _ui_label,
     _GRC_TCOL,
     _EL_VERB_COL_LBL,
     _EL_VOICE_CAP,
+    _fragment_keys,
+    _mark_fragments,
+    language_notes_problems,
+    mixed_language_notes,
 )
 from eee_project.notebook_utils import language_bridge, language_selector
 from conftest import (
@@ -2597,3 +2604,263 @@ class TestResolveClickedWord:
     def test_missing_form_key_does_not_raise(self):
         words = [{"lemma": "x", "meaning": "y"}]  # no "form" key
         assert resolve_clicked_word(words, "ανδρα") is None
+
+
+# ──────────────── mixed_language_notes: comments tied to words of the poem ──
+
+def _marks(line, fragments):
+    return _mark_fragments(line, _fragment_keys(fragments))
+
+
+class TestMarkFragments:
+    """_mark_fragments: which words of a poem line the comments' fragments are
+    about -- the highlight behind mixed_language_notes."""
+
+    LINE = "τον θυμωμένο Ποσειδώνα μη φοβάσαι"
+
+    def test_fragment_keys_are_the_normalized_words_of_every_fragment(self):
+        assert _fragment_keys([["θυμωμένο Ποσειδώνα", "άγριο"], ["Σα"]]) == [
+            [["θυμωμενο", "Ποσειδωνα"], ["αγριο"]], [["Σα"]]]
+
+    def test_a_line_without_fragments_is_one_plain_run(self):
+        assert _marks(self.LINE, []) == [(self.LINE, None)]
+
+    def test_a_fragment_marks_its_words_with_the_comment_index(self):
+        assert _marks(self.LINE, [["θυμωμένο Ποσειδώνα"]]) == [
+            ("τον", None), ("θυμωμένο Ποσειδώνα", 0), ("μη φοβάσαι", None)]
+
+    def test_the_comment_index_is_its_position_in_the_list(self):
+        assert _marks(self.LINE, [["μη"], ["τον"]]) == [
+            ("τον", 1), ("θυμωμένο Ποσειδώνα", None), ("μη", 0), ("φοβάσαι", None)]
+
+    def test_accents_and_edge_punctuation_are_ignored_but_the_text_is_kept(self):
+        assert _marks("τον θυμωμένο Ποσειδώνα, μη", [["θυμωμενο Ποσειδωνα"]]) == [
+            ("τον", None), ("θυμωμένο Ποσειδώνα,", 0), ("μη", None)]
+
+    def test_case_is_not_ignored(self):
+        assert _marks("Σα βγεις", [["σα"]]) == [("Σα βγεις", None)]
+
+    def test_every_occurrence_in_the_line_is_marked(self):
+        assert _marks("να μάθεις και να μάθεις", [["να"]]) == [
+            ("να", 0), ("μάθεις και", None), ("να", 0), ("μάθεις", None)]
+
+    def test_adjacent_matches_of_one_comment_stay_separate(self):
+        assert _marks("να να", [["να"]]) == [("να", 0), ("να", 0)]
+
+    def test_every_fragment_of_a_comment_is_marked(self):
+        assert _marks(self.LINE, [["τον", "φοβάσαι"]]) == [
+            ("τον", 0), ("θυμωμένο Ποσειδώνα μη", None), ("φοβάσαι", 0)]
+
+    def test_a_fragment_overlapping_an_earlier_comments_words_claims_nothing(self):
+        # the first comment keeps "Ποσειδώνα"; the second claims not even its "μη"
+        assert _marks(self.LINE, [["θυμωμένο Ποσειδώνα"], ["Ποσειδώνα μη"]]) == [
+            ("τον", None), ("θυμωμένο Ποσειδώνα", 0), ("μη φοβάσαι", None)]
+
+    def test_runs_of_whitespace_collapse_to_single_spaces(self):
+        assert _marks("τον   μη ", []) == [("τον μη", None)]
+
+    def test_an_empty_line_has_no_runs(self):
+        assert _marks("", [["τον"]]) == []
+
+
+class _NotesMo:
+    """marimo stand-in: mixed_language_notes only needs Html and md(...).text."""
+
+    class Html:
+        def __init__(self, s):
+            self.s = s
+
+    @staticmethod
+    def md(s):
+        return SimpleNamespace(text=f"<md>{s}</md>")
+
+
+_NOTES_STANZAS = [
+    {"ref": "1", "lines": ["τον θυμωμένο Ποσειδώνα", "μη φοβάσαι"],
+     "translations": {"A": "angry Poseidon\nfear not", "B": "the raging god"}},
+    {"ref": "2", "lines": ["να μάθεις"], "translations": {"A": "to learn", "B": "to know"}},
+]
+_NOTES_ROWS = [
+    {"fragments": "θυμωμένο Ποσειδώνα", "en": "note <one> & more", "ru": "заметка один", "el": "σημείωση ένα"},
+    {"fragments": "να μάθεις | μη", "en": "note two", "ru": "заметка два", "el": "σημείωση δύο"},
+]
+
+
+def _notes_html(translator="A", lang="en", stanzas=_NOTES_STANZAS, notes=_NOTES_ROWS, **kw):
+    return mixed_language_notes(_NotesMo, stanzas=stanzas, translator=translator, notes=notes, lang=lang, **kw).s
+
+
+class TestMixedLanguageNotes:
+    """mixed_language_notes: the poem next to one translation and, below them,
+    every comment as a card -- choosing a card highlights its words in the text
+    (hidden radio inputs + sibling selectors: no widget, no round trip)."""
+
+    def test_public_api(self):
+        import eee_project as eee
+        assert eee.mixed_language_notes is mixed_language_notes
+        assert "mixed_language_notes" in eee.__all__
+
+    def test_returns_marimo_html(self):
+        result = mixed_language_notes(_NotesMo, stanzas=_NOTES_STANZAS, translator="A", notes=_NOTES_ROWS)
+        assert isinstance(result, _NotesMo.Html)
+
+    def test_the_words_of_a_comment_are_wrapped_in_its_span(self):
+        html = _notes_html()
+        assert '<span class="cm h0">θυμωμένο Ποσειδώνα</span>' in html
+        assert '<span class="cm h1">μη</span>' in html
+        assert '<span class="cm h1">να μάθεις</span>' in html
+
+    def test_left_column_separates_stanzas_with_a_blank_line(self):
+        assert ('<div style="padding-right:0.8em">'
+                '<div>τον <span class="cm h0">θυμωμένο Ποσειδώνα</span></div>'
+                '<div><span class="cm h1">μη</span> φοβάσαι</div>'
+                '<div>&nbsp;</div>'
+                '<div><span class="cm h1">να μάθεις</span></div></div>') in _notes_html()
+
+    def test_right_column_is_the_chosen_translation(self):
+        assert ('<div style="border-left:3px solid #ccc;padding-left:0.8em">'
+                '<div>angry Poseidon</div><div>fear not</div><div>&nbsp;</div><div>to learn</div></div>'
+                ) in _notes_html("A")
+
+    def test_a_shorter_translation_is_padded_so_the_next_stanza_stays_level(self):
+        assert ('<div>the raging god</div><div>&nbsp;</div><div>&nbsp;</div><div>to know</div></div>'
+                ) in _notes_html("B")
+
+    def test_a_translator_without_the_stanza_shows_a_dash(self):
+        assert "<div>—</div>" in _notes_html("nobody")
+
+    def test_one_radio_per_comment_and_a_checked_none(self):
+        html = _notes_html()
+        assert '<input type="radio" name="mx" id="mxr-none" class="mxr" checked>' in html
+        assert '<input type="radio" name="mx" id="mxr1" class="mxr">' in html
+        assert html.count('class="mxr"') == 3
+
+    def test_css_has_a_selection_rule_per_comment_and_no_extra(self):
+        html = _notes_html()
+        for i in (0, 1):
+            assert f"#mxr{i}:checked~.mxt .h{i}{{" in html
+            assert f"#mxr{i}:checked~.mxn label[for=mxr{i}]{{" in html
+            assert f"#mxr{i}:focus-visible~.mxn label[for=mxr{i}]{{" in html
+        assert "#mxr2" not in html
+
+    def test_cards_show_the_fragments_then_the_comment_in_the_ui_language(self):
+        assert '<label for="mxr0"><b>θυμωμένο Ποσειδώνα</b> — note &lt;one&gt; &amp; more</label>' in _notes_html(lang="en")
+        assert '<label for="mxr1"><b>να μάθεις · μη</b> — заметка два</label>' in _notes_html(lang="ru")
+        assert '<label for="mxr0"><b>θυμωμένο Ποσειδώνα</b> — σημείωση ένα</label>' in _notes_html(lang="el")
+
+    def test_heading_and_hint_default_to_the_generic_ui_labels(self):
+        for lang in ("en", "ru", "el"):
+            heading = _ui_label("language_notes_heading", lang)
+            hint = _ui_label("language_notes_hint", lang)
+            assert f"<md>### {heading}\n\n{hint}</md>" in _notes_html(lang=lang)
+
+    def test_heading_and_hint_can_be_given_by_the_caller(self):
+        html = mixed_language_notes(_NotesMo, stanzas=_NOTES_STANZAS, translator="A", notes=_NOTES_ROWS, lang="ru",
+                                    heading="My heading", hint="My hint.").s
+        assert "<md>### My heading\n\nMy hint.</md>" in html
+        assert _ui_label("language_notes_heading", "ru") not in html
+
+    def test_a_caller_can_pass_the_ui_labels_of_its_own_lesson(self):
+        heading, hint = _ui_label("mixed_language_heading", "el"), _ui_label("mixed_language_hint", "el")
+        html = mixed_language_notes(_NotesMo, stanzas=_NOTES_STANZAS, translator="A", notes=_NOTES_ROWS, lang="el",
+                                    heading=heading, hint=hint).s
+        assert f"<md>### {heading}\n\n{hint}</md>" in html
+
+    def test_the_generic_ui_labels_are_written_in_each_language(self):
+        assert _ui_label("language_notes_heading", "en") == "Language notes"
+        assert _ui_label("language_notes_heading", "ru") == "Заметки о языке"
+        assert _ui_label("language_notes_heading", "el") == "Σχόλια για τη γλώσσα"
+        assert _ui_label("language_notes_hint", "en") == "Choose a comment and the words it is about are highlighted in the text."
+        assert _ui_label("language_notes_hint", "ru").startswith("Выберите комментарий")
+        assert _ui_label("language_notes_hint", "el").startswith("Επιλέξτε ένα σχόλιο")
+
+    def test_the_kavafis_lessons_labels_are_written_in_each_language(self):
+        assert _ui_label("mixed_language_heading", "en") == "A mixed poetic language"
+        assert _ui_label("mixed_language_heading", "ru") == "Смешанный поэтический язык"
+        assert _ui_label("mixed_language_heading", "el") == "Μικτή ποιητική γλώσσα"
+        assert _ui_label("mixed_language_hint", "en").startswith("Cavafy combines learned (katharevousa)")
+        assert _ui_label("mixed_language_hint", "ru").startswith("Кавафис соединяет в одной фразе")
+        assert _ui_label("mixed_language_hint", "el").startswith("Ο Καβάφης συνδυάζει στην ίδια φράση")
+
+    def test_text_is_html_escaped(self):
+        stanzas = [{"ref": "1", "lines": ["ν' αράξεις <b>"], "translations": {"A": "to <anchor> & rest"}}]
+        notes = [{"fragments": "αράξεις", "en": "x", "ru": "x", "el": "x"}]
+        html = _notes_html(stanzas=stanzas, notes=notes)
+        assert 'ν&#x27; <span class="cm h0">αράξεις</span> &lt;b&gt;' in html
+        assert "<div>to &lt;anchor&gt; &amp; rest</div>" in html
+
+    def test_block_id_prefixes_the_element_ids_the_radio_group_and_the_css(self):
+        html = _notes_html(block_id="b")
+        assert '<input type="radio" name="b" id="br-none" class="mxr" checked>' in html
+        assert '<input type="radio" name="b" id="br1" class="mxr">' in html
+        assert '<label for="br0">' in html
+        assert "#br0:checked~.mxt .h0{" in html
+        assert "#br1:focus-visible~.mxn label[for=br1]{" in html
+        assert 'id="mxr' not in html and 'name="mx"' not in html and "#mxr" not in html and 'for="mxr' not in html
+
+    def test_two_blocks_on_one_page_share_no_ids(self):
+        def ids(html):
+            return set(re.findall(r'id="([^"]+)"', html))
+
+        assert ids(_notes_html(block_id="a")).isdisjoint(ids(_notes_html(block_id="b")))
+        assert ids(_notes_html()).isdisjoint(ids(_notes_html(block_id="b")))
+
+    @pytest.mark.parametrize("bad", ["", "1a", "a b", 'a"b', "a<b", "a.b"])
+    def test_block_id_must_be_a_plain_identifier(self, bad):
+        with pytest.raises(ValueError, match="block_id"):
+            _notes_html(block_id=bad)
+
+
+class TestLanguageNotesProblems:
+    """language_notes_problems: the fragments mixed_language_notes would show as nothing --
+    the one place the matching rule lives, for a lesson's data checker to call."""
+
+    LINES = ["τον θυμωμένο Ποσειδώνα μη φοβάσαι", "να μάθεις"]
+
+    @staticmethod
+    def _notes(*fragments):
+        return [{"fragments": f, "en": "x", "ru": "x", "el": "x"} for f in fragments]
+
+    def test_public_api(self):
+        import eee_project as eee
+        assert eee.language_notes_problems is language_notes_problems
+        assert "language_notes_problems" in eee.__all__
+
+    def test_notes_the_page_can_all_highlight_have_no_problems(self):
+        assert language_notes_problems(self.LINES, self._notes("θυμωμένο Ποσειδώνα", "να μάθεις | μη")) == []
+
+    def test_a_fragment_that_is_nowhere_in_the_text(self):
+        assert language_notes_problems(self.LINES, self._notes("τον", "άγριο Ποσειδώνα")) == [
+            {"row": 1, "fragment": "άγριο Ποσειδώνα", "problem": "not in the text", "holder": None}]
+
+    def test_accents_and_edge_punctuation_do_not_hide_a_fragment_but_case_does(self):
+        assert language_notes_problems(["Σα βγεις, μη"], self._notes("βγεις μη", "Σα")) == []
+        assert [p["fragment"] for p in language_notes_problems(["Σα βγεις"], self._notes("σα"))] == ["σα"]
+
+    def test_a_fragment_overlapping_an_earlier_note_is_reported_with_its_holder(self):
+        assert language_notes_problems(self.LINES, self._notes("θυμωμένο Ποσειδώνα", "Ποσειδώνα μη")) == [
+            {"row": 1, "fragment": "Ποσειδώνα μη", "problem": "overlaps", "holder": 0}]
+
+    def test_overlap_with_an_earlier_fragment_of_the_same_note(self):
+        assert language_notes_problems(self.LINES, self._notes("θυμωμένο Ποσειδώνα | Ποσειδώνα μη")) == [
+            {"row": 0, "fragment": "Ποσειδώνα μη", "problem": "overlaps", "holder": 0}]
+
+    def test_one_problem_however_often_the_overlap_occurs(self):
+        assert language_notes_problems(["τον μη", "τον μη"], self._notes("τον", "τον μη")) == [
+            {"row": 1, "fragment": "τον μη", "problem": "overlaps", "holder": 0}]
+
+    def test_blank_fragments_and_empty_cells_are_ignored(self):
+        notes = [{"fragments": "τον |  | "}, {"fragments": ""}, {"fragments": None}]
+        assert language_notes_problems(self.LINES, notes) == []
+
+    def test_problems_come_ordered_by_note_then_fragment(self):
+        problems = language_notes_problems(self.LINES, self._notes("ξένο | τον", "τον θυμωμένο", "άγριο"))
+        assert [(p["row"], p["fragment"], p["problem"]) for p in problems] == [
+            (0, "ξένο", "not in the text"), (1, "τον θυμωμένο", "overlaps"), (2, "άγριο", "not in the text")]
+
+    def test_what_it_reports_is_what_the_page_leaves_unhighlighted(self):
+        notes = self._notes("θυμωμένο Ποσειδώνα", "Ποσειδώνα μη")
+        stanzas = [{"ref": "1", "lines": self.LINES, "translations": {"A": "one\ntwo"}}]
+        assert [p["row"] for p in language_notes_problems(self.LINES, notes)] == [1]
+        html = mixed_language_notes(_NotesMo, stanzas=stanzas, translator="A", notes=notes).s
+        assert 'class="cm h0"' in html and 'class="cm h1"' not in html

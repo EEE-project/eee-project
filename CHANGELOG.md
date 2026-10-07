@@ -1,5 +1,46 @@
 # Changelog
 
+## 1.22.0 - 2026-10-07
+- Added `mixed_language_notes(mo, *, stanzas, translator, notes, lang="en", heading=None, hint=None, block_id="mx")`:
+  the poem next to one translation and, below them, every comment on its
+  language as a card. Choosing a card highlights the words it is about in the
+  Greek text; all comments stay visible. Each comment names its words in a
+  `fragments` column of `language_notes.tsv` (`a b | c d`), matched ignoring
+  accents, breathings and edge punctuation; every occurrence is highlighted,
+  and a word belongs to one comment (the earlier row wins). Plain HTML/CSS
+  (hidden radio inputs + sibling selectors): the highlight is instant, there
+  is no widget, and the choice survives redrawing the block with another
+  translation or language. `heading=` and `hint=` (markdown) replace the
+  default heading and hint for a lesson with its own wording; `block_id=`
+  prefixes the element ids and the radio group, so a page can hold several
+  blocks (the default reproduces a single block's markup exactly).
+- Added `language_notes_problems(lines, notes)`: the fragments of a poem's
+  language notes that the block would show as nothing -- one that occurs
+  nowhere in the poem, or that overlaps a word an earlier fragment already
+  holds -- as a list of `{"row", "fragment", "problem", "holder"}`. It runs the
+  matcher the block itself uses, so a lesson's data checker or a test calls it
+  instead of re-implementing the rule.
+- Added `GreekUtils.load_language_notes(*, nb_dir, remote_base=None)`, which
+  reads `language_notes.tsv` into row dicts (local file first, otherwise
+  downloaded from `remote_base`, like `load_vocab_tsv`).
+- Added four rows to `data/labels/ui-{en,ru,el}.tsv`: `language_notes_heading`
+  and `language_notes_hint`, the default heading and hint ("Language notes";
+  "Choose a comment and the words it is about are highlighted in the text."),
+  and `mixed_language_heading` and `mixed_language_hint`, the Kavafis lessons'
+  wording about Cavafy's mixed learned (katharevousa) and everyday (demotic)
+  language.
+- `examples/interactive_text_notebook.py` now also demonstrates
+  `mixed_language_notes`: Odyssey 1.1-2 beside two renderings, three comments
+  in en/ru/el, a translation picker and a UI-language picker
+  (`make -C examples notebook-itext`).
+- Fixed `examples/unimorph_notebook.py`: the Lemma box it builds when there is
+  no corpus table to pick from -- a part of speech the language lacks (Verb
+  for Ancient Greek, Latin, Russian and Spanish; Adjective and Verb for
+  Turkish), or a corpus with no entries, where it is the manual way to enter a
+  lemma -- was a bare expression inside an `if`, which marimo never displays.
+  It is now shown. (`marimo check` flagged it as `branch-expression`.)
+- 49 new tests, full suite 1670/1670 passing, `ruff check` clean.
+
 ## 1.21.0 - 2026-10-05
 - `interactive_text` gained `word_classes={css_class: forms}`: any number
   of named highlight sets. A clickable token whose normalized form is in a

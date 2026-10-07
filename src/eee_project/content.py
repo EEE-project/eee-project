@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import csv
 import functools
+import html as _html
 import importlib.resources
+import itertools
 import re as _re
 import unicodedata as _unicodedata
 from typing import Any
@@ -1132,7 +1134,6 @@ def build_modern_paradigm_table(el_backend: Any, *, lang: str = "ru") -> Any:
     styles.
     """
     import functools
-    import html as _html
     import eee_project as _eee
     from modern_greek_inflexion_eee import PRONOUN_LEMMAS_INDECLINABLE
 
@@ -1710,3 +1711,195 @@ def grc_lexicon_sources(w: dict, *, lexicons: "dict[str, Any]") -> list:
         except Exception:
             pass
     return sorted(sources)
+
+
+_NOTES_CSS = (
+    ".mxc{position:relative;line-height:1.5}"
+    ".mxc input.mxr{position:absolute;opacity:0;pointer-events:none}"
+    ".mxc .cm{border-bottom:1px dotted #a89968}"
+    ".mxc .mxn label{display:block;cursor:pointer;padding:.45em .8em;margin:.4em 0;border:1px solid #ddd6bf;border-left:4px solid #ddd6bf;border-radius:4px;background:#fff;color:#1f2328}"
+    ".mxc .mxn label:hover{background:#faf6e8}"
+)
+# per comment ``{i}`` of the block ``{p}``: its highlight in the text, its selected card, its keyboard focus ring
+_NOTES_RULES = (
+    "#{p}r{i}:checked~.mxt .h{i}{{background:#ffe08a;color:#1f2328;border-bottom-color:transparent}}"
+    "#{p}r{i}:checked~.mxn label[for={p}r{i}]{{background:#fff3c4;border-color:#d4a017}}"
+    "#{p}r{i}:focus-visible~.mxn label[for={p}r{i}]{{outline:2px solid #003d82}}"
+)
+_NOTES_ID_RE = _re.compile(r"[A-Za-z][A-Za-z0-9_-]*")
+
+
+def _fragment_keys(fragments: "list[list[str]]") -> "list[list[list[str]]]":
+    """The comparison key of every fragment of every comment: its words through
+    :func:`norm_grc_surface`. Built once per poem, not once per line."""
+    return [[[norm_grc_surface(w) for w in fragment.split()] for fragment in comment] for comment in fragments]
+
+
+def _claim_fragments(norm: "list[str]", keys: "list[list[list[str]]]") -> "tuple[list, list]":
+    """Claim the words of one line (already normalized) for the comments'
+    fragments, comment by comment and fragment by fragment: the first to reach a
+    word keeps it, and an occurrence with any word already held claims nothing.
+
+    ``keys`` is :func:`_fragment_keys` of the comments' fragments. Returns
+    ``(owner, matches)``: ``owner[w]`` is ``(comment, start of its match)`` or
+    ``None``; ``matches`` lists every occurrence found as ``(comment, fragment,
+    holder)`` -- ``holder`` is ``None`` for an occurrence that claimed its words,
+    else the comment that already held one of them.
+    """
+    owner: "list[tuple[int, int] | None]" = [None] * len(norm)
+    matches = []
+    for i, comment_keys in enumerate(keys):
+        for f, key in enumerate(comment_keys):
+            if not key:
+                continue
+            for start in range(len(norm) - len(key) + 1):
+                if norm[start:start + len(key)] != key:
+                    continue
+                held = [o for o in owner[start:start + len(key)] if o is not None]
+                matches.append((i, f, held[0][0] if held else None))
+                if not held:
+                    owner[start:start + len(key)] = [(i, start)] * len(key)
+    return owner, matches
+
+
+def _mark_fragments(line: str, keys: "list[list[list[str]]]") -> "list[tuple[str, int | None]]":
+    """Split a poem line into runs of words, each tagged with the index of the
+    comment it is about (``None`` for words no comment is about).
+
+    ``keys`` is :func:`_fragment_keys` of the comments' fragments: ``keys[i]``
+    holds the fragments of comment *i*; a fragment is one or more of the poem's
+    own words. Words compare by :func:`norm_grc_surface` -- accents, breathings
+    and edge punctuation do not matter, case does -- and every occurrence in the
+    line is marked. A word belongs to one comment only: a fragment with any word
+    already held by an earlier comment or fragment claims nothing (see
+    :func:`_claim_fragments`). The words of one match form one run; two adjacent
+    matches stay two runs.
+    """
+    tokens = line.split()
+    owner, _ = _claim_fragments([norm_grc_surface(t) for t in tokens], keys)
+    return [
+        (" ".join(token for token, _ in run), None if match is None else match[0])
+        for match, run in itertools.groupby(zip(tokens, owner), key=lambda pair: pair[1])
+    ]
+
+
+def language_notes_problems(lines: "list[str]", notes: "list[dict]") -> "list[dict]":
+    """The fragments of a poem's language notes that :func:`mixed_language_notes`
+    would show as nothing -- for a lesson's data checker or a test to call, so the
+    matching rule lives in one place.
+
+    ``lines`` is every line of the poem (all stanzas); ``notes`` the rows of
+    ``language_notes.tsv``. Returns ``[]`` when every fragment occurs in the poem
+    and none is refused. Otherwise one dict per problem, ordered by note then
+    fragment: ``{"row": i, "fragment": text, "problem": ..., "holder": j}`` with
+    ``row`` and ``holder`` 0-based indexes into ``notes`` --
+
+    * ``"not in the text"``: no line of the poem contains the fragment
+      (``holder`` is ``None``);
+    * ``"overlaps"``: an occurrence is refused because a word of it is already
+      held by note ``holder`` (the same note, for an earlier fragment of its own).
+
+    Blank fragments and empty cells are ignored. Comparison is the page's:
+    accents, breathings and edge punctuation do not matter, case does.
+    """
+    fragments = [(row["fragments"] or "").split(" | ") for row in notes]
+    keys = _fragment_keys(fragments)
+    found, refused = set(), set()
+    for line in lines:
+        _, matches = _claim_fragments([norm_grc_surface(t) for t in line.split()], keys)
+        for i, f, holder in matches:
+            found.add((i, f))
+            if holder is not None:
+                refused.add((i, f, holder))
+    problems = [(i, f, "not in the text", None) for i, comment in enumerate(keys) for f, key in enumerate(comment) if key and (i, f) not in found]
+    problems += [(i, f, "overlaps", holder) for i, f, holder in sorted(refused)]
+    return [
+        {"row": i, "fragment": fragments[i][f], "problem": problem, "holder": holder}
+        for i, f, problem, holder in sorted(problems, key=lambda p: p[:3])
+    ]
+
+
+def mixed_language_notes(mo, *, stanzas: "list[dict]", translator: str, notes: "list[dict]", lang: str = "en",
+                         heading: "str | None" = None, hint: "str | None" = None, block_id: str = "mx"):
+    """The poem next to one translation and, below them, every comment on the
+    poem's language -- choosing a comment highlights the words it is about.
+
+    All comments stay visible: the explanation is never hidden behind the
+    selection. Plain HTML/CSS (hidden radio inputs + sibling selectors), so the
+    highlight is instant, needs no widget, and the choice survives a redraw with
+    another translation or language -- marimo redraws changed text, not the
+    inputs. Both columns share one line height, so the lines stay level.
+
+    Args:
+        mo:         The marimo module.
+        stanzas:    The poem as the lesson notebooks hold it: ``[{"ref": ...,
+                    "lines": [Greek line, ...], "translations": {translator:
+                    "line\\nline"}}, ...]``.
+        translator: Key into each stanza's ``translations``. A stanza the
+                    translator lacks shows "—"; a version with fewer lines than
+                    the Greek is padded so the next stanza stays level.
+        notes:      Rows of ``language_notes.tsv``
+                    (:meth:`GreekUtils.load_language_notes`): ``fragments`` --
+                    the poem's own words each comment is about, separated by
+                    `` | `` -- and the comment itself in a column per UI language.
+        lang:       UI language: the ``notes`` column shown, and the language of
+                    the default heading and hint.
+        heading:    Markdown heading between the text and the cards. ``None``
+                    (default) -- the generic ``language_notes_heading`` row of
+                    ``ui-{lang}.tsv``. A lesson with its own wording passes it,
+                    e.g. ``gu.ui_label("mixed_language_heading", lang)``.
+        hint:       Markdown paragraph under the heading, likewise defaulting to
+                    the ``language_notes_hint`` row.
+        block_id:   Prefix of the element ids and of the radio group's name
+                    (``mxr0``, ``mxr1`` ... by default): a plain identifier
+                    (letters, digits, ``-``, ``_``; starting with a letter). Give
+                    each block on one page its own, or their radios would join one
+                    group and their ids collide.
+
+    :func:`language_notes_problems` checks a poem's notes against its text.
+
+    Example cell::
+
+        mo.vstack([trans_selector, eee.mixed_language_notes(
+            mo, stanzas=STANZAS, translator=trans_selector.value,
+            notes=MIX_ROWS, lang=language_selector.value)])
+    """
+    if not _NOTES_ID_RE.fullmatch(block_id):
+        raise ValueError(f"block_id must be a plain identifier (letters, digits, - and _; starting with a letter), got {block_id!r}")
+    fragments = [row["fragments"].split(" | ") for row in notes]
+    keys = _fragment_keys(fragments)
+
+    def greek_line(line):
+        return " ".join(
+            _html.escape(text) if comment is None else f'<span class="cm h{comment}">{_html.escape(text)}</span>'
+            for text, comment in _mark_fragments(line, keys)
+        ) or "&nbsp;"
+
+    left, right = [], []
+    for s, stanza in enumerate(stanzas):
+        translation = stanza["translations"].get(translator, "—").split("\n")
+        translation += [""] * (len(stanza["lines"]) - len(translation))  # a shorter version keeps the next stanza level
+        left += ([""] if s else []) + stanza["lines"]
+        right += ([""] if s else []) + translation
+    css = _NOTES_CSS + "".join(_NOTES_RULES.format(p=block_id, i=i) for i in range(len(notes)))
+    radios = f'<input type="radio" name="{block_id}" id="{block_id}r-none" class="mxr" checked>' + "".join(
+        f'<input type="radio" name="{block_id}" id="{block_id}r{i}" class="mxr">' for i in range(len(notes))
+    )
+    cards = "".join(
+        f'<label for="{block_id}r{i}"><b>{_html.escape(" · ".join(fs))}</b> — {_html.escape(row[lang])}</label>'
+        for i, (fs, row) in enumerate(zip(fragments, notes))
+    )
+    left_html = "".join(f"<div>{greek_line(ln)}</div>" for ln in left)
+    right_html = "".join(f"<div>{_html.escape(ln) or '&nbsp;'}</div>" for ln in right)
+    heading = _ui_label("language_notes_heading", lang) if heading is None else heading
+    hint = _ui_label("language_notes_hint", lang) if hint is None else hint
+    head = mo.md(f"### {heading}\n\n{hint}").text
+    return mo.Html(
+        f"<style>{css}</style>"
+        f'<div class="mxc">{radios}'
+        '<div class="mxt" style="display:grid;grid-template-columns:max-content minmax(0,1fr);column-gap:1.5rem">'
+        f'<div style="padding-right:0.8em">{left_html}</div>'
+        f'<div style="border-left:3px solid #ccc;padding-left:0.8em">{right_html}</div></div>'
+        f"{head}"
+        f'<div class="mxn">{cards}</div></div>'
+    )

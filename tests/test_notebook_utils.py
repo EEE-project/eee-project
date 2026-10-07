@@ -6588,6 +6588,31 @@ class TestLoadVocabTsv:
         assert len(result) == 1
 
 
+# ──────────────────────────────── load_language_notes ──
+
+class TestLoadLanguageNotes:
+    """language_notes.tsv: one row per commented place -- the poem fragments it is
+    about, then its comment in each UI language (rendered by mixed_language_notes)."""
+
+    TSV = "fragments\tru\tel\ten\nθυμωμένο Ποσειδώνα\tр1\tε1\te1\nνα μάθεις | μη\tр2\tε2\te2\n"
+
+    def test_reads_every_row_with_its_columns(self, gu_marimo, tmp_path):
+        (tmp_path / "language_notes.tsv").write_text(self.TSV, encoding="utf-8")
+        assert gu_marimo.load_language_notes(nb_dir=tmp_path) == [
+            {"fragments": "θυμωμένο Ποσειδώνα", "ru": "р1", "el": "ε1", "en": "e1"},
+            {"fragments": "να μάθεις | μη", "ru": "р2", "el": "ε2", "en": "e2"},
+        ]
+
+    def test_missing_no_remote_raises(self, gu_marimo, tmp_path):
+        with pytest.raises(FileNotFoundError, match="language_notes.tsv"):
+            gu_marimo.load_language_notes(nb_dir=tmp_path)
+
+    def test_missing_file_is_fetched_from_remote_base(self, gu_marimo, tmp_path):
+        with patch("urllib.request.urlopen", return_value=_make_resp(self.TSV.encode("utf-8"))):
+            rows = gu_marimo.load_language_notes(nb_dir=tmp_path, remote_base="https://example.com")
+        assert [r["en"] for r in rows] == ["e1", "e2"]
+
+
 # ──────────────────────────────────────── vocab_table ──
 
 class TestVocabTable:
