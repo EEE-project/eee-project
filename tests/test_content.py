@@ -4,7 +4,6 @@ navigation/GreekUtils surface still tested in test_notebook_utils.py)."""
 import json
 import re
 import unicodedata
-from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -56,6 +55,7 @@ from eee_project.content import (
 from eee_project.notebook_utils import language_bridge, language_selector
 from conftest import (
     LangMo as _LangMo, FakeParadigmBackend as _FakeParadigmBackend,
+    StubHtmlMo as _StubHtmlMo,
     SAMPLE_GA as _SAMPLE_GA, make_resp as _make_resp,
 )
 
@@ -2663,18 +2663,6 @@ class TestMarkFragments:
         assert _marks("", [["τον"]]) == []
 
 
-class _NotesMo:
-    """marimo stand-in: mixed_language_notes only needs Html and md(...).text."""
-
-    class Html:
-        def __init__(self, s):
-            self.s = s
-
-    @staticmethod
-    def md(s):
-        return SimpleNamespace(text=f"<md>{s}</md>")
-
-
 _NOTES_STANZAS = [
     {"ref": "1", "lines": ["τον θυμωμένο Ποσειδώνα", "μη φοβάσαι"],
      "translations": {"A": "angry Poseidon\nfear not", "B": "the raging god"}},
@@ -2687,7 +2675,7 @@ _NOTES_ROWS = [
 
 
 def _notes_html(translator="A", lang="en", stanzas=_NOTES_STANZAS, notes=_NOTES_ROWS, **kw):
-    return mixed_language_notes(_NotesMo, stanzas=stanzas, translator=translator, notes=notes, lang=lang, **kw).s
+    return mixed_language_notes(_StubHtmlMo, stanzas=stanzas, translator=translator, notes=notes, lang=lang, **kw).s
 
 
 class TestMixedLanguageNotes:
@@ -2701,8 +2689,8 @@ class TestMixedLanguageNotes:
         assert "mixed_language_notes" in eee.__all__
 
     def test_returns_marimo_html(self):
-        result = mixed_language_notes(_NotesMo, stanzas=_NOTES_STANZAS, translator="A", notes=_NOTES_ROWS)
-        assert isinstance(result, _NotesMo.Html)
+        result = mixed_language_notes(_StubHtmlMo, stanzas=_NOTES_STANZAS, translator="A", notes=_NOTES_ROWS)
+        assert isinstance(result, _StubHtmlMo.Html)
 
     def test_the_words_of_a_comment_are_wrapped_in_its_span(self):
         html = _notes_html()
@@ -2755,15 +2743,13 @@ class TestMixedLanguageNotes:
             assert f"<md>### {heading}\n\n{hint}</md>" in _notes_html(lang=lang)
 
     def test_heading_and_hint_can_be_given_by_the_caller(self):
-        html = mixed_language_notes(_NotesMo, stanzas=_NOTES_STANZAS, translator="A", notes=_NOTES_ROWS, lang="ru",
-                                    heading="My heading", hint="My hint.").s
+        html = _notes_html(lang="ru", heading="My heading", hint="My hint.")
         assert "<md>### My heading\n\nMy hint.</md>" in html
         assert _ui_label("language_notes_heading", "ru") not in html
 
     def test_a_caller_can_pass_the_ui_labels_of_its_own_lesson(self):
         heading, hint = _ui_label("mixed_language_heading", "el"), _ui_label("mixed_language_hint", "el")
-        html = mixed_language_notes(_NotesMo, stanzas=_NOTES_STANZAS, translator="A", notes=_NOTES_ROWS, lang="el",
-                                    heading=heading, hint=hint).s
+        html = _notes_html(lang="el", heading=heading, hint=hint)
         assert f"<md>### {heading}\n\n{hint}</md>" in html
 
     def test_the_generic_ui_labels_are_written_in_each_language(self):
@@ -2862,5 +2848,5 @@ class TestLanguageNotesProblems:
         notes = self._notes("θυμωμένο Ποσειδώνα", "Ποσειδώνα μη")
         stanzas = [{"ref": "1", "lines": self.LINES, "translations": {"A": "one\ntwo"}}]
         assert [p["row"] for p in language_notes_problems(self.LINES, notes)] == [1]
-        html = mixed_language_notes(_NotesMo, stanzas=stanzas, translator="A", notes=notes).s
+        html = _notes_html(stanzas=stanzas, notes=notes)
         assert 'class="cm h0"' in html and 'class="cm h1"' not in html

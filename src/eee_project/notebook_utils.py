@@ -349,6 +349,39 @@ class ConfigStore:
 
         return (_at(i - 1), _at(i + 1))
 
+    def page_titles(self, titles: "dict | str", own_url: str, *, sep: str = " — ") -> "dict[str, str]":
+        """Browser-tab titles, one per language, for the lesson whose ``url``
+        column matches ``own_url`` (trailing slash optional on either side).
+
+        Each is ``"<course><sep><label>: <title>"``: the course name from
+        ``titles`` (a ``{lang: name}`` dict, or a plain string used for every
+        language), then the row's ``label_<lang>`` and ``title_<lang>``
+        columns — the text the index page's lesson cards already show. A
+        language is left out when its ``title_<lang>`` is empty, and the
+        label part is dropped when its ``label_<lang>`` is.
+
+        Returns ``{}`` when no row matches or the TSV has no per-language
+        title columns; pass the result as ``eee_topbar(page_titles=...)``,
+        which then leaves the tab title alone.
+        """
+        i = self._lesson_index(own_url)
+        if i is None:
+            return {}
+        row = self._lessons[i]
+        out: "dict[str, str]" = {}
+        for key, value in row.items():
+            title = value.strip() if isinstance(value, str) else ""
+            if not isinstance(key, str) or not key.startswith("title_") or not title:
+                continue
+            lang = key[len("title_"):]
+            if isinstance(titles, dict):
+                course = titles.get(lang) or titles.get("en") or next(iter(titles.values()), "")
+            else:
+                course = titles
+            label = (row.get(f"label_{lang}") or "").strip()
+            out[lang] = f"{course}{sep}{label}: {title}" if label else f"{course}{sep}{title}"
+        return out
+
     @property
     def raw_base(self) -> "str | None":
         """Raw Codeberg base URL (parent of the index.tsv directory), or None."""
@@ -375,7 +408,7 @@ class ConfigStore:
         return f"{self._raw_base}/{dir_name}"
 
 
-def eee_topbar(mo, back_url: str, lang: str, titles: "dict | str", *, style: str = "back", icon: str = "●", ga_config=None, parent_titles: "dict | str | None" = None, same_window: bool = False):
+def eee_topbar(mo, back_url: str, lang: str, titles: "dict | str", *, style: str = "back", icon: str = "●", ga_config=None, parent_titles: "dict | str | None" = None, same_window: bool = False, page_titles: "dict | str | None" = None):
     """Render the EEE sticky navigation topbar.
 
     Must be the **last expression** in a marimo cell — no trailing ``return``.
@@ -418,6 +451,16 @@ def eee_topbar(mo, back_url: str, lang: str, titles: "dict | str", *, style: str
                        hosted outside molab (e.g. static WASM exports on
                        Codeberg Pages), where that bug doesn't apply and
                        same-window navigation is the expected behavior.
+        page_titles:   Browser-tab title, as a ``{lang: title}`` dict or a
+                       plain string — typically
+                       :meth:`ConfigStore.page_titles`. When given, the
+                       topbar also sets ``document.title`` to the entry for
+                       ``lang`` (falling back to ``"en"``, then the first
+                       entry) every time the cell re-renders, so the tab
+                       title follows the language dropdown. ``None``
+                       (default) leaves the title alone. A static export
+                       still starts with marimo's ``app_title`` (what link
+                       previews and the page before its scripts run show).
 
     Example cell::
 
@@ -431,7 +474,7 @@ def eee_topbar(mo, back_url: str, lang: str, titles: "dict | str", *, style: str
         eee_topbar(mo, back_url="https://.../created_with_eee/", lang=lang_sel.value,
                    titles="Kapodistrias", parent_titles="created_with_eee", style="index")
     """
-    ga_widget = _make_ga_widget(mo, ga_config)
+    extras = [w for w in (_make_ga_widget(mo, ga_config), _make_title_widget(mo, page_titles, lang)) if w is not None]
     title = titles.get(lang, next(iter(titles.values()))) if isinstance(titles, dict) else titles
     _target_attr = "" if same_window else ' target="_blank" rel="noopener"'
     if style == "index":
@@ -450,7 +493,7 @@ def eee_topbar(mo, back_url: str, lang: str, titles: "dict | str", *, style: str
         # widget in a 1-item vstack fired gtag.js + /g/collect correctly
         # every time). Not unit-testable (the stub mo has no real DOM/mount
         # step) -- verified via `marimo export html-wasm` + a real browser.
-        return mo.vstack([ga_widget], gap=0) if ga_widget is not None else None
+        return mo.vstack(extras, gap=0) if extras else None
     else:
         left = f'<a class="tb-back" href="{back_url}"{_target_attr}>◀ {title}</a>'
     bar = mo.Html(f"""{_TOPBAR_CSS}
@@ -458,7 +501,7 @@ def eee_topbar(mo, back_url: str, lang: str, titles: "dict | str", *, style: str
   {left}
   {_BADGE}
 </div>""")
-    return mo.vstack([bar, ga_widget], gap=0) if ga_widget is not None else bar
+    return mo.vstack([bar, *extras], gap=0) if extras else bar
 
 
 def eee_ga_tracker(mo, ga_config: "dict | None"):
@@ -769,6 +812,35 @@ def _make_ga_widget(mo, ga_config: "dict | None"):
     if not measurement_id or not _ANYWIDGET_OK:
         return None
     return mo.ui.anywidget(_make_ga_widget_class(measurement_id)())
+
+
+# document.title is main-thread state and a static export's <title> never changes: a real widget render() sets it.
+_PAGE_TITLE_ESM = """\
+function render({ model, el }) {
+  el.style.display = "none";
+  const apply = () => { document.title = model.get("page_title"); };
+  apply();
+  model.on("change:page_title", apply);
+}
+export default { render };
+"""
+
+if _ANYWIDGET_OK:
+    class _PageTitleWidget(_anywidget.AnyWidget):
+        _esm = _PAGE_TITLE_ESM
+        page_title = _traitlets.Unicode("").tag(sync=True)
+
+
+def _make_title_widget(mo, page_titles: "dict | str | None", lang: str):
+    """Return an anywidget that sets the browser-tab title for *lang*, or
+    None if *page_titles* is empty or anywidget isn't installed."""
+    if not page_titles or not _ANYWIDGET_OK:
+        return None
+    if isinstance(page_titles, dict):
+        title = page_titles.get(lang) or page_titles.get("en") or next(iter(page_titles.values()))
+    else:
+        title = page_titles
+    return mo.ui.anywidget(_PageTitleWidget(page_title=title))
 
 
 # ═══════════════════════════ cross-page language persistence (anywidget) ══

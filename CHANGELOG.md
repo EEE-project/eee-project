@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.23.0 - 2026-10-12
+- `eee_topbar(..., page_titles=...)`: the browser-tab title can now follow the language dropdown. Pass a
+  `{lang: title}` dict (or a plain string) and the topbar sets `document.title` to the entry for the current
+  language each time it re-renders, falling back to `en` and then to the first entry. A static export's own title
+  never changes, because marimo sets it only while exporting; a hidden widget does it instead, wrapped in the same
+  `mo.vstack` as the GA tag so it mounts in a WASM export too. The default `None` changes nothing.
+- `ConfigStore.page_titles(titles, own_url)`: builds those titles from the lesson's own `index.tsv` row, as
+  `"<course> — <label>: <title>"` for every language that has `label_<lang>`/`title_<lang>` columns -- the text
+  the index page's lesson cards already show, so no new strings are needed. It finds the row the way
+  `adjacent_urls()` does and returns `{}` when there is none.
+- 21 new tests, full suite 1698/1698 passing, `ruff check` clean.
+
 ## 1.22.1 - 2026-10-07
 - Added the interactive text demo (`examples/interactive_text_notebook.py`) to the
   live demo site as a seventh page, `interactive-text/`, with its own card on the

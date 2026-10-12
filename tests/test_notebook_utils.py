@@ -34,6 +34,7 @@ from eee_project.notebook_utils import (
 )
 from conftest import (
     StubMo as _StubMo, StubBackend as _StubBackend, StubMoLayout as _StubMoLayout,
+    StubHtml as _StubHtml, StubHtmlMo as _StubHtmlMo,
     LangMo as _LangMo, FakeDropdown as _FakeDropdown,
     FakeParadigmBackend as _FakeParadigmBackend,
     SAMPLE_GA as _SAMPLE_GA, make_resp as _make_resp,
@@ -487,15 +488,6 @@ class TestLanguageSelector:
 
 # ──────────────────────────────────────── eee_topbar / eee_footer ──
 
-class _StubHtmlMo:
-    """Marimo stub that captures Html output."""
-    class Html:
-        def __init__(self, s): self.s = s
-        def __str__(self): return self.s
-    @staticmethod
-    def md(s): return s
-
-
 class TestEeeTopbar:
     def test_returns_html(self):
         result = eee_topbar(_StubHtmlMo(), back_url="https://example.com",
@@ -593,6 +585,68 @@ class TestEeeTopbar:
         result = eee_topbar(_StubHtmlMo(), back_url="https://x.com", lang="en",
                             titles="T", ga_config={"other": "value"})
         assert "gtag" not in result.s
+
+
+class TestEeeTopbarPageTitles:
+    @pytest.fixture(autouse=True)
+    def _need_anywidget(self):
+        import eee_project.notebook_utils as _nu
+        if not _nu._ANYWIDGET_OK:
+            pytest.skip("anywidget not installed")
+
+    @staticmethod
+    def _topbar(**kw):
+        return eee_topbar(_FormMo(), **{"back_url": "https://x.com", "lang": "en", "titles": "T", **kw})
+
+    def test_default_adds_no_widget(self):
+        assert isinstance(self._topbar(), _FormMo.Html)
+
+    def test_title_follows_the_language(self):
+        titles = {"en": "Odyssey", "ru": "Одиссея"}
+        for lang, want in (("en", "Odyssey"), ("ru", "Одиссея")):
+            bar, widget = self._topbar(lang=lang, page_titles=titles)
+            assert widget.page_title == want
+
+    def test_missing_language_falls_back_to_en_then_the_first_entry(self):
+        _, widget = self._topbar(lang="el", page_titles={"ru": "R", "en": "E"})
+        assert widget.page_title == "E"
+        _, widget = self._topbar(lang="el", page_titles={"ru": "R", "fr": "F"})
+        assert widget.page_title == "R"
+
+    def test_plain_string(self):
+        _, widget = self._topbar(page_titles="Just one title")
+        assert widget.page_title == "Just one title"
+
+    @pytest.mark.parametrize("empty", [None, {}, ""])
+    def test_empty_adds_no_widget(self, empty):
+        assert isinstance(self._topbar(page_titles=empty), _FormMo.Html)
+
+    def test_widget_comes_after_the_ga_widget(self):
+        bar, ga, title = self._topbar(ga_config={"measurement_id": "G-TEST123"}, page_titles={"en": "E"})
+        assert "G-TEST123" in ga._esm
+        assert title.page_title == "E"
+
+    def test_no_back_url_still_sets_the_title(self):
+        result = self._topbar(back_url="", page_titles={"en": "E"})
+        assert len(result) == 1 and result[0].page_title == "E"
+
+    def test_index_style_also_sets_the_title(self):
+        bar, widget = self._topbar(back_url=None, style="index", page_titles={"en": "E"})
+        assert widget.page_title == "E"
+
+    def test_esm_sets_document_title_and_follows_changes(self):
+        _, widget = self._topbar(page_titles={"en": "E"})
+        assert 'document.title = model.get("page_title")' in widget._esm
+        assert '"change:page_title"' in widget._esm
+
+    def test_without_anywidget_the_topbar_is_plain_html(self):
+        import eee_project.notebook_utils as _nu
+        orig = _nu._ANYWIDGET_OK
+        try:
+            _nu._ANYWIDGET_OK = False
+            assert isinstance(self._topbar(page_titles={"en": "E"}), _FormMo.Html)
+        finally:
+            _nu._ANYWIDGET_OK = orig
 
 
 class TestAnywidgetImportFallback:
@@ -1430,10 +1484,7 @@ def _dia(value: str = ""):
 
 class _FormMo(_StubMoLayout):
     """Extended marimo stub with button/radio support."""
-    class Html:
-        def __init__(self, s): self.s = s
-        def __str__(self): return self.s
-        def __repr__(self): return self.s
+    Html = _StubHtml
     class ui:
         @staticmethod
         def button(label="", on_click=None, disabled=False, kind="neutral"):
@@ -4927,6 +4978,62 @@ class TestConfigStoreAdjacentUrls:
     def test_empty_lessons_returns_none_none(self):
         cfg = ConfigStore.from_dict([])
         assert cfg.adjacent_urls("chapter_01/") == (None, None)
+
+
+_TITLE_ROW = {
+    "url": "2026_07_06/",
+    "label_ru": "День 4", "label_el": "el-label", "label_en": "Day 4",
+    "title_ru": "Одиссея IX.82–104", "title_el": "el-title", "title_en": "Odyssey IX.82–104",
+}
+_COURSE_TITLES = {"ru": "Одиссея с Гомером", "el": "el-course", "en": "Odyssey with Homer"}
+
+
+class TestConfigStorePageTitles:
+    def test_composes_course_label_and_title_per_language(self):
+        got = ConfigStore.from_dict([_TITLE_ROW]).page_titles(_COURSE_TITLES, "2026_07_06/")
+        assert got == {
+            "ru": "Одиссея с Гомером — День 4: Одиссея IX.82–104",
+            "el": "el-course — el-label: el-title",
+            "en": "Odyssey with Homer — Day 4: Odyssey IX.82–104",
+        }
+
+    def test_trailing_slash_optional_on_either_side(self):
+        cfg = ConfigStore.from_dict([_TITLE_ROW])
+        assert cfg.page_titles(_COURSE_TITLES, "2026_07_06") == cfg.page_titles(_COURSE_TITLES, "2026_07_06/")
+        cfg = ConfigStore.from_dict([{**_TITLE_ROW, "url": "2026_07_06"}])
+        assert cfg.page_titles(_COURSE_TITLES, "2026_07_06/") == cfg.page_titles(_COURSE_TITLES, "2026_07_06")
+
+    def test_unknown_lesson_empty_store_and_plain_columns_give_nothing(self):
+        assert ConfigStore.from_dict([_TITLE_ROW]).page_titles(_COURSE_TITLES, "nope/") == {}
+        assert ConfigStore.from_dict([]).page_titles(_COURSE_TITLES, "2026_07_06/") == {}
+        plain = {"url": "a/", "label": "L", "title": "T"}   # the single-language TSV schema
+        assert ConfigStore.from_dict([plain]).page_titles("C", "a/") == {}
+
+    def test_empty_label_drops_that_part(self):
+        row = {**_TITLE_ROW, "label_en": ""}
+        assert ConfigStore.from_dict([row]).page_titles(_COURSE_TITLES, "2026_07_06/")["en"] == "Odyssey with Homer — Odyssey IX.82–104"
+
+    def test_empty_title_leaves_that_language_out(self):
+        row = {**_TITLE_ROW, "title_el": " "}
+        assert set(ConfigStore.from_dict([row]).page_titles(_COURSE_TITLES, "2026_07_06/")) == {"ru", "en"}
+
+    def test_plain_string_course_name_is_used_for_every_language(self):
+        got = ConfigStore.from_dict([_TITLE_ROW]).page_titles("Course", "2026_07_06/")
+        assert got["en"] == "Course — Day 4: Odyssey IX.82–104" and got["el"] == "Course — el-label: el-title"
+
+    def test_course_name_falls_back_to_en_then_the_first_entry(self):
+        cfg = ConfigStore.from_dict([_TITLE_ROW])
+        assert cfg.page_titles({"en": "E", "ru": "R"}, "2026_07_06/")["el"].startswith("E — ")
+        assert cfg.page_titles({"ru": "R", "fr": "F"}, "2026_07_06/")["el"].startswith("R — ")
+
+    def test_separator_can_be_changed(self):
+        got = ConfigStore.from_dict([_TITLE_ROW]).page_titles("C", "2026_07_06/", sep=" | ")
+        assert got["en"] == "C | Day 4: Odyssey IX.82–104"
+
+    def test_a_row_with_extra_fields_does_not_break_it(self):
+        text = "url\ttitle_en\nx/\tT\textra-field\n"   # csv.DictReader files the overflow under the key None
+        cfg = ConfigStore.from_dict(ConfigStore._parse_tsv(text))
+        assert cfg.page_titles("C", "x/") == {"en": "C — T"}
 
 
 # ──────────────────────────────── eee_topbar style="index" ──

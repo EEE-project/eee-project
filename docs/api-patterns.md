@@ -391,6 +391,33 @@ eee_footer(mo, lang=lang_sel.value, prev_url=_prev_url, next_url=_next_url,
            same_window=True)
 ```
 
+#### Browser-tab title
+
+A static export's `<title>` is whatever `marimo.App(app_title=...)` said at
+export time, and marimo never changes it at runtime — so by default the tab
+title ignores the language dropdown. Pass `page_titles=` (a `{lang: title}`
+dict or a plain string) to `eee_topbar` and a hidden widget, wrapped in the
+same `mo.vstack` as the GA tag, sets `document.title` for the current `lang`
+each time the cell re-renders, falling back to `"en"` and then to the first
+entry. It is opt-in: with `page_titles=None` (the default) nothing changes.
+
+`ConfigStore.page_titles(titles, own_url)` builds that dict from the lesson's
+own `index.tsv` row — `"<course> — <label>: <title>"` per language, from the
+`label_<lang>`/`title_<lang>` columns the index page's cards already show, so
+no extra strings need writing. It finds the row the way `adjacent_urls()`
+does (your own lesson's `url`, trailing slash optional) and returns `{}` —
+leaving the title alone — when there is no such row or the TSV only has the
+single-language `label`/`title` columns:
+
+```python
+_TITLES = {"ru": "Каподистриас", "en": "Kapodistrias"}
+eee_topbar(mo, back_url=_cfg.index_url(), lang=lang_sel.value, titles=_TITLES,
+           page_titles=_cfg.page_titles(_TITLES, "26_05_01/"), same_window=True)
+```
+
+Set `app_title=` to the default-language (`"en"`) version of the same title:
+it is what link previews, and the page before its scripts run, show.
+
 ### Language persistence
 
 Cross-page UI-language persistence via the browser's `localStorage` (key

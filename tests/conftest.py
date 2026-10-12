@@ -97,6 +97,26 @@ class StubMoLayout:
     def accordion(sections, **kwargs): return sections
 
 
+class _Md(str):
+    """What the stubs' mo.md() returns: the text itself, with marimo's .text as a marked-up copy."""
+    @property
+    def text(self): return f"<md>{self}</md>"
+
+
+class StubHtml:
+    """mo.Html stand-in: keeps the markup it was given in .s."""
+    def __init__(self, s): self.s = s
+    def __str__(self): return self.s
+    def __repr__(self): return self.s
+
+
+class StubHtmlMo:
+    """marimo stub for helpers that return mo.Html(...) and read mo.md(...).text."""
+    Html = StubHtml
+    @staticmethod
+    def md(s): return _Md(s)
+
+
 class StubBackend:
     """Minimal morphology backend stub for GreekUtils(backend, mo, ...).
 
