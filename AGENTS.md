@@ -73,6 +73,11 @@ introduced shortly after `30fa087`) is where per-version detail lives now —
   dropdowns are known to do this — the page itself is fine, only
   `Page.captureScreenshot` hangs), switch to JS-only interaction
   (`javascript_exec` for DOM queries/events) rather than retrying screenshots.
+- `tests/test_examples_run.py` runs every `examples/*.py` (the notebooks and the plain
+  scripts) from its first line to its last (`python -I`, 4 at a time, about 25 s in all), so a
+  library change that breaks an example fails the suite. It does not render a page, so the
+  live check above still applies. A new example is covered when its file sits directly in
+  `examples/` and ends in `.py`.
 
 ## Commit messages
 

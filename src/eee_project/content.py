@@ -13,6 +13,7 @@ import html as _html
 import importlib.resources
 import itertools
 import re as _re
+import sys
 import unicodedata as _unicodedata
 from typing import Any
 
@@ -90,6 +91,19 @@ def _find_local(directory, filename) -> "Any | None":
 
     p = _Path(directory) / filename
     return p if p.exists() else None
+
+
+def _not_fetched_by_page(filename) -> bool:
+    """True for a file that a static WASM page does not fetch: a PDF.
+
+    The lessons link their PDFs by address and nothing reads a copy. Under
+    Pyodide (``sys.platform == "emscripten"``) a copy would sit in the page's
+    in-memory file system, which is never served to the browser, so the
+    download would cost a request and the size of the file for nothing.
+    :meth:`GreekUtils.ensure_file` and :meth:`GreekUtils.ensure_files` return
+    ``None`` for such a file that is not already local, without a warning.
+    """
+    return sys.platform == "emscripten" and str(filename).lower().endswith(".pdf")
 
 
 def _raw_base_from_url(url: str) -> str:
@@ -196,8 +210,6 @@ def _fetch_url_bytes(url: str, timeout: "int | float") -> bytes:
     never touched at all. Plain CPython (local dev, no non-ASCII-header
     bug to work around) uses ``urllib.request.urlopen`` as normal.
     """
-    import sys
-
     if sys.platform == "emscripten":
         from js import XMLHttpRequest, Uint8Array
 
@@ -258,7 +270,6 @@ async def _fetch_url_bytes_async(url: str, timeout: "int | float") -> bytes:
     instead.
     """
     import asyncio
-    import sys
 
     if sys.platform == "emscripten":
         from pyodide.http import pyfetch
@@ -875,7 +886,6 @@ def build_grc_paradigm_table(
         build_paradigm_table = eee.build_grc_paradigm_table(ag_backend, um_backend)
         html = build_paradigm_table(word_dict)
     """
-    import functools
     import eee_project as _eee
 
     _default_lang = lang  # captured before build_paradigm_table's own `lang` param shadows this name
@@ -1133,7 +1143,6 @@ def build_modern_paradigm_table(el_backend: Any, *, lang: str = "ru") -> Any:
     lemma with no Modern reflex → no Modern rung). Shares the grc renderer's HTML
     styles.
     """
-    import functools
     import eee_project as _eee
     from modern_greek_inflexion_eee import PRONOUN_LEMMAS_INDECLINABLE
 

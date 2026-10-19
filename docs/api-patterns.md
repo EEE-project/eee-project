@@ -688,7 +688,10 @@ DataFrame (or `None` if no candidate file can be found, never raising) for
 bundled TSV entirely; leave it unset for a fixed vocab table nothing can
 override. `ru_variant=True` with `language="ru"` tries
 `"<stem>_ru.<ext>"` first, falling back to *filename* when no such variant
-exists.
+exists. The variant is requested over the network only when *filename* itself
+is not local (a notebook uploaded on its own): a page or checkout that holds
+*filename* holds every file of the lesson, so a variant that is not local
+does not exist and costs no request.
 
 `vocab_table` wraps `mo.ui.table(df, selection="multi", page_size=len(df),
 wrapped_columns=list(df.columns), ...)` — every row on one scrollable page,
@@ -724,7 +727,7 @@ above for why `lemma`/`context` are optional rather than a design flaw):
 **`ensure_file` behaviour:**
 
 ```python
-path = gu.ensure_file("filename.pdf", nb_dir=NB_DIR, remote_base=NB_REMOTE)
+path = gu.ensure_file("filename.tsv", nb_dir=NB_DIR, remote_base=NB_REMOTE)
 ```
 
 - If the file already exists in `nb_dir` — returns its `Path` immediately.
@@ -737,6 +740,13 @@ path = gu.ensure_file("filename.pdf", nb_dir=NB_DIR, remote_base=NB_REMOTE)
 This means PDF links in homework cells gracefully degrade when the PDF has not
 yet been uploaded to the remote — the notebook still loads, vocabulary cells
 still run, and only the download warning appears in the kernel log.
+
+- **On a static WASM page (Pyodide) a missing `.pdf` is not fetched:** it
+  returns `None` at once, with no warning, and `ensure_files` does the same for
+  each PDF in its list. The page's in-memory files are never served to the
+  browser, so a copy there could not be opened; link a PDF by its remote
+  address (as the lessons do) and do not read the returned path. Other file
+  types are fetched as before, and so are PDFs on a desktop or molab run.
 
 **`ensure_files` — concurrent variant, for a cell fetching several files at once:**
 

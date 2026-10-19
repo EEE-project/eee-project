@@ -2614,7 +2614,9 @@ class TestMakeParadigmForm:
         assert "MONOTONIC_MARKS" in _nu._PARA_ESM
 
     def test_esm_mount_autofocus_skips_a_first_field_below_the_fold(self):
-        # Page load leaves focus on <body> like a word advance does, so a first field below the fold must not be focused: focus() scrolled the Exercise demo down to Exercise 5.
+        # Page load leaves focus on <body> like a word advance does, so a first
+        # field below the fold must not be focused: focus() scrolled the Exercise
+        # demo down to Exercise 5.
         import eee_project.notebook_utils as _nu
         assert "document.activeElement === document.body) && inputs[0].getBoundingClientRect().bottom <= window.innerHeight" in _nu._PARA_ESM
 
@@ -6805,6 +6807,44 @@ class TestLoadVocabTable:
         (tmp_path / "nouns.tsv").write_text("Word\tTranslation\nλύω\tloosen\n", encoding="utf-8")
         df = gu_marimo.load_vocab_table("nouns.tsv", nb_dir=tmp_path, ru_variant=True, language="ru")
         assert list(df["Word"]) == ["λύω"]
+
+    def test_ru_variant_not_requested_over_network_when_base_file_is_local(self, gu_marimo, tmp_path):
+        # A page or checkout that already holds the base file holds every file of the lesson (the WASM export
+        # embeds them), so a variant that is not local does not exist: asking the network for it only produced a
+        # 404 on every page start.
+        (tmp_path / "nouns.tsv").write_text("Word\tTranslation\nλύω\tloosen\n", encoding="utf-8")
+        with patch("urllib.request.urlopen") as mock_urlopen:
+            df = gu_marimo.load_vocab_table(
+                "nouns.tsv", nb_dir=tmp_path, remote_base="https://example.com", ru_variant=True, language="ru",
+            )
+        mock_urlopen.assert_not_called()
+        assert list(df["Word"]) == ["λύω"]
+
+    def test_ru_variant_local_file_wins_without_network(self, gu_marimo, tmp_path):
+        (tmp_path / "nouns.tsv").write_text("Word\tTranslation\nλύω\tloosen\n", encoding="utf-8")
+        (tmp_path / "nouns_ru.tsv").write_text("Word\tTranslation\nслово\tслово-en\n", encoding="utf-8")
+        with patch("urllib.request.urlopen") as mock_urlopen:
+            df = gu_marimo.load_vocab_table(
+                "nouns.tsv", nb_dir=tmp_path, remote_base="https://example.com", ru_variant=True, language="ru",
+            )
+        mock_urlopen.assert_not_called()
+        assert list(df["Word"]) == ["слово"]
+
+    def test_ru_variant_requested_over_network_when_base_file_is_not_local(self, gu_marimo, tmp_path):
+        # No local file at all (a notebook uploaded on its own): the network is the only source, so the variant
+        # is tried there first, as before.
+        seen = []
+
+        def fake_urlopen(url, timeout=None):
+            seen.append(url)
+            return _make_resp("Word\tTranslation\nслово\tслово-en\n".encode("utf-8"))
+
+        with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+            df = gu_marimo.load_vocab_table(
+                "nouns.tsv", nb_dir=tmp_path, remote_base="https://example.com", ru_variant=True, language="ru",
+            )
+        assert len(seen) == 1 and seen[0].endswith("/nouns_ru.tsv")
+        assert list(df["Word"]) == ["слово"]
 
     def test_file_upload_overrides_bundled_file(self, tmp_path):
         # load_data (called on the upload path) needs pd_module set, unlike

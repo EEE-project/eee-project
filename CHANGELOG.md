@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.23.2 - 2026-10-19
+- A static WASM page no longer fetches files that nothing reads. `GreekUtils.ensure_file` and `ensure_files` return
+  `None` at once, with no warning, for a missing `.pdf` when the page runs in the browser (Pyodide): the page's
+  in-memory files are never served to the browser, so a copy there could not be opened, and the lessons link their
+  PDFs by their remote address. Other file types, and PDFs on a desktop or molab run, are fetched as before.
+- `load_vocab_table(..., ru_variant=True, language="ru")` asks the network for `<stem>_ru.<ext>` only when the base
+  file is not local. A page or checkout that already holds the base file holds every file of its lesson, so a variant
+  that is not local does not exist, and the request for it (which ended in an HTTP 404) is gone.
+- 22 new tests, full suite 1721/1721 passing, `ruff check` clean.
+
 ## 1.23.1 - 2026-10-19
 - The paradigm-drill form (`make_paradigm_form` and the `*_paradigm_drill_form` helpers built on it) no longer
   scrolls the page when it loads. It focuses its first field on mount only when that field is not below the fold, so a

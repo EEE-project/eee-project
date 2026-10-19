@@ -61,6 +61,7 @@ from eee_project._slot_template import SlotTemplate
 
 from eee_project.content import (
     load_ga_config as load_ga_config, _find_local as _find_local,
+    _not_fetched_by_page as _not_fetched_by_page,
     _raw_base_from_url as _raw_base_from_url,
     _parse_codeberg_raw_url as _parse_codeberg_raw_url,
     _cors_safe_raw_url as _cors_safe_raw_url, _rehost_raw_url as _rehost_raw_url,
@@ -1423,7 +1424,8 @@ function render({model,el}){
   // has it -- otherwise this would yank focus away from wherever the user
   // actually is. When the previous word's form loses focus (its DOM node
   // gets removed on advance), the browser moves focus to <body>, which is
-  // exactly the case this is meant to catch. Page load looks the same (focus is on <body>), so the field must also not be below the fold: focus() would scroll the page down to it.
+  // exactly the case this is meant to catch. Page load looks the same, so a
+  // first field below the fold is skipped too: focus() would scroll down to it.
   if (inputs.length && (!document.activeElement || document.activeElement === document.body) && inputs[0].getBoundingClientRect().bottom <= window.innerHeight) {
     focusAndSelect(inputs[0]);
   }
@@ -5952,12 +5954,16 @@ class GreekUtils:
 
         Returns the local path if the file exists or was downloaded successfully.
         Returns None and prints a warning if the file is missing and the remote fetch fails.
+        On a static WASM page a missing PDF is not fetched at all: returns None, no warning
+        (see :func:`eee_project.content._not_fetched_by_page`).
         """
         from pathlib import Path
         import urllib.parse
 
         local = Path(nb_dir) / filename
         if not local.exists():
+            if _not_fetched_by_page(filename):
+                return None
             url = _cors_safe_raw_url(f"{remote_base.rstrip('/')}/{urllib.parse.quote(filename)}")
             try:
                 local.write_bytes(_fetch_url_bytes(url, timeout))
@@ -5990,6 +5996,8 @@ class GreekUtils:
             local = Path(nb_dir) / filename
             if local.exists():
                 return local
+            if _not_fetched_by_page(filename):
+                return None
             url = _cors_safe_raw_url(f"{remote_base.rstrip('/')}/{urllib.parse.quote(filename)}")
             try:
                 local.write_bytes(await _fetch_url_bytes_async(url, timeout))
@@ -6076,7 +6084,10 @@ class GreekUtils:
 
         ``ru_variant``: when ``True`` and ``language == 'ru'``, try
         ``"<stem>_ru.<ext>"`` first, falling back to *filename* if that
-        variant doesn't exist.
+        variant doesn't exist. The variant is requested over the network only
+        when *filename* itself is not local: a page or checkout that already
+        holds *filename* holds every file of the lesson, so a variant that is
+        not local does not exist and costs no request.
         """
         if file_upload is not None and file_upload.value:
             return self.load_data(file_upload)
@@ -6089,9 +6100,11 @@ class GreekUtils:
             if stem:
                 candidates.insert(0, f'{stem}_ru.{ext}')
 
+        base_is_local = _find_local(nb_dir, filename) is not None
         for candidate in candidates:
+            remote = None if candidate != filename and base_is_local else remote_base
             try:
-                path = self._resolve_tsv_path(candidate, nb_dir=nb_dir, remote_base=remote_base)
+                path = self._resolve_tsv_path(candidate, nb_dir=nb_dir, remote_base=remote)
             except FileNotFoundError:
                 continue
             return _pd.read_csv(path, sep='\t')

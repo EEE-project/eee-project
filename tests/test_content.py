@@ -1291,6 +1291,34 @@ class TestEnsureFile:
             "%D0%9E%D0%B4%D0%B8%D1%81%D1%81%D0%B5%D1%8F%201.pdf/raw?ref=main"
         )
 
+    def test_missing_pdf_not_fetched_on_static_wasm_page(self, gu_marimo, tmp_path, monkeypatch, capsys):
+        # The lessons link their PDFs by address and nothing reads a copy; under Pyodide the copy would sit in an
+        # in-memory file system that the browser never serves, so the download is a request for nothing.
+        import sys
+        monkeypatch.setattr(sys, "platform", "emscripten")
+        fetched = []
+        monkeypatch.setattr("eee_project.notebook_utils._fetch_url_bytes", lambda url, timeout: fetched.append(url) or b"x")
+        result = gu_marimo.ensure_file("Одиссея. Зачин.PDF", nb_dir=tmp_path, remote_base="http://example.com")
+        assert result is None
+        assert fetched == []
+        assert capsys.readouterr().out == ""
+        assert not (tmp_path / "Одиссея. Зачин.PDF").exists()
+
+    def test_existing_pdf_returned_on_static_wasm_page(self, gu_marimo, tmp_path, monkeypatch):
+        import sys
+        monkeypatch.setattr(sys, "platform", "emscripten")
+        f = tmp_path / "a.pdf"
+        f.write_bytes(b"%PDF")
+        assert gu_marimo.ensure_file("a.pdf", nb_dir=tmp_path, remote_base="http://example.com") == f
+
+    def test_other_files_still_fetched_on_static_wasm_page(self, gu_marimo, tmp_path, monkeypatch):
+        import sys
+        monkeypatch.setattr(sys, "platform", "emscripten")
+        monkeypatch.setattr("eee_project.notebook_utils._fetch_url_bytes", lambda url, timeout: b"downloaded")
+        result = gu_marimo.ensure_file("file.tsv", nb_dir=tmp_path, remote_base="http://example.com")
+        assert result == tmp_path / "file.tsv"
+        assert result.read_text() == "downloaded"
+
 
 class TestEnsureFiles:
     """GreekUtils.ensure_files: concurrent ensure_file() for several filenames at once."""
@@ -1361,6 +1389,24 @@ class TestEnsureFiles:
         assert seen == [
             "https://codeberg.org/api/v1/repos/EEE-project/eee-project/raw/examples/vocab.tsv?ref=main"
         ]
+
+    def test_missing_pdf_not_fetched_on_static_wasm_page(self, gu_marimo, tmp_path, monkeypatch):
+        import asyncio
+        import sys
+        monkeypatch.setattr(sys, "platform", "emscripten")
+        fetched = []
+
+        async def fake_fetch(url, timeout):
+            fetched.append(url)
+            return b"downloaded"
+
+        monkeypatch.setattr("eee_project.notebook_utils._fetch_url_bytes_async", fake_fetch)
+        result = asyncio.run(gu_marimo.ensure_files(
+            "a.pdf", "b.tsv", nb_dir=tmp_path, remote_base="http://example.com",
+        ))
+        assert result["a.pdf"] is None
+        assert result["b.tsv"] == tmp_path / "b.tsv"
+        assert len(fetched) == 1 and fetched[0].endswith("b.tsv")
 
 
 class TestCorsSafeRawUrl:
