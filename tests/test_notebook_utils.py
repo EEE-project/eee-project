@@ -2613,6 +2613,11 @@ class TestMakeParadigmForm:
         assert "model.get('polytonic')" in _nu._PARA_ESM
         assert "MONOTONIC_MARKS" in _nu._PARA_ESM
 
+    def test_esm_mount_autofocus_skips_a_first_field_below_the_fold(self):
+        # Page load leaves focus on <body> like a word advance does, so a first field below the fold must not be focused: focus() scrolled the Exercise demo down to Exercise 5.
+        import eee_project.notebook_utils as _nu
+        assert "document.activeElement === document.body) && inputs[0].getBoundingClientRect().bottom <= window.innerHeight" in _nu._PARA_ESM
+
     def test_esm_focus_request_guards_against_late_reply_race(self):
         # focus_request's Python round trip is async; if the user has already
         # moved focus elsewhere by the time the reply lands (e.g. clicked past

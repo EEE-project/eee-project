@@ -1423,8 +1423,8 @@ function render({model,el}){
   // has it -- otherwise this would yank focus away from wherever the user
   // actually is. When the previous word's form loses focus (its DOM node
   // gets removed on advance), the browser moves focus to <body>, which is
-  // exactly the case this is meant to catch.
-  if (inputs.length && (!document.activeElement || document.activeElement === document.body)) {
+  // exactly the case this is meant to catch. Page load looks the same (focus is on <body>), so the field must also not be below the fold: focus() would scroll the page down to it.
+  if (inputs.length && (!document.activeElement || document.activeElement === document.body) && inputs[0].getBoundingClientRect().bottom <= window.innerHeight) {
     focusAndSelect(inputs[0]);
   }
 

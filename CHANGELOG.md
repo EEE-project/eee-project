@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.23.1 - 2026-10-19
+- The paradigm-drill form (`make_paradigm_form` and the `*_paradigm_drill_form` helpers built on it) no longer
+  scrolls the page when it loads. It focuses its first field on mount only when that field is not below the fold, so a
+  page whose drill sits below the fold (the Exercise demo opened scrolled down to Exercise 5) now opens at the top. A
+  drill that is visible when the page loads still starts focused, and the form after "Next" still focuses its first field.
+- 1 new test, full suite 1699/1699 passing, `ruff check` clean.
+
 ## 1.23.0 - 2026-10-12
 - `eee_topbar(..., page_titles=...)`: the browser-tab title can now follow the language dropdown. Pass a
   `{lang: title}` dict (or a plain string) and the topbar sets `document.title` to the entry for the current
