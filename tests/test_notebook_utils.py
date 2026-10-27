@@ -2203,6 +2203,28 @@ class TestWordDrillForm:
                             get_checked=chk_g, set_checked=chk_s)
         assert "✗" in str(result)
 
+    @pytest.mark.parametrize("typed, edited", [("wrong answer", "other text"), ("", "x")], ids=["a wrong answer", "nothing typed"])
+    def test_enter_sets_checked_only_when_the_text_changed(self, gu_form, typed, edited):
+        # enter_pressed never resets and every set_checked re-runs the form (the check button is rebuilt): a set on each run froze the quiz
+        state = self._state(cv=_WD_VOCAB[0], rem=_WD_VOCAB[1:])
+        chk_g, chk_s, _ = _pair(None)
+        sets = []
+        for text in (typed, typed, edited, edited):
+            wi = _FakeWI(text)
+            wi._ui.value = {"enter_pressed": 1}
+            self._call(gu_form, state, wi=wi, get_checked=chk_g, set_checked=lambda v: (sets.append(v), chk_s(v)))
+        assert sets == [typed, edited]
+
+    def test_the_right_word_after_a_wrong_enter_moves_on_without_a_second_enter(self, gu_form):
+        # the Enter count of the field stays at 1, so the next run with the right word advances
+        state = self._state(cv=_WD_VOCAB[0], rem=_WD_VOCAB[1:])
+        chk_g, chk_s, _ = _pair(None)
+        for text in ("wrong answer", _WD_VOCAB[0]["form"]):
+            wi = _FakeWI(text)
+            wi._ui.value = {"enter_pressed": 1}
+            self._call(gu_form, state, wi=wi, get_checked=chk_g, set_checked=chk_s)
+        assert state[2][0] == _WD_VOCAB[1]
+
 
 # ────────────────────────────────────────── word_quiz_widgets ──
 
@@ -2259,6 +2281,138 @@ class TestWordQuizWidgets:
         )
         assert next_btn.label == "Следующий ▶"
         assert prev_btn.label == "◀ Предыдущий"
+
+
+# ──────────────────────────── "Errors" button of word_drill_form / word_quiz_form ──
+
+def _flat(items):
+    """Every widget in a nested list of stack rows."""
+    for x in items:
+        if isinstance(x, list):
+            yield from _flat(x)
+        else:
+            yield x
+
+
+def _answered(vocab, results):
+    """A history of answered words: ``results[i]`` says whether word i was answered right."""
+    return [{"word": vocab[i], "answer": "x", "correct": ok} for i, ok in enumerate(results)]
+
+
+class TestWordRetryButton:
+    def test_label_follows_the_language(self, gu_form):
+        assert gu_form.word_retry_button([], lang="en").label == "Errors"
+        assert gu_form.word_retry_button([], lang="ru").label == "Ошибки"
+        assert gu_form.word_retry_button([], lang="el").label == "Λάθη"
+
+    def test_disabled_until_an_answer_was_wrong(self, gu_form):
+        assert gu_form.word_retry_button([]).disabled
+        assert gu_form.word_retry_button(_answered(_WQ_VOCAB, [True, True])).disabled
+        assert not gu_form.word_retry_button(_answered(_WQ_VOCAB, [True, False])).disabled
+
+
+class _ErrorsButtonCases:
+    """The same cases for both forms; a subclass sets ``_VOCAB`` and ``_call``(gu, state, retry_btn=...)."""
+    _VOCAB: list = []
+
+    def _state(self, cv=None, rem=None, hist=None):
+        return _form_state(cv, rem, None, None, hist, None)
+
+    def _done(self, results):
+        return self._state(cv=None, rem=[], hist=_answered(self._VOCAB, results))
+
+    def test_done_shows_the_button_when_an_answer_was_wrong(self, gu_form):
+        retry = _FakeBtn(label="errors")
+        with pytest.raises(StopIteration) as exc_info:
+            self._call(gu_form, self._done([True, False, False]), retry_btn=retry)
+        assert retry in _flat(exc_info.value.args[0])
+
+    def test_done_hides_the_button_when_every_answer_was_right(self, gu_form):
+        retry = _FakeBtn(label="errors")
+        with pytest.raises(StopIteration) as exc_info:
+            self._call(gu_form, self._done([True, True]), retry_btn=retry)
+        assert retry not in _flat(exc_info.value.args[0])
+
+    def test_without_the_button_the_done_screen_is_unchanged(self, gu_form):
+        with pytest.raises(StopIteration) as exc_info:
+            self._call(gu_form, self._done([False, False]))
+        assert len([b for b in _flat(exc_info.value.args[0]) if isinstance(b, _FakeBtn)]) == 1
+
+    def test_click_starts_a_round_over_the_words_answered_wrong(self, gu_form):
+        state = self._done([True, False, False])
+        result = self._call(gu_form, state, retry_btn=_FakeBtn(1))
+        assert result == "*...*"
+        cv_b, rem_b, sc_b, hist_b = state[2], state[5], state[8], state[13]
+        assert sorted(w["form"] for w in [cv_b[0], *rem_b[0]]) == sorted(self._VOCAB[i]["form"] for i in (1, 2))
+        assert sc_b[0] == {"correct": 0, "total": 0}
+        assert hist_b[0] == []
+
+    def test_click_in_the_middle_of_a_round_does_nothing(self, gu_form):
+        state = self._state(cv=self._VOCAB[0], rem=self._VOCAB[1:], hist=_answered(self._VOCAB[3:], [False]))
+        result = self._call(gu_form, state, retry_btn=_FakeBtn(1))
+        assert result != "*...*"
+        assert state[2][0] == self._VOCAB[0]
+
+    def test_click_with_nothing_wrong_keeps_the_done_screen(self, gu_form):
+        with pytest.raises(StopIteration):
+            self._call(gu_form, self._done([True, True]), retry_btn=_FakeBtn(1))
+
+    def test_progress_counts_the_words_of_the_retry_round(self, gu_form):
+        state = self._state(cv=self._VOCAB[1], rem=[self._VOCAB[2]])  # a round of 2 words from a longer vocab
+        assert "**1** / 2" in str(self._call(gu_form, state, retry_btn=_FakeBtn(None)))
+        assert f"**1** / {len(self._VOCAB)}" in str(self._call(gu_form, state))
+
+    def test_progress_keeps_the_round_size_after_prev_on_the_done_screen(self, gu_form):
+        # Prev on the done screen leaves a word-less "done position" in future: it is not a word of the round
+        state = _form_state(cv=self._VOCAB[1], rem=[], sc={"correct": 0, "total": 1}, rst={"answer": "x", "correct": False},
+                            hist=_answered(self._VOCAB[:1], [False]), fut=[{"word": None, "answer": None, "correct": None}])
+        assert "**2** / 2" in str(self._call(gu_form, state, retry_btn=_FakeBtn(None)))
+
+    def _stale_state(self):
+        """What a lesson leaves behind when a new selection clears only cv and remaining."""
+        return _form_state(cv=None, rem=None, sc={"correct": 1, "total": 2}, rst={"answer": "x", "correct": False},
+                           hist=_answered(self._VOCAB, [False, True]), fut=[{"word": None, "answer": None, "correct": None}])
+
+    @pytest.mark.parametrize("with_button", [True, False], ids=["with the Errors button", "without the Errors button"])
+    def test_a_new_selection_starts_a_fresh_round(self, gu_form, with_button):
+        state = self._stale_state()
+        assert self._call(gu_form, state, retry_btn=_FakeBtn(None) if with_button else None) == "*...*"
+        assert (state[6](), state[11](), state[14](), state[9]()) == ({"correct": 0, "total": 0}, [], [], None)
+
+    @pytest.mark.parametrize("with_button", [True, False], ids=["with the Errors button", "without the Errors button"])
+    def test_a_start_with_nothing_stale_calls_no_setter(self, gu_form, with_button):
+        # each setter call re-runs the cells that read the state: with an empty vocab the cell would run itself in a loop
+        calls = []
+        state = list(self._state())
+        for i in (7, 10, 12, 15):
+            state[i] = calls.append
+        assert self._call(gu_form, tuple(state), retry_btn=_FakeBtn(None) if with_button else None) == "*...*"
+        assert calls == []
+
+
+class TestWordDrillFormErrorsButton(_ErrorsButtonCases):
+    _VOCAB = _WD_VOCAB
+
+    def _call(self, gu, state, retry_btn=None):
+        cv_g, cv_s, _, rem_g, rem_s, _, sc_g, sc_s, _, rst_g, rst_s, hist_g, hist_s, _, fut_g, fut_s = state
+        wi = _FakeWI()
+        return gu.word_drill_form(
+            cv_g, cv_s, rem_g, rem_s, sc_g, sc_s, rst_g, rst_s, hist_g, hist_s, fut_g, fut_s,
+            wi, wi._ui, _FakeBtn(None), _FakeBtn(None), _FakeBtn(None),
+            vocab=_WD_VOCAB, lang="en", retry_btn=retry_btn,
+        )
+
+
+class TestWordQuizFormErrorsButton(_ErrorsButtonCases):
+    _VOCAB = _WQ_VOCAB
+
+    def _call(self, gu, state, retry_btn=None):
+        cv_g, cv_s, _, rem_g, rem_s, _, sc_g, sc_s, _, rst_g, rst_s, hist_g, hist_s, _, fut_g, fut_s = state
+        return gu.word_quiz_form(
+            cv_g, cv_s, rem_g, rem_s, sc_g, sc_s, rst_g, rst_s, hist_g, hist_s, fut_g, fut_s,
+            _FakeRadio(), _FakeBtn(None), _FakeBtn(None),
+            vocab=_WQ_VOCAB, lang="en", retry_btn=retry_btn,
+        )
 
 
 # ────────────────────────────────────────── word_quiz_form ──
@@ -3933,6 +4087,94 @@ class TestVerbParadigmDrillForm(_ParadigmDrillFormBase):
                       get_errors=get_errors, set_errors=set_errors,
                       get_retry_cnt=get_retry_cnt, set_retry_cnt=set_retry_cnt)
         assert errors_box[0] == {}
+
+    # ────────────────────────────────────── widgets that the notebook re-creates ──
+    # REGRESSION: a re-made button or form starts at 0 clicks; a stored count that stays higher swallows its first clicks.
+
+    def test_restart_works_on_the_first_click_of_every_new_button(self, gu):
+        state = self._state(words=[])
+        for use in range(1, 5):
+            state["words"][2][0] = []  # the round is finished again: done screen
+            self._call(gu, state, None, _pdform([]), self._meta(), restart_v=0)  # the new button, not clicked yet
+            result = self._call(gu, state, None, _pdform([]), self._meta(), restart_v=1)
+            assert result == "*...*", f"use {use}: one click on the new Again button did nothing"
+            self._assert_same_words(state["words"][2][0], self._VOCAB)
+
+    def test_retry_works_on_the_first_click_of_every_new_button(self, gu):
+        get_errors, set_errors, errors_box = _pair({})
+        get_retry_cnt, set_retry_cnt, _ = _pair(0)
+        kw = dict(get_errors=get_errors, set_errors=set_errors,
+                  get_retry_cnt=get_retry_cnt, set_retry_cnt=set_retry_cnt)
+        state = self._state(words=[])
+        wrong = self._VOCAB[1]
+        for use in range(1, 5):
+            state["words"][2][0] = []  # the round is finished again: done screen
+            errors_box[0] = {wrong["form"]: 1}  # one mistake in the round that just ended
+            self._call(gu, state, None, _pdform([]), self._meta(), retry_btn=_FakeBtn(0), **kw)
+            result = self._call(gu, state, None, _pdform([]), self._meta(), retry_btn=_FakeBtn(1), **kw)
+            assert result == "*...*", f"use {use}: one click on the new Errors button did nothing"
+            assert state["words"][2][0] == [wrong]
+
+    def test_a_click_is_handled_once_when_the_same_button_is_passed_again(self, gu):
+        # The same button still holds its click (value 1) when the cell re-runs: it must not restart the round again.
+        state = self._state(words=[])
+        assert self._call(gu, state, None, _pdform([]), self._meta(), restart_v=1) == "*...*"
+        state["words"][2][0] = [self._VOCAB[0]]  # the student has moved on
+        result = self._call(gu, state, self._VOCAB[0], _pdform([""]), self._meta(), restart_v=1)
+        assert result != "*...*"
+        assert state["words"][2][0] == [self._VOCAB[0]]
+
+    def test_next_works_on_the_first_click_of_every_new_button(self, gu):
+        cv = self._VOCAB[0]
+        state = self._state()
+        for use in range(1, 5):
+            state["words"][2][0], state["hist"][2][0] = list(self._VOCAB), []
+            self._call(gu, state, cv, _pdform([""]), self._meta(), nxt_v=0)  # the new button, not clicked yet
+            self._call(gu, state, cv, _pdform([""]), self._meta(), nxt_v=1)
+            assert cv in state["hist"][2][0], f"use {use}: one click on the new Next button did nothing"
+
+    def test_prev_works_on_the_first_click_of_every_new_button(self, gu):
+        cv, prev_word = self._VOCAB[0], self._VOCAB[1]
+        state = self._state()
+        for use in range(1, 5):
+            state["words"][2][0], state["hist"][2][0] = [cv], [prev_word]
+            self._call(gu, state, cv, _pdform([""]), self._meta(), prev_v=0)
+            self._call(gu, state, cv, _pdform([""]), self._meta(), prev_v=1)
+            assert state["hist"][2][0] == [], f"use {use}: one click on the new Prev button did nothing"
+
+    def test_check_works_on_the_first_click_of_every_new_button(self, gu):
+        cv = self._VOCAB[0]
+        state = self._state()
+        with patch.object(gu, "check_verb_test", return_value=(True, "")):
+            for use in range(1, 5):
+                state["words"][2][0], state["hist"][2][0] = list(self._VOCAB), []
+                self._call(gu, state, cv, _pdform(["λύω"]), self._meta(), check_v=0)
+                self._call(gu, state, cv, _pdform(["λύω"]), self._meta(), check_v=1)
+                assert cv in state["hist"][2][0], f"use {use}: one click on the new Check button did nothing"
+
+    def test_enter_works_on_the_first_press_of_every_new_form(self, gu):
+        cv = self._VOCAB[0]
+        state = self._state()
+        get_errors, set_errors, errors_box = _pair({})
+        get_retry_cnt, set_retry_cnt, _ = _pair(0)
+        kw = dict(get_errors=get_errors, set_errors=set_errors,
+                  get_retry_cnt=get_retry_cnt, set_retry_cnt=set_retry_cnt)
+        with patch.object(gu, "check_verb_slot", return_value=False), \
+             patch.object(gu, "check_verb_test", return_value=(False, "")):
+            for use in range(1, 5):
+                self._call(gu, state, cv, _pdform(["asd", ""], submit_count=0), self._meta(), **kw)  # the new form, no Enter yet
+                self._call(gu, state, cv, _pdform(["asd", ""], submit_count=1, enter_field_index=0), self._meta(), **kw)
+                assert errors_box[0] == {"λύω": use}, f"use {use}: the first Enter in the new form did nothing"
+
+    def test_is_new_click_restarts_the_count_of_a_widget_with_no_clicks(self, gu):
+        for clicks, stored, expect_new, expect_stored in [
+            (0, 3, False, 0), (None, 3, False, 0),  # made again: the stored count restarts
+            (3, 3, False, 3), (4, 3, True, 3),  # clicked: the count stays for the caller to raise
+            (0, 0, False, 0), (1, 0, True, 0),
+        ]:
+            get, set_, box = _pair(stored)
+            assert gu._is_new_click(clicks, get, set_) is expect_new
+            assert box[0] == expect_stored
 
     def test_restart_clears_errors_when_error_tracking_provided(self, gu):
         get_errors, set_errors, errors_box = _pair({"λύω": 3})

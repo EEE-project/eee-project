@@ -3717,7 +3717,7 @@ class GreekUtils:
         retry_cnt, set_retry_cnt = mo.state(0)
         return errors, set_errors, retry_cnt, set_retry_cnt
 
-    def retry_mistakes_button(self, errors: dict, *, label: "str | None" = None, lang: str = "ru") -> Any:
+    def retry_mistakes_button(self, errors: "dict | list", *, label: "str | None" = None, lang: str = "ru") -> Any:
         """Button for retrying only the words with a recorded mistake this
         session (``errors`` from :meth:`make_error_tracking_state`) -- pass
         its result as ``retry_btn`` to a ``*_paradigm_drill_form`` call.
@@ -3728,6 +3728,14 @@ class GreekUtils:
         if label is None:
             label = self.ui_label('retry_label', lang)
         return self._mo.ui.button(label=label, on_click=_INC, disabled=not errors)
+
+    def word_retry_button(self, history: list, *, label: "str | None" = None, lang: str = "ru") -> Any:
+        """The "Errors" button of :meth:`word_drill_form` / :meth:`word_quiz_form` (pass it as ``retry_btn``).
+
+        Build it in its own cell from the history state, e.g. ``word_retry_button(history(), lang=lang)``:
+        it is disabled while no answer in ``history`` was wrong.
+        """
+        return self.retry_mistakes_button(self._wrong_words(history), label=label, lang=lang)
 
     @staticmethod
     def _has_input(values: list) -> bool:
@@ -3746,6 +3754,26 @@ class GreekUtils:
         bodies."""
         errs = get_errors()
         set_errors({**errs, word: errs.get(word, 0) + 1})
+
+    @staticmethod
+    def _is_new_click(clicks, get_cnt, set_cnt) -> bool:
+        """Whether *clicks* is beyond the count already handled; a widget made again starts at 0, so that count restarts too."""
+        if not clicks and get_cnt():  # every set_cnt call re-runs the cells that read the count: call it only on a change
+            set_cnt(0)
+        return (clicks or 0) > get_cnt()
+
+    @staticmethod
+    def _wrong_words(history: list) -> list:
+        """The words of a word quiz/drill *history* (answered-words stack) that were answered wrong."""
+        return [h["word"] for h in history if not h["correct"]]
+
+    @staticmethod
+    def _round_size(cv: "dict | None", remaining: list, history: list, future: list) -> int:
+        """Words in this round: answered + current + reviewed ahead + still to come.
+
+        Prev on the done screen leaves a word-less "done position" in *future*; it is not a word.
+        """
+        return len(history) + (cv is not None) + sum(f["word"] is not None for f in future) + len(remaining)
 
     def dirty_check_button(self, form, cap, cv: "dict | None", attr_name: str, *,
                             word_key: str = "form", label: str = "Check"):
@@ -3982,7 +4010,7 @@ class GreekUtils:
         words = get_words()
         hist = get_hist()
 
-        if (restart_btn.value or 0) > get_restart_cnt():
+        if self._is_new_click(restart_btn.value, get_restart_cnt, set_restart_cnt):
             set_restart_cnt(restart_btn.value)
             self.reset_paradigm_drill_state(
                 vocab, set_words, set_hist, set_msg, set_cap,
@@ -3991,7 +4019,8 @@ class GreekUtils:
             )
             return mo.md("*...*")
 
-        if retry_btn is not None and get_errors is not None and (retry_btn.value or 0) > get_retry_cnt():
+        if (retry_btn is not None and get_errors is not None
+                and self._is_new_click(retry_btn.value, get_retry_cnt, set_retry_cnt)):
             set_retry_cnt(retry_btn.value)
             mistakes = [w for w in vocab if w[word_key] in get_errors()]
             self.reset_paradigm_drill_state(
@@ -4006,7 +4035,7 @@ class GreekUtils:
         # ever depended on hist, never on cv/form/whether words is empty,
         # so moving it earlier changes nothing about what it does, only
         # when it's reachable.
-        if (prev_btn.value or 0) > get_prev_cnt():
+        if self._is_new_click(prev_btn.value, get_prev_cnt, set_prev_cnt):
             set_prev_cnt(prev_btn.value)
             set_entered(self.save_entry(get_entered(), cv, form, word_key=word_key))
             set_cap(None)
@@ -4035,8 +4064,8 @@ class GreekUtils:
         _live = list(_w.values)
         _sub_req = _w.submit_request or {}
         _req_id = _sub_req.get("request_id", 0)
-        _click = (check_btn.value or 0) > get_sub_cnt()
-        _enter = _req_id > get_entercnt()
+        _click = self._is_new_click(check_btn.value, get_sub_cnt, set_sub_cnt)
+        _enter = self._is_new_click(_req_id, get_entercnt, set_entercnt)
         if _click or _enter:
             set_sub_cnt(check_btn.value or 0)
             set_entercnt(_req_id)
@@ -4076,7 +4105,7 @@ class GreekUtils:
         if _click and get_errors is not None and cv and self._has_input(_live):
             self._record_mistake(get_errors, set_errors, cv[word_key])
 
-        if (nxt_btn.value or 0) > get_nxt_cnt():
+        if self._is_new_click(nxt_btn.value, get_nxt_cnt, set_nxt_cnt):
             set_nxt_cnt(nxt_btn.value)
             set_entered(self.save_entry(get_entered(), cv, form, word_key=word_key))
             set_cap(None)
@@ -4606,6 +4635,8 @@ class GreekUtils:
         checked: "str | None" = None,
         prev_disabled: bool = False,
         show_prev_when_done: bool = False,
+        retry_btn: Any = None,
+        total: "int | None" = None,
     ) -> Any:
         """Render the write-the-word drill UI with history navigation.
 
@@ -4668,12 +4699,18 @@ class GreekUtils:
                            ever renders. A plain (non-"warn") check_btn never
                            changes ``checked``, so passing it leaves existing
                            callers unaffected regardless of this parameter.
+            retry_btn:     "Errors" button to show on the done screen
+                           (see :meth:`word_retry_button`); the caller passes
+                           it only when an answer was wrong.
+            total:         Words in this round, for the progress line; ``None``
+                           (default) shows ``len(vocab)``.
         """
         mo = self._mo
         _done = self.word_drill_done(cv, remaining)
         if _done:
             self._quiz_done_stop(score, lang, next_btn=next_btn,
-                                 prev_btn=prev_btn if show_prev_when_done else None)
+                                 prev_btn=prev_btn if show_prev_when_done else None,
+                                 retry_btn=retry_btn)
         _meaning = cv.get(meaning_key, "") if cv is not None else ""
         _typed = write_input.value.strip()
         _enter = dia_reactive.value.get("enter_pressed", 0)
@@ -4691,7 +4728,7 @@ class GreekUtils:
         if comment:
             parts.append(mo.md(comment))
         _corr = self.ui_label('quiz_progress_correct', lang)
-        parts.append(mo.md(f"**{score['total'] + 1}** / {len(vocab)} — {_corr}: {score['correct']}"))
+        parts.append(mo.md(f"**{score['total'] + 1}** / {len(vocab) if total is None else total} — {_corr}: {score['correct']}"))
         if nav_icons:
             _row = self._icon_nav_row(prev_btn, next_btn, check_btn, prev_disabled=prev_disabled)
         else:
@@ -4703,18 +4740,31 @@ class GreekUtils:
         ])
 
     def _exercise_state_init(self, get_cv, get_remaining, get_score, get_restore,
-                             get_history, get_future, set_cv, set_remaining, vocab: list):
+                             get_history, get_future, set_cv, set_remaining, vocab: list,
+                             set_score, set_history, set_future, set_restore):
         """Shared first-run/state-unpack step for :meth:`word_drill_form` and
-        :meth:`word_quiz_form`. On first run (``remaining`` is ``None``),
+        :meth:`word_quiz_form`. On first run, or when a notebook has set
+        ``remaining`` to ``None`` to start over (a new selection),
         shuffle-starts ``vocab`` and returns ``None`` -- the caller must
         return the placeholder (``mo.md("*...*")``) immediately. Otherwise
         returns the unpacked ``(cv, remaining, score, restore_entry,
         history, future)`` 6-tuple.
+
+        A start also empties the score, answers and Prev history an earlier round left behind
+        (a setter runs only for a state that holds something: each call re-runs the cells that read it).
         """
         remaining = get_remaining()
         if remaining is None:
             if vocab:
                 self._shuffle_start(vocab, set_cv, set_remaining)
+            if get_score()["total"]:
+                set_score({"correct": 0, "total": 0})
+            if get_history():
+                set_history([])
+            if get_future():
+                set_future([])
+            if get_restore() is not None:
+                set_restore(None)
             return None
         return get_cv(), remaining, get_score(), get_restore(), get_history(), get_future()
 
@@ -4751,6 +4801,7 @@ class GreekUtils:
         get_checked=None, set_checked=None,
         nav_icons: "bool | None" = None,
         show_prev_when_done: "bool | None" = None,
+        retry_btn: Any = None,
     ) -> Any:
         """Unified word-drill: initialization, navigation, and display in one call.
 
@@ -4763,6 +4814,9 @@ class GreekUtils:
         Args:
             get_cv / set_cv: state pair for the current word dict.
             get_remaining / set_remaining: state pair for remaining word list.
+                  A notebook starts the quiz again (a new selection) by setting it
+                  to ``None``: the form then also clears the score, the answers and
+                  the Prev history of the earlier round.
             get_score / set_score: state pair for ``{"correct": int, "total": int}``.
             get_restore / set_restore: state pair for history-review entry.
             get_history / set_history: state pair for the answered-words stack.
@@ -4798,6 +4852,10 @@ class GreekUtils:
                   screen (review past answers instead of only restarting).
                   Opt-in — see :meth:`word_drill_display`'s own parameter of
                   the same name for what it does and why it's safe.
+            retry_btn: optional "Errors" button from :meth:`word_retry_button`
+                  (built in its own cell). On the done screen it appears when an
+                  answer was wrong, and a click starts a round over just those
+                  words; the progress line then counts that round's words.
         """
         if nav_icons is None:
             nav_icons = self._cfg.nav_icons
@@ -4805,10 +4863,12 @@ class GreekUtils:
             show_prev_when_done = self._cfg.show_prev_when_done
         mo = self._mo
         _state = self._exercise_state_init(get_cv, get_remaining, get_score, get_restore,
-                                           get_history, get_future, set_cv, set_remaining, vocab)
+                                           get_history, get_future, set_cv, set_remaining, vocab,
+                                           set_score, set_history, set_future, set_restore)
         if _state is None:
             return mo.md("*...*")
         cv, remaining, score, restore_entry, history, future = _state
+        _wrong = self._wrong_words(history) if retry_btn is not None else []  # the words to retry; only looked up with a retry button
 
         def _set_checked(value: "str | None") -> None:
             if set_checked is not None:
@@ -4852,7 +4912,8 @@ class GreekUtils:
         _enter = dia_reactive.value.get("enter_pressed", 0)
         if (check_btn.value or _enter) and cv is not None and not future:
             _typed = write_input.value.strip()
-            _set_checked(_typed)
+            if get_checked is None or get_checked() != _typed:  # a stale Enter count plus a set on every run would loop forever
+                _set_checked(_typed)
             if _typed and self._ci(_typed, {cv[form_key]}):
                 _advance(_typed, True)
                 return mo.md("*...*")
@@ -4881,6 +4942,12 @@ class GreekUtils:
                 _advance(_typed, self._ci(_typed, {cv[form_key]}))
             return mo.md("*...*")
 
+        # Handle Errors button -- done screen only: a new round over the words answered wrong
+        if _wrong and retry_btn.value and self.word_drill_done(cv, remaining):
+            self._restart_quiz(_wrong, set_cv, set_remaining, set_score, set_history, set_future, set_restore)
+            _set_checked(None)
+            return mo.md("*...*")
+
         # Handle Prev button
         if prev_btn.value:
             _result = self._handle_prev(cv, restore_entry, history, future, score,
@@ -4899,6 +4966,8 @@ class GreekUtils:
             checked=get_checked() if get_checked is not None else None,
             prev_disabled=len(history) == 0,
             show_prev_when_done=show_prev_when_done,
+            retry_btn=retry_btn if _wrong else None,
+            total=self._round_size(cv, remaining, history, future) if retry_btn is not None else None,
         )
 
     # ------------------------------------------------------- word-form quiz
@@ -4942,7 +5011,7 @@ class GreekUtils:
         return mo.vstack(content)
 
     def _quiz_done_stop(self, score_dict: dict, lang: str, *, next_btn: Any = None,
-                        prev_btn: Any = None) -> None:
+                        prev_btn: Any = None, retry_btn: Any = None) -> None:
         """Call mo.stop with the standard done-screen (shared by all quiz/drill types).
 
         next_btn: optional restart button embedded in the done-screen vstack
@@ -4957,11 +5026,14 @@ class GreekUtils:
         :meth:`_drill_done_content`'s own None-filtering) — a caller passing
         just next_btn (everyone today) keeps the exact same single-bare-widget
         shape as before this parameter existed.
+        retry_btn: optional "Errors" button (see :meth:`word_retry_button`),
+        shown after next_btn; callers pass it only when something was wrong.
         """
         _done_msg = self.ui_label('quiz_done_message', lang).format(btn=self.ui_label('nav_again_label', lang))
         _score_line = f"{self.ui_label('quiz_correct_label', lang)} **{score_dict['correct']}** / **{score_dict['total']}**"
         _prev = prev_btn if next_btn is not None else None
-        self._mo.stop(True, self._drill_done_content(_done_msg, score_line=_score_line, buttons=[_prev, next_btn]))
+        self._mo.stop(True, self._drill_done_content(_done_msg, score_line=_score_line,
+                                                     buttons=[_prev, next_btn, retry_btn]))
 
     def word_quiz_question(
         self,
@@ -5133,6 +5205,7 @@ class GreekUtils:
         renew_btn: "Any | None" = None,
         nav_icons: "bool | None" = None,
         show_prev_when_done: "bool | None" = None,
+        retry_btn: "Any | None" = None,
     ) -> Any:
         """Unified multiple-choice quiz: initialization, navigation, and display.
 
@@ -5148,6 +5221,9 @@ class GreekUtils:
         Args:
             get_cv / set_cv: state pair for the current word dict.
             get_remaining / set_remaining: state pair for remaining word list.
+                  A notebook starts the quiz again (a new selection) by setting it
+                  to ``None``: the form then also clears the score, the answers and
+                  the Prev history of the earlier round.
             get_score / set_score: state pair for ``{"correct": int, "total": int}``.
             get_restore / set_restore: state pair for history-review entry.
             get_history / set_history: state pair for the answered-words stack.
@@ -5179,6 +5255,11 @@ class GreekUtils:
                        reviewed via Prev instead of only restarting —
                        see :meth:`word_drill_form`'s own parameter of the
                        same name for what it does and why it's safe.
+            retry_btn: optional "Errors" button from :meth:`word_retry_button`
+                       (built in its own cell). On the done screen it appears
+                       when an answer was wrong, and a click starts a round over
+                       just those words; the progress line then counts that
+                       round's words.
         """
         if nav_icons is None:
             nav_icons = self._cfg.nav_icons
@@ -5186,10 +5267,12 @@ class GreekUtils:
             show_prev_when_done = self._cfg.show_prev_when_done
         mo = self._mo
         _state = self._exercise_state_init(get_cv, get_remaining, get_score, get_restore,
-                                           get_history, get_future, set_cv, set_remaining, vocab)
+                                           get_history, get_future, set_cv, set_remaining, vocab,
+                                           set_score, set_history, set_future, set_restore)
         if _state is None:
             return mo.md("*...*")
         cv, remaining, score, restore_entry, history, future = _state
+        _wrong = self._wrong_words(history) if retry_btn is not None else []  # the words to retry; only looked up with a retry button
 
         _done = self.word_drill_done(cv, remaining)
         _ans = answer_radio.value
@@ -5225,6 +5308,11 @@ class GreekUtils:
                 set_restore(None)
                 return mo.md("*...*")
 
+        # Handle Errors button -- done screen only: a new round over the words answered wrong
+        if _wrong and retry_btn.value and _done:
+            self._restart_quiz(_wrong, set_cv, set_remaining, set_score, set_history, set_future, set_restore)
+            return mo.md("*...*")
+
         # Handle Prev button
         if prev_btn.value:
             return self._handle_prev(cv, restore_entry, history, future, score,
@@ -5233,7 +5321,8 @@ class GreekUtils:
         # Display
         if _done:
             self._quiz_done_stop(score, lang, next_btn=next_btn,
-                                 prev_btn=prev_btn if show_prev_when_done else None)
+                                 prev_btn=prev_btn if show_prev_when_done else None,
+                                 retry_btn=retry_btn if _wrong else None)
 
         _fb_ans = _ans if _ans is not None else (restore_entry["answer"] if restore_entry else None)
         if _fb_ans is not None:
@@ -5253,7 +5342,8 @@ class GreekUtils:
             fb = mo.md("")
         _pfx = f"{title}\n\n" if title else ""
         _corr = self.ui_label('quiz_progress_correct', lang)
-        progress = mo.md(f"{_pfx}**{score['total'] + 1}** / {len(vocab)} — {_corr}: {score['correct']}")
+        _total = self._round_size(cv, remaining, history, future) if retry_btn is not None else len(vocab)
+        progress = mo.md(f"{_pfx}**{score['total'] + 1}** / {_total} — {_corr}: {score['correct']}")
         if nav_icons:
             # In icon mode Prev/Next must stay first/last even with
             # renew_btn present -- reorder only here; the default
@@ -6100,9 +6190,8 @@ class GreekUtils:
             if stem:
                 candidates.insert(0, f'{stem}_ru.{ext}')
 
-        base_is_local = _find_local(nb_dir, filename) is not None
         for candidate in candidates:
-            remote = None if candidate != filename and base_is_local else remote_base
+            remote = None if candidate != filename and _find_local(nb_dir, filename) is not None else remote_base
             try:
                 path = self._resolve_tsv_path(candidate, nb_dir=nb_dir, remote_base=remote)
             except FileNotFoundError:

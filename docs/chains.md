@@ -69,6 +69,10 @@ set_chain("grc", ["ancient-greek", "unimorph"],
           pre_hook=normalize, post_hook=gap_fill)
 ```
 
+`eee.PreHook` and `eee.PostHook` are the type aliases of the two hook signatures
+(`(lemma, features, pos, ctx) → (lemma, features, pos)` and `(forms, ctx) → set[str]`);
+use them to annotate your own hooks. `ctx` is a `HookContext`.
+
 Pre-hooks run once before the chain starts; post-hooks run once after all
 backends have been tried and the stop condition applied.
 

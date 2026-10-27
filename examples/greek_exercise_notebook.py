@@ -2,7 +2,7 @@
 # requires-python = ">=3.12"
 # dependencies = [
 #     "marimo>=0.25.1",
-#     "eee-project>=1.1.0",
+#     "eee-project>=1.24.0",
 #     "modern-greek-backend-eee>=1.0.0",
 #     "ancient-greek-backend-eee>=2.0.0",
 #     "pandas==3.0.5",
@@ -43,6 +43,7 @@ def _(mo):
     | `gu.adverb_vocab(adjectives)` | derive adverb vocab from adjectives (καλός → καλῶς) |
     | `gu.word_quiz_widgets(...)` / `word_quiz_form(...)` | multiple-choice quiz — state, navigation, and display in one call |
     | `gu.word_drill_widgets(...)` / `word_drill_form(...)` | write-the-word drill — state, navigation, and display in one call |
+    | `gu.word_retry_button(history, lang=...)` | "Errors" button for a quiz or drill: a new round over just the words answered wrong (`retry_btn=`) |
     | `gu.paradigm_drill_widgets(labels, ...)` | form + Prev/Next/Restart widgets for a full-paradigm drill |
     | `gu.verb_paradigm_drill_form(...)` / `noun_...` / `adjective_...` | full-paradigm drill per POS — Enter-navigation, check, restart, and display in one call |
     | `gu.dirty_check_button(form, cap, cv, attr_name)` | Check button that turns orange when the form has unsaved changes |
@@ -156,7 +157,8 @@ def _(mo):
 
     Pick the correct Ancient Greek word for the given translation.
     Once finished, **Prev** still works on the done screen so you can
-    review past answers instead of only restarting.
+    review past answers instead of only restarting. If an answer was wrong,
+    **Errors** starts a new round over just those words.
     """)
     return
 
@@ -199,6 +201,13 @@ def _(WORDS, cv_c, gu_ag, history_c, remaining_c, restore_entry_c):
 
 
 @app.cell(hide_code=True)
+def _(gu_ag, history_c):
+    # Its own cell: the button is built again from the history after every answer, so it is disabled until one was wrong.
+    retry_btn_c = gu_ag.word_retry_button(history_c(), lang="en")
+    return (retry_btn_c,)
+
+
+@app.cell(hide_code=True)
 def _(
     WORDS,
     answer_radio_c,
@@ -210,6 +219,7 @@ def _(
     prev_btn_c,
     remaining_c,
     restore_entry_c,
+    retry_btn_c,
     score_c,
     set_cv_c,
     set_future_c,
@@ -228,6 +238,7 @@ def _(
         form_key="form",
         lang="en",
         show_prev_when_done=True,
+        retry_btn=retry_btn_c,
     )
     return
 
@@ -243,7 +254,8 @@ def _(mo):
 
     The **part-of-speech switcher** below picks which vocabulary you're writing —
     verbs, nouns (type the article too: *ὁ λόγος*), adjectives, or derived
-    adverbs. Switching restarts the drill.
+    adverbs. Switching restarts the drill. On the done screen, **Errors**
+    starts a new round over just the words answered wrong.
 
     - **Combining marks:** click more than one before typing to stack them — one
       accent (acute/grave/circumflex) + one breathing (smooth/rough) + iota
@@ -319,6 +331,12 @@ def _(cv_w, gu_ag, history_w, remaining_w, restore_entry_w):
 
 
 @app.cell(hide_code=True)
+def _(gu_ag, history_w):
+    retry_btn_w = gu_ag.word_retry_button(history_w(), lang="en")
+    return (retry_btn_w,)
+
+
+@app.cell(hide_code=True)
 def _(
     check_btn_w,
     cv_w,
@@ -330,6 +348,7 @@ def _(
     prev_btn_w,
     remaining_w,
     restore_entry_w,
+    retry_btn_w,
     score_w,
     set_cv_w,
     set_future_w,
@@ -348,6 +367,7 @@ def _(
         vocab=vocab_w,
         form_key="form",
         lang="en",
+        retry_btn=retry_btn_w,
     )
     return
 

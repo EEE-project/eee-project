@@ -18,7 +18,7 @@ rather than examples, see [../docs/api-patterns.md](../docs/api-patterns.md)
 | [`ancient_greek_notebook.py`](ancient_greek_notebook.py) | Interactive paradigm viewer — Ancient Greek (Marimo) |
 | [`greek_notebook.py`](greek_notebook.py) | Combined interactive notebook — el + grc (Marimo) |
 | [`unimorph_notebook.py`](unimorph_notebook.py) | Interactive browser for all 187 UniMorph languages with slot template support |
-| [`greek_exercise_notebook.py`](greek_exercise_notebook.py) | `GreekUtils` full demo — verb drills, custom drill, `greek_compare`, vocab quiz (MG + AG) |
+| [`greek_exercise_notebook.py`](greek_exercise_notebook.py) | `GreekUtils` full demo — verb drills, custom drill, `greek_compare`, vocab quiz and write-the-word drill with an Errors button (MG + AG) |
 | [`config_store_notebook.py`](config_store_notebook.py) | `ConfigStore` demo — `from_url`, `from_file`, `from_dict` with `eee_topbar` |
 | [`modern_greek_drill_notebook.py`](modern_greek_drill_notebook.py) | Modern Greek paradigm drill — verb/noun/adjective/pronoun, switchable, with personal vocab TSV upload |
 | [`interactive_text_notebook.py`](interactive_text_notebook.py) | `interactive_text` demo — clickable poem words, named highlight sets via `word_classes`, styling via `css=`, click-reactive panel; then `mixed_language_notes` — the poem beside a chosen translation with comment cards that highlight their words (Marimo) |

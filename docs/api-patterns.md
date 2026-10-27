@@ -371,6 +371,12 @@ Returns `None` silently if the file is missing — GA is disabled, the topbar
 renders normally. When `back_url` is empty but `ga_config` is set, the topbar
 is suppressed but the GA script is still injected.
 
+For a notebook with no topbar at all (a standalone library demo, say),
+`eee_ga_tracker(mo, ga_config)` fires the GA4 pageview with no visible UI,
+instead of passing dummy `back_url`/`lang`/`titles` to `eee_topbar`. It returns
+`None` when `ga_config` is `None` (GA unset). Like `eee_topbar`, it must be the
+last expression of its marimo cell.
+
 #### Lesson navigation (prev/next)
 
 `eee_footer` takes optional `prev_url=`/`next_url=` to render ◀/▶ links to
@@ -542,6 +548,30 @@ translated "couldn't load" message via `mo.md()` instead when
 `_cfg.lessons()` is empty.
 
 ---
+
+### Images (`magnify_image`)
+
+```python
+from pathlib import Path
+from eee_project import magnify_image
+
+magnify_image(
+    mo, Path(__file__).parent / "map.jpg",
+    raw_base="https://codeberg.org/EEE-project/created_with_eee/raw/branch/main/odyssey/2026_06_15",
+    width=280,
+)
+```
+
+`magnify_image(mo, path, *, raw_base, width=None, prefer_local=False)` renders a
+thumbnail that opens the full-size image in a new tab on click. `raw_base` is
+required: the raw-content URL of the image's directory. The link, and by
+default the thumbnail too, use that remote URL (`raw_base` + the file name),
+never a base64 `data:` URI: a `data:` link does not reliably open on click
+when the notebook is embedded in a sandboxed iframe, as molab and the Telegram
+mini-app wrappers embed it. Pass `prefer_local=True` to read the thumbnail
+from the local file when it exists — for a lesson whose images are not pushed
+yet; the click target stays the remote URL. `width` is the optional maximum
+width of the thumbnail in pixels.
 
 ### String comparison
 
@@ -1044,6 +1074,36 @@ same convention (opt-in, default `False`, resolves from
 keep Prev working on a finished quiz's done screen at all, unlike
 `word_drill_form`.
 
+**Opt-in: Errors button (1.24.0+).** `word_quiz_form` and `word_drill_form`
+accept `retry_btn`: on the done screen it starts a new round over just the
+words answered wrong, like the retry mode of the paradigm drills below. Build
+the button in its own cell from the history state, so that its disabled state
+follows the answers, and pass it to the form:
+
+```python
+# own cell, after the state cell
+retry_btn = gu.word_retry_button(history(), lang=lang)
+```
+
+```python
+gu.word_quiz_form(
+    ..., vocab=VOCAB, retry_btn=retry_btn,
+)
+```
+
+The form shows the button on the done screen only when an answer was wrong (a
+skipped word counts as wrong). The progress line of the new round counts that
+round's words, and "Again" still starts over with the full `vocab`. Without
+`retry_btn` the done screen is unchanged. Example: Exercises 3 and 4 of
+`examples/greek_exercise_notebook.py`.
+
+**New selection (1.24.0+).** A notebook starts a quiz again for a new selection
+by setting `remaining` to `None` (the `ellinika_b` chapters also clear `cv`).
+`word_quiz_form` and `word_drill_form` then also empty the score, the answers and
+the Prev history of the earlier round. Before 1.24.0 these stayed: the first
+question read "5 / 4 — correct: 1", Prev was on, and the Errors button could retry
+words of the old selection. A notebook does not need to clear these states itself.
+
 ### Paradigm drill (3-cell API)
 
 For exercises where the student fills in an entire paradigm at once (every
@@ -1090,6 +1150,17 @@ of Cell 3's call — same order, no repacking. `check_btn` is built in its own
 cell (not bundled into `paradigm_drill_widgets`) because it depends on `cap`,
 which changes on every check; bundling it would rebuild `form` from scratch
 on each check and lose whatever the student just typed.
+
+**Rebuilt widgets (1.24.0+).** Cell 2 builds `form` and the buttons again on
+every run, and a new button starts at 0 clicks, while the drill keeps a count of
+the clicks it has already handled. The drill sets that count back to 0 itself
+when it gets a button (or a form) with no clicks, so no cell has to reset a
+count. Before 1.24.0 a click on a rebuilt button was ignored until the button had
+been clicked as often as its predecessor was (the second *Next* needed two
+clicks, the third three). A notebook that must also run on 1.23.x or older
+therefore keeps `set_prev_cnt(0)`, `set_nxt_cnt(0)` and `set_entercnt(0)` at the
+end of Cell 2 and `set_sub_cnt(0)` in the cell that builds `check_btn`; on
+1.24.0 and later these lines do no harm.
 
 **Opt-in: ◀/▶/↺ nav icons (1.9.1+).** Pass `nav_icons=True` to both
 `paradigm_drill_widgets` and the `*_paradigm_drill_form` call — same flag
@@ -1340,6 +1411,43 @@ build_lexicon_tabs(w) -> str | None
 Both closures cache slot templates internally — call the factory once at
 notebook startup, not once per word.
 
+#### Modern Greek table (`build_modern_paradigm_table`)
+
+`build_modern_paradigm_table(el_backend, *, lang="ru")` is the Modern Greek
+counterpart of `build_grc_paradigm_table` and returns a closure of the same
+shape, `build_paradigm_table(w) -> str | None`. It normalizes the word's
+polytonic Ancient `lemma` to monotonic Modern (`poly_to_mono`) before
+inflecting. Nouns and adjectives show Nom/Gen/Acc/Voc (no dative) × sg/pl.
+Verbs show present, imperfect, aorist, θα-future (simple and continuous),
+να-subjunctive and imperative over 6 persons, in separate Active and Passive
+tables, with the θα/να particle inside the form cell. It returns `None` when
+the Modern backend yields no forms (a lemma with no Modern reflex gets no
+Modern rung). It shares the Ancient Greek renderer's HTML styles.
+
+#### Which lexicon confirms a form (`grc_lexicon_sources`)
+
+`grc_lexicon_sources(w, *, lexicons) -> list` returns the sorted names of the
+`lexicons` (the same dict as above) whose complete `paradigm()` for
+`w["lemma"]`/`w["pos"]` contains `w["form"]` — the data for a "which lexicon
+confirms this form" badge. The comparison ignores case, accents and breathings
+(and the movable-nu parenthesization), so a sentence-initial capital or an
+accent shift in connected speech still matches. It checks the complete
+paradigm, participles included, not only the cells of the compact table. It
+returns `[]` for a POS outside `LEXICON_TAG_POS`.
+
+Two independent POS sets of `eee_project` steer the Odyssey lesson notebooks.
+Changing one never implies changing the other:
+
+- `LEXICON_TAG_POS = {"noun", "verb", "adj", "pronoun"}` — the POS values that
+  get a lexicon-coverage badge at all. `LEXICON_TAG_POS_ALIASES =
+  {"adj": "adjective"}` maps a short POS code of that set to the string the
+  paradigm lookup expects (only `adj` needs it).
+- `TRANSLATION_PRESENCE_CONTENT_POS = {"noun", "verb", "adj", "adv", "name"}` —
+  the POS values that count as content words for the translation-presence
+  exercise. Function words (particles, conjunctions, prepositions, pronouns)
+  are left out on purpose: "is this function word reflected in the
+  translation" is not a meaningful question for a literary translation.
+
 #### A real dropdown instead of `build_grc_lexicon_tabs`'s CSS picker
 
 `build_grc_lexicon_tabs`'s multi-lexicon picker is CSS-only (no JS runs in
@@ -1506,6 +1614,15 @@ translation = eee.find_stanza_translation(stanza["ref"], translations[trans_sele
   Runnable demo (clickable words, overlapping sets, `css=` on/off, a
   click-reactive panel): `examples/interactive_text_notebook.py`, or
   `make -C examples notebook-itext`.
+- `resolve_clicked_word(words_raw, selected_form) -> dict | None` — map the
+  token that `interactive_text` reports in `.widget.selected_word` (tags and
+  edge punctuation stripped; case, accents and breathings kept) back to its
+  entry in the vocabulary list `words_raw`. It tries an exact match on `form`
+  first, and only then a match that ignores accents and breathings
+  (`norm_grc_surface`): that second key can merge two different words that
+  differ only by a breathing (ὅ and ὁ, οἳ and οἱ), so it is the fallback, not
+  the primary lookup. Returns `None` for an empty token or when nothing
+  matches.
 - `parse_stanza_text(md, *, ref_prefix="### ")` / `parse_stanza_translations(md, *, ref_prefix="### ")`
   — parse a `greek.md`-style poem file and a `translations.md`-style
   translator file (`## <translator name>` sections, each holding
@@ -1640,6 +1757,10 @@ Pass `polytonic=False` (or better, `polytonic=config.polytonic` — this is
 exactly what `paradigm_drill_widgets` does automatically) to limit the
 diacritics bar to acute accent + diaeresis for Modern Greek content, instead
 of the full polytonic mark set (default `True`, unchanged behavior).
+
+The buttons below use `on_click=lambda v: (v or 0) + 1`. `eee.increment_counter`
+is that same function, exported so a notebook can write
+`on_click=eee.increment_counter` instead of repeating the lambda.
 
 ### Verb paradigm (6 slots)
 

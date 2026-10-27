@@ -1,9 +1,12 @@
 # API Reference
 
-Full function-by-function reference for the `eee` package. For notebook-authoring
-patterns (`GreekUtils`, slot templates in practice, drill widgets), see
-[api-patterns.md](api-patterns.md). For backend chains and hooks in depth, see
-[chains.md](chains.md).
+Reference for the core `eee` API: inflection, reverse lookup, the backend registry,
+chains, slot templates and exceptions. The notebook helpers (`GreekUtils`,
+`eee_topbar`, `ConfigStore`, the drill and quiz widgets, the Ancient Greek table
+builders and the like) are not listed here: they are documented in
+[api-patterns.md](api-patterns.md), together with the notebook-authoring patterns.
+Backend chains and hooks in depth are in [chains.md](chains.md). Every name in
+`eee.__all__` is documented in one of these three files or in the README.
 
 ### `eee.inflect(lemma, features, pos, *, language, backend=None) → set[str]`
 
@@ -49,8 +52,10 @@ Catch-all for all unregistered language codes.
 
 Register an ordered list of backend names for a language. Backends are tried in order; the first non-empty result is returned (`stop="first"`). See [chains.md](chains.md) for the full chain API, union mode, and hooks.
 
-- `pre_hook`: `callable(lemma, features, pos, ctx) → (lemma, features, pos)` — transform inputs before the chain runs.
-- `post_hook`: `callable(forms, ctx) → set[str]` — transform or supplement results after the chain runs. Used as an LLM gap-filler when `not forms`.
+- `pre_hook`: a `PreHook` — `callable(lemma, features, pos, ctx) → (lemma, features, pos)` — transform inputs before the chain runs.
+- `post_hook`: a `PostHook` — `callable(forms, ctx) → set[str]` — transform or supplement results after the chain runs. Used as an LLM gap-filler when `not forms`.
+
+`eee.PreHook` and `eee.PostHook` are the type aliases of these two signatures, for annotating your own hooks. `ctx` is a `HookContext` (see [chains.md](chains.md#hook-extension-points)).
 
 ### `eee.language_info(code) → dict | None`
 
@@ -112,6 +117,8 @@ xx = "my_xx_eee.backend:MyBackend"
 my-backend = "my_xx_eee.backend:MyBackend"
 ```
 
+A backend can also offer **slot templates**: the optional method `get_slot_templates(self, lang, pos, terms_lang="en")`, which returns the paradigm slots (a `list[SlotTemplate]`, with labels in `terms_lang`) for `(lang, pos)`, or `None` when it has none. `eee.get_slot_templates()` returns that result, or `None` for a backend without the method. `inflect_slot()` raises `PosNotSupportedError` when the method exists and returns `None` for `pos`; a backend without the method is not treated as "pos not supported". `eee.SupportsSlotTemplates` is the `typing.Protocol` that describes this method, for type annotations and static checkers.
+
 ## Exceptions
 
 | Exception | Raised when |
@@ -119,6 +126,8 @@ my-backend = "my_xx_eee.backend:MyBackend"
 | `eee.UnsupportedLanguageError` | No backend registered for `language` / `backend` combination |
 | `eee.BackendLoadError` | Backend found but failed to load |
 | `eee.PosNotSupportedError` | The resolved backend has no data at all for `pos` (checked via `get_slot_templates(...) is None`) — raised by `inflect_slot()`. Distinct from a supported `pos` that simply has no forms for one particular lemma/slot, which still returns an empty set. |
+| `eee.AmbiguousPOSError` | A caller needs `pos` for `lemma` and none was given. Attribute `.lemma`; message `POS is required but was not provided for lemma '…'`. Nothing in the EEE packages raises it today: it is defined for backends and callers. |
+| `eee.FeatureNotSupportedError` | A UD feature has no UniMorph mapping. Raised by the UniMorph backend's `inflect()` while it translates `features` into UniMorph tags (for example `VerbForm=Part` or `VerbForm=Inf`). Attributes `.key` and `.value`; message `UD feature 'key=value' has no UniMorph mapping.` |
 
 **Chain vs. single backend — different failure handling, on purpose.** With
 `chain=[...]` (or a registered chain), a backend that fails to load or raises

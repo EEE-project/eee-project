@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.24.0 - 2026-10-27
+- New: an "Errors" button for the multiple-choice and typing quizzes (`word_quiz_form`, `word_drill_form`). On the done screen it
+  starts a new round over just the words answered wrong, like the retry mode of the paradigm drills. Build it with
+  `GreekUtils.word_retry_button(history(), lang=...)` in its own cell and pass it as `retry_btn=`. The form shows it only when an
+  answer was wrong (a skipped word counts as wrong), the progress line of the new round counts that round's words, and "Again"
+  still starts over with the full vocabulary. Without `retry_btn` the done screen is unchanged. The exercise demo
+  (`examples/greek_exercise_notebook.py`, Exercises 3 and 4) shows it.
+- A new selection of words in `word_quiz_form` and `word_drill_form` (the notebook sets `remaining` to `None`) now starts a fresh
+  round. Before, the quiz kept the score, the answers and the Prev history of the earlier round: the first question read
+  "5 / 4 — correct: 1", Prev was on, and the end score added both rounds. The ten `ellinika_b` chapters showed this when a
+  student changed the ticked phrases after answering. A notebook does not need to clear these states itself.
+- The buttons of the paradigm drills (`verb_`, `noun_`, `adjective_` and `pronoun_paradigm_drill_form`) work on the first
+  click every time: "Again", "Errors", "Prev", "Next" and "Check", and the Enter key in the form. A notebook builds these
+  widgets again each time the drill changes, and a new widget starts at 0 clicks, but the drill kept the count of the clicks
+  it had handled: the second "Again" needed two clicks, the third needed three, and "Errors" behaved the same, which looked
+  like a long wait. (The lessons already hid this for the other buttons with `set_..._cnt(0)` lines in their cells.) The drill
+  now sets the count back to 0 when it gets a widget with no clicks, so a notebook does not have to reset any count.
+- The typing quiz (`word_drill_form`) no longer freezes when the student presses Enter with a wrong or an empty answer. The
+  Enter count of the text field never goes back to 0, and each run of the form set its "checked text" again, which ran the
+  form again without end; the page then ignored every click. The form now sets the checked text only when the typed text is
+  new. After a wrong answer, typing the right word moves on without a second Enter (the Enter count stays at 1).
+- Documentation: every public name of the package is now described in the README or a `docs/` file (14 were not),
+  `docs/api-reference.md` says which API it covers, and a test fails when a public name is in no doc. `docs/api-patterns.md`
+  explains how the paradigm drill treats widgets that a notebook builds again.
+- 38 new tests, full suite 1759/1759 passing, `ruff check` clean.
+
 ## 1.23.2 - 2026-10-19
 - A static WASM page no longer fetches files that nothing reads. `GreekUtils.ensure_file` and `ensure_files` return
   `None` at once, with no warning, for a missing `.pdf` when the page runs in the browser (Pyodide): the page's
