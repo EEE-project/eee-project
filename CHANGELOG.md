@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.25.0 - 2026-10-28
+- New: `python -m eee_project.split_lesson NOTEBOOK.py` splits a multilingual lesson notebook into one notebook per UI language, so a translator can work in the notebook of one
+  language, and `python -m eee_project.join_lesson NOTEBOOK.py [--write]` joins them back. The split writes `notebook_ru.py`, `notebook_el.py` and `notebook_en.py` next to the
+  notebook, and a `README.md` that lists the files of each language and the files all languages share. Each language notebook has the same cells in the same order. Its language
+  selector is fixed to its language, and the text of the other languages is empty there: the other values of a dict keyed by language code, and the other branches of an
+  `if _lang == ...` chain. The command never overwrites a file and writes nothing unless the three notebooks join back to the source byte for byte. A notebook that gets its
+  selector in another way than one `language_selector(mo, bridge)` call is refused with the reason (for now the `ellinika_b`, Kavafis, Zorba and Kapodistrias notebooks are). The
+  library functions are `split_source` and `join_source` in `eee_project.lesson_languages`; "Lesson languages" in `docs/api-patterns.md` has the worked example.
+- `join_lesson` takes every language text from the notebook of its language. With a `notebook.py` it changes only the language texts in it and keeps every other byte, also after
+  marimo saved some or all of the language notebooks (a save rewrites the header, the `def _(...)` lines and the final `return` of the cells, and puts a blank line above a `return` in some; none of that is
+  compared). The default is a dry run that shows a diff; `--write` writes. It refuses, and names the reason, when a notebook differs from `notebook.py` outside the language texts,
+  when text was typed into the empty place of another language, when a language notebook is missing, or when two notebooks hold different text for one place. Without a
+  `notebook.py` it makes one from the Russian notebook.
+- Checked: 61 new tests (`tests/test_lesson_languages.py`; the fixtures are a marimo-style notebook and a plain-Python notebook with every shape of chain), the whole suite passes (1820 tests), `ruff check` is clean.
+  Run besides on the 8 Odyssey lessons of `created_with_eee`: each one splits and joins back byte for byte, also when marimo saved the language notebooks, and the headless runs of the
+  source against its split notebooks (8 lessons x 3 languages) differ only in the language dropdown. A language notebook edited in a live `marimo edit` session (marimo 0.25.1, autosave) joins back too: three text edits reach `notebook.py` and no other byte of it changes.
+
 ## 1.24.0 - 2026-10-27
 - New: an "Errors" button for the multiple-choice and typing quizzes (`word_quiz_form`, `word_drill_form`). On the done screen it
   starts a new round over just the words answered wrong, like the retry mode of the paradigm drills. Build it with

@@ -123,6 +123,9 @@ building structured inflection tables, and three exception types
 chain-aware failure handling. Full signatures, the slot-template API, writing
 a new backend, and exception semantics: [docs/api-reference.md](docs/api-reference.md).
 
+Lesson tools: `python -m eee_project.split_lesson NOTEBOOK.py` splits a multilingual lesson notebook into one notebook per UI language and
+`python -m eee_project.join_lesson NOTEBOOK.py` joins them back; see "Lesson languages" in [docs/api-patterns.md](docs/api-patterns.md).
+
 ## Backends
 
 | Language | Code | Package |

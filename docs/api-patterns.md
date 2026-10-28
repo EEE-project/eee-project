@@ -467,6 +467,46 @@ before the async browser read has had a chance to apply it (the write is
 synchronous, the read isn't, so an unconditional write would win that race
 every time).
 
+### Lesson languages (`split_lesson`, `join_lesson`)
+
+A lesson notebook that serves all three UI languages holds the text of every language: dicts keyed by language code (`{"ru": ..., "el": ..., "en": ...}`),
+`if _lang == "ru": ... elif _lang == "el": ... else: ...` chains, and one `lang_sel = language_selector(mo, bridge)` call. To let a translator work on one language,
+split the notebook into one notebook per language, in the same folder, and join the edited notebooks back (1.25.0+):
+
+```bash
+python -m eee_project.split_lesson ancient_greek/odyssey/2026_07_27/notebook.py
+# writes notebook_ru.py, notebook_el.py, notebook_en.py and README.md next to it
+
+python -m eee_project.join_lesson ancient_greek/odyssey/2026_07_27/notebook.py            # shows what would change, writes nothing
+python -m eee_project.join_lesson ancient_greek/odyssey/2026_07_27/notebook.py --write    # writes it
+```
+
+Each language notebook has the same cells in the same order. Its selector is fixed to its language
+(`language_selector(mo, bridge, options={"<label>": "<lang>"}, default="<lang>")  # eee-split lang=<lang> orig=language_selector(mo, bridge)`), and the text of the other
+languages is empty there: the other values of a language-keyed dict become `""`, `()`, `[]`, `{}` or `None`, and the other branches of an if-chain become `pass`. Every key and
+every branch stays, so code like `_TXT.get(lang, _TXT["ru"])` still runs. Conditional expressions on the language and other ifs are left as they are (the command names them), and a
+dict with other keys is not touched. A language notebook offers only its own language in the dropdown, and opening it stores that language as the UI language of the browser
+address, as picking it does. The `README.md` lists the files of each language and the files all languages share; a file without a language label (`vocab.tsv` next to
+`vocab_el.tsv` and `vocab_en.tsv`) belongs to the language that has no labeled file of that name, and git-ignored files are left out.
+
+`split_lesson` never overwrites a file, and it writes nothing unless the three notebooks join back to the source byte for byte. It accepts a notebook whose selector is
+exactly one call `language_selector(a, b)` alone at the end of a line; a notebook that gets the selector in another way is refused with the reason.
+
+`join_lesson` reads the three language notebooks next to `notebook.py`. With a `notebook.py` only the language texts in it change and every other byte stays: also when marimo
+saved some or all of the language notebooks (a save rewrites the header, the `def _(...)` lines and the final `return` of the cells; those are not compared). Without a `notebook.py` it is made
+from the Russian notebook. Nothing is written, and the reason is named, when a language notebook differs from `notebook.py` outside the language texts (a code line, a cell),
+when text was typed into the empty place of another language, when a language notebook is missing, or when two notebooks hold different text for one place (the branch of an
+`else` that two languages share). A text edited in `notebook.py` after the split is replaced by the text of the language notebook: read the diff before `--write`.
+
+The same functions work on strings:
+
+```python
+from eee_project.lesson_languages import join_source, split_source
+
+files, report = split_source(source_text)                # {"ru": ..., "el": ..., "en": ...} and what was split
+changed = join_source(edited_files, source_text)         # source_text with the edited language texts; join_source(edited_files) rebuilds it from the notebooks alone
+```
+
 ### Config storage (`ConfigStore`)
 
 `ConfigStore` is a unified abstraction for lesson navigation config and GA

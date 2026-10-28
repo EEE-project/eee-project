@@ -763,6 +763,7 @@ _UI_LABELS = _load_ui_labels()
 # ("ru", "en", "el") themselves, so those dicts also pick up a new language
 # with no code change, same as a plain _ui_label() call does.
 _UI_LANGS = sorted({lang for entry in _UI_LABELS.values() for lang in entry})
+_LANGUAGE_OPTIONS = {"English": "en", "Русский": "ru", "Ελληνικά": "el"}   # the choices of language_selector's dropdown, {label: code}; lesson_languages.py reads them too
 
 
 def _ui_label(key: str, lang: "str | None" = None) -> str:

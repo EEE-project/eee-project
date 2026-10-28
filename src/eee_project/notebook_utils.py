@@ -82,6 +82,7 @@ from eee_project.content import (
     strip_comment_lines as strip_comment_lines, greek_compare as greek_compare,
     _load_tense_labels as _load_tense_labels, _load_ui_labels as _load_ui_labels,
     _UI_LABELS as _UI_LABELS, _UI_LANGS as _UI_LANGS, _ui_label as _ui_label,
+    _LANGUAGE_OPTIONS as _LANGUAGE_OPTIONS,
     _lang_map as _lang_map, setup_ancient_greek as setup_ancient_greek,
     _GRC_NL as _GRC_NL, _GRC_DL as _GRC_DL, _GRC_TCOL as _GRC_TCOL,
     _GRC_PROW as _GRC_PROW, _GRC_INF_LBL as _GRC_INF_LBL, _GRC_IMP_LBL as _GRC_IMP_LBL,
@@ -907,7 +908,7 @@ def language_selector(mo, bridge, options: dict | None = None, default: str = "e
     value) the moment the browser read lands, since it's watching
     *bridge* for changes.
     """
-    options = options or {"English": "en", "Русский": "ru", "Ελληνικά": "el"}
+    options = options or dict(_LANGUAGE_OPTIONS)
     initial_code = default
     if bridge is not None:
         stored = getattr(bridge, "stored", None)
@@ -3397,7 +3398,7 @@ class GreekUtils:
 
         *show_ictus*/*show_homer* are the caller's already-built
         ``mo.ui.switch`` elements; *eee_note* is the already-resolved note
-        text (loaded from ``eee_note.md`` or inline, caller's choice).
+        text (loaded from ``eee_note_<lang>.md`` or inline, caller's choice).
         *ictus_color*/*ictus_color_name* are the CSS color and its name (in
         *lang*) used in the ictus-highlighting sentence -- lessons vary this
         (e.g. red vs. green) to match their own ``ictus.html``.
