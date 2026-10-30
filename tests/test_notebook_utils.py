@@ -30,6 +30,7 @@ from eee_project.notebook_utils import (
     _PARA_ESM,
     _ITEXT_ESM,
     _ITEXT_CSS,
+    stanza_view,
     _UI_LABELS,
 )
 from conftest import (
@@ -5558,11 +5559,43 @@ class TestInteractiveText:
         lines.append("ἔννεπε")
         assert len(w.lines) == 2
 
+    def test_wrap_defaults_false(self):
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set())
+        assert w.wrap is False
+
+    def test_wrap_true_is_stored(self):
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), wrap=True)
+        assert w.wrap is True
+
+    def test_wrap_does_not_change_the_default_stylesheet(self):
+        # the wrap rules sit in the stylesheet for every widget, but only a
+        # widget drawn with wrap=True gets the classes they select
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), wrap=True)
+        assert w._css == _ITEXT_CSS
+        assert ".eee-itext.wrap{white-space:normal" in _ITEXT_CSS
+        assert ".eee-itext .eee-line{padding-left:1.1em;text-indent:-1.1em" in _ITEXT_CSS
+
+    def test_wrap_rules_stay_before_a_callers_css(self):
+        rule = ".eee-itext.wrap{line-height:1.8}"
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), wrap=True, css=rule)
+        assert w._css.index(".eee-itext.wrap{white-space:normal") < w._css.index(rule) < w._css.index(".gk-word.active")
+
 
 class TestInteractiveTextEsm:
     """Static _ITEXT_ESM guards — the click/keydown JS can't run headlessly
     (see [[feedback_marimo_reactivity_testing]]); marimo-pair + a human browser
     verifies actual click/keyboard behaviour (section-08)."""
+
+    def test_wrap_mode_draws_one_block_per_line(self):
+        assert "model.get('wrap')" in _ITEXT_ESM
+        assert "'eee-itext wrap'" in _ITEXT_ESM
+        assert '<div class="eee-line">' in _ITEXT_ESM
+
+    def test_without_wrap_the_lines_stay_one_br_separated_run(self):
+        assert "lineHtml.join('<br>')" in _ITEXT_ESM
+
+    def test_wrap_change_redraws(self):
+        assert "model.on('change:wrap', draw)" in _ITEXT_ESM
 
     def test_delegates_single_click_listener(self):
         assert _ITEXT_ESM.count("addEventListener('click'") == 1
@@ -8302,3 +8335,118 @@ class TestTranslationPresenceForm:
         state = self._state(cv=self._ITEMS[0], rem=self._ITEMS[1:])
         result = self._call(gu_form, state, radio=_FakeRadio(value=None), lang="en")
         assert "correct" in str(result)
+
+
+# ──────────────────────────────── stanza_view (text + translation block) ──
+
+class _FakeTextWidget:
+    """Stands for the mo.ui.anywidget that interactive_text returns: str() is its markup."""
+    def __str__(self):
+        return "<WIDGET>"
+
+
+class TestStanzaView:
+    def _view(self, *args, **kw):
+        return str(stanza_view(_StubHtmlMo, _FakeTextWidget(), *args, **kw))
+
+    def test_returns_mo_html_holding_the_widget(self):
+        out = stanza_view(_StubHtmlMo, _FakeTextWidget())
+        assert isinstance(out, _StubHtmlMo.Html)
+        assert "<div><WIDGET></div>" in str(out)
+
+    def test_no_translation_means_no_card(self):
+        out = self._view(None)
+        assert 'class="eee-tr"' not in out
+        assert "eee-tr-line" not in out.split("</style>", 1)[1]
+
+    def test_card_has_a_block_per_line_whatever_their_number(self):
+        # the translation need not have as many lines as the Greek
+        assert self._view(["a", "b", "c"]).count('class="eee-tr-line"') == 3
+        assert self._view(["a"]).count('class="eee-tr-line"') == 1
+
+    def test_lines_are_html_escaped(self):
+        out = self._view(["<b>x</b> & y"])
+        assert "&lt;b&gt;x&lt;/b&gt; &amp; y" in out
+        assert "<b>x</b>" not in out
+
+    def test_asterisk_becomes_a_coloured_pointer(self):
+        out = self._view(["πολλοπάητον* άντραν"])
+        assert 'πολλοπάητον<span class="eee-star">*</span> άντραν' in out
+
+    def test_notes_stand_under_their_line_and_not_elsewhere(self):
+        out = self._view(["l0", "l1", "l2"], notes={1: [("w", "m"), ("w2", "m2")]})
+        body = out.split("</style>", 1)[1]
+        assert body.count('class="eee-tr-note"') == 1
+        assert body.index("l0") < body.index("l1") < body.index('class="eee-tr-note"') < body.index("l2")
+        assert '<span class="eee-star">*</span> w — m · <span class="eee-star">*</span> w2 — m2' in body
+
+    def test_notes_are_html_escaped(self):
+        out = self._view(["l0"], notes={0: [("<w>", "a & b")]})
+        assert "&lt;w&gt; — a &amp; b" in out
+
+    def test_notes_of_a_line_that_does_not_exist_are_ignored(self):
+        assert 'class="eee-tr-note"' not in self._view(["l0"], notes={5: [("w", "m")]}).split("</style>", 1)[1]
+
+    def test_two_columns_threshold_is_a_container_query(self):
+        out = self._view(["a"])
+        assert ".eee-stanza-wrap{container-type:inline-size}" in out
+        assert "@container (min-width: 600px)" in out
+        assert "@container (min-width: 480px)" in self._view(["a"], two_columns_from_px=480)
+
+
+# ──────────────────────────────── render_gloss_sheet (panel + table in one) ──
+
+class TestRenderGlossSheet:
+    _TABLES = [("homer", "<table>HOMER</table>"), ("lsj", "<table>LSJ</table>")]
+
+    def _parts(self, gu):
+        words = [{"form": "λόγος", "lemma": "λόγος", "context": "word", "meaning": "word/reason"}]
+        return gu.render_gloss_selector(words, "λόγος", lambda w: self._TABLES, lang="en")
+
+    def _sheet(self, gu, **kw):
+        tables, selector, panel = self._parts(gu)
+        kw.setdefault("selected_word", "λόγος")
+        return str(gu.render_gloss_sheet(panel, tables, selector, **kw))
+
+    def test_panel_and_table_are_in_one_block(self, gu_form):
+        out = self._sheet(gu_form)
+        assert out.count('class="eee-sheet on"') == 1
+        assert out.count('class="eee-sheet-table"') == 1
+        assert "λόγος" in out and "HOMER" in out and "LSJ" not in out
+        assert out.index("λόγος") < out.index("HOMER")
+
+    def test_table_follows_the_dropdown(self, gu_form):
+        tables, selector, panel = self._parts(gu_form)
+        selector.value = "lsj"
+        out = str(gu_form.render_gloss_sheet(panel, tables, selector, selected_word="λόγος"))
+        assert "LSJ" in out and "HOMER" not in out
+
+    def test_it_is_a_sheet_only_once_a_word_is_chosen(self, gu_form):
+        assert 'class="eee-sheet on"' in self._sheet(gu_form, selected_word="λόγος")
+        out = str(gu_form.render_gloss_sheet("hint", None, None, selected_word=""))
+        assert 'class="eee-sheet"' in out and 'class="eee-sheet on"' not in out
+
+    def test_no_table_block_without_tables(self, gu_form):
+        out = str(gu_form.render_gloss_sheet("hint", None, None, selected_word=""))
+        assert 'class="eee-sheet-table"' not in out.split("</style>", 1)[1]
+        assert "hint" in out
+
+    def test_root_tag_alternates_with_every_click(self, gu_form):
+        # the browser keeps a checkbox's state across a rerun; a new tag is a new element, so open again
+        even = self._sheet(gu_form, click_seq=2)
+        odd = self._sheet(gu_form, click_seq=3)
+        assert even.rstrip().endswith("</div>") and '<div class="eee-sheet' in even
+        assert odd.rstrip().endswith("</section>") and '<section class="eee-sheet' in odd
+
+    def test_close_control_is_labelled_in_the_language(self, gu_form):
+        assert 'aria-label="Close"' in self._sheet(gu_form, lang="en")
+        assert 'aria-label="Закрыть"' in self._sheet(gu_form, lang="ru")
+        assert 'aria-label="Κλείσιμο"' in self._sheet(gu_form, lang="el")
+
+    def test_bottom_sheet_applies_below_the_given_viewport_width(self, gu_form):
+        assert "@media (max-width: 749px)" in self._sheet(gu_form)
+        assert "@media (max-width: 599px)" in self._sheet(gu_form, sheet_below_px=600)
+
+    def test_the_sheet_label_exists_in_every_ui_language(self, gu_form):
+        for lang in ("en", "ru", "el"):
+            assert gu_form.ui_label("gloss_sheet_close", lang) != "gloss_sheet_close"

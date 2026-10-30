@@ -82,6 +82,7 @@ ictus_note_label	Ictus (stressed syllables) of each foot are highlighted in {col
 homer_lexicon_note	Words from the Homeric lexicon, for which the EEE engine builds word-form tables across different periods of the Greek language.
 eee_engine_accordion_label	About the EEE morphological engine
 gloss_panel_empty	*Select a word in the text to see its translation and word forms from the Homeric lexicon…*
+gloss_sheet_close	Close
 gloss_panel_era_caption	*Word forms by era — only the simplest morphological correspondence by lemma, meaning may vary*
 period_selector_label	Period
 word_missing_in_paradigm	{word} — missing in the paradigm of {lemma}

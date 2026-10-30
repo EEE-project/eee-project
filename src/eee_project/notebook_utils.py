@@ -49,6 +49,7 @@ from __future__ import annotations
 
 import csv
 import functools
+import html as _html
 import io
 import random as _random
 import re
@@ -1540,6 +1541,8 @@ _ITEXT_CSS_BASE = """\
 .eee-itext .gk-word:hover{border-bottom-color:#003d82}
 .eee-itext .gk-word:focus{outline:2px solid #003d82;outline-offset:1px}
 .eee-itext .gk-word.homer{background:#f2ecd8}
+.eee-itext.wrap{white-space:normal;flex-shrink:1;min-width:0;line-height:1.5}
+.eee-itext .eee-line{padding-left:1.1em;text-indent:-1.1em;text-wrap:balance}
 """
 # Declared last, so the selected word beats every highlight class, including ones added via `css=`.
 _ITEXT_CSS_ACTIVE = ".eee-itext .gk-word.active{background:#dceeff;border-bottom:2px solid #003d82}\n"
@@ -1599,6 +1602,8 @@ function render({ model, el }) {
     const showIctus = model.get('show_ictus');
     const ictusHtml = model.get('ictus_html') || {};
     const selected = model.get('selected_word') || '';
+    const wrap = !!model.get('wrap');
+    container.className = wrap ? 'eee-itext wrap' : 'eee-itext';
 
     const lineHtml = lines.map(line => {
       // ictusHtml values are trusted, internally-authored markup (e.g. <b>
@@ -1620,7 +1625,11 @@ function render({ model, el }) {
       return parts.join(' ');
     });
 
-    container.innerHTML = lineHtml.join('<br>');
+    // wrap: one block per line, so a line that is longer than the box wraps with a
+    // hanging indent; otherwise the lines are one nowrap run separated by <br>.
+    container.innerHTML = wrap
+      ? lineHtml.map(l => '<div class="eee-line">' + (l || '&nbsp;') + '</div>').join('')
+      : lineHtml.join('<br>');
   }
 
   function activate(span) {
@@ -1652,6 +1661,7 @@ function render({ model, el }) {
   model.on('change:word_classes', draw);
   model.on('change:show_ictus', draw);
   model.on('change:ictus_html', draw);
+  model.on('change:wrap', draw);
 
   draw();
   el.appendChild(container);
@@ -1673,11 +1683,12 @@ if _ANYWIDGET_OK:
         word_classes = _traitlets.Dict(value_trait=_traitlets.List(_traitlets.Unicode())).tag(sync=True)
         ictus_html = _traitlets.Dict().tag(sync=True)
         show_ictus = _traitlets.Bool(True).tag(sync=True)
+        wrap = _traitlets.Bool(False).tag(sync=True)
         selected_word = _traitlets.Unicode("").tag(sync=True)
         click_seq = _traitlets.Int(0).tag(sync=True)
 
 
-def interactive_text(mo, *, lines, clickable, homer_words=None, word_classes=None, css=None, ictus_html=None, show_ictus=True) -> Any:
+def interactive_text(mo, *, lines, clickable, homer_words=None, word_classes=None, css=None, ictus_html=None, show_ictus=True, wrap=False) -> Any:
     """Render poem `lines` with vocabulary words as permanent clickable spans.
 
     Returns the real ``mo.ui.anywidget`` — a panel cell must reference
@@ -1718,6 +1729,12 @@ def interactive_text(mo, *, lines, clickable, homer_words=None, word_classes=Non
 
     ``ictus_html``: optional ``{raw_line: html_with_markup}`` map; shown per
     line when ``show_ictus`` is true, else the plain line text.
+
+    ``wrap``: when true, every line is its own block that wraps inside its
+    box and indents the continuation lines (a hanging indent), so the poem
+    fits a narrow screen. The default (false) keeps each line on one row
+    (``white-space: nowrap``), as in a wide two-column layout; the widget
+    then cannot shrink below its longest line.
     """
     if not _ANYWIDGET_OK:
         raise ImportError("anywidget is required for interactive_text")
@@ -1732,7 +1749,78 @@ def interactive_text(mo, *, lines, clickable, homer_words=None, word_classes=Non
     w.word_classes = {name: list(forms) for name, forms in {"homer": homer_words, **(word_classes or {})}.items() if forms}
     w.ictus_html = dict(ictus_html) if ictus_html else {}
     w.show_ictus = bool(show_ictus)
+    w.wrap = bool(wrap)
     return mo.ui.anywidget(w)
+
+
+_STANZA_CSS = """\
+<style>
+.eee-stanza-wrap{container-type:inline-size}
+.eee-stanza{display:grid;grid-template-columns:minmax(0,1fr);gap:1.2em;align-items:start}
+@container (min-width: __PX__px){.eee-stanza{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr)}}
+.eee-tr{border:1px solid rgba(127,127,127,.45);border-radius:10px;background:rgba(127,127,127,.08);padding:.75em .9em}
+.eee-tr-line{padding-left:1.1em;text-indent:-1.1em}
+.eee-tr-line + .eee-tr-line,.eee-tr-note + .eee-tr-line{margin-top:.2em}
+.eee-tr-note{padding-left:1.1em;font-size:.88em;opacity:.8}
+.eee-star{color:#003d82;font-weight:700}
+.dark .eee-star{color:#8ab4ff}
+</style>"""
+
+
+_GLOSS_SHEET_CSS = """\
+<style>
+.eee-sheet{margin-top:1em}
+.eee-sheet-table{margin-top:1.5em}
+.eee-sheet-x{position:absolute;opacity:0;width:1px;height:1px}
+.eee-sheet-close{display:none}
+@media (max-width: __PX__px){
+.eee-sheet.on{position:fixed;left:0;right:0;bottom:0;z-index:40;box-sizing:border-box;max-height:55vh;overflow-y:auto;margin:0;padding:14px 16px 16px;background:var(--background,#fff);border-top:1px solid rgba(127,127,127,.4);border-radius:16px 16px 0 0;box-shadow:0 -10px 30px rgba(0,0,0,.14)}
+.eee-sheet.on .eee-sheet-close{display:flex;position:absolute;top:2px;right:4px;width:44px;height:44px;align-items:center;justify-content:center;font-size:26px;line-height:1;cursor:pointer}
+.eee-sheet.on .eee-sheet-x:focus-visible + .eee-sheet-close{outline:2px solid #003d82}
+.eee-sheet.on:has(.eee-sheet-x:checked){display:none}
+}
+</style>"""
+
+
+def stanza_view(mo, text_widget, translation_lines=None, *, notes=None, two_columns_from_px: int = 600) -> Any:
+    """A stanza's Greek text and its translation as one block that fits any screen width.
+
+    *text_widget* is the result of :func:`interactive_text` (build it with
+    ``wrap=True``). *translation_lines* is the translator's text for the whole
+    stanza, a list of lines; its number of lines need not equal the number of
+    Greek lines (a free verse translation, a prose translation). ``None`` shows
+    no translation: pass it when the reader chose the blank entry of the
+    translation dropdown. *notes* is the translator's margin notes,
+    ``{line_index: [(word, meaning), ...]}``: each note is shown under the line it
+    belongs to, and an asterisk in a line is coloured so that it points to its note.
+
+    The translation sits in a card. When the box that holds the view is at
+    least *two_columns_from_px* wide (a container query, so the page width does
+    not matter, only the width the notebook gives the view) the card stands
+    beside the Greek; below that it stands under it. All text is HTML-escaped.
+    """
+    def esc(text):
+        return _html.escape(str(text), quote=False)
+
+    def star(text):
+        return esc(text).replace("*", '<span class="eee-star">*</span>')
+
+    card = ""
+    if translation_lines is not None:
+        notes = notes or {}
+        rows = []
+        for i, line in enumerate(translation_lines):
+            rows.append(f'<div class="eee-tr-line">{star(line)}</div>')
+            if notes.get(i):
+                items = " · ".join(
+                    f'<span class="eee-star">*</span> {esc(word)} — {esc(meaning)}' for word, meaning in notes[i]
+                )
+                rows.append(f'<div class="eee-tr-note">{items}</div>')
+        card = f'<div class="eee-tr">{"".join(rows)}</div>'
+    css = _STANZA_CSS.replace("__PX__", str(int(two_columns_from_px)))
+    return mo.Html(
+        f'{css}<div class="eee-stanza-wrap"><div class="eee-stanza"><div>{text_widget}</div>{card}</div></div>'
+    )
 
 
 # ════════════════════════════════════════════════════ greek configs ══
@@ -3512,6 +3600,43 @@ class GreekUtils:
         return self._mo.Html(render_grc_period_table(
             period_tables, period_selector.value if period_selector is not None else None,
         ))
+
+    def render_gloss_sheet(self, gloss_panel: Any, period_tables: "list | None", period_selector: Any, *,
+                            selected_word: str, click_seq: int = 0, lang: str = "ru",
+                            sheet_below_px: int = 750) -> Any:
+        """The gloss panel and its period table as ONE sheet -- the cell that shows them.
+
+        Call it from a cell that takes *period_selector* as a parameter (like
+        :meth:`render_gloss_table`, so that only this cell reruns when the dropdown
+        changes), with the three values of :meth:`render_gloss_selector`, whose own
+        cell then shows nothing::
+
+            gu.render_gloss_sheet(
+                gloss_panel, period_tables, period_selector, lang=lang_sel.value,
+                selected_word=text_widget.widget.selected_word, click_seq=text_widget.widget.click_seq,
+            )
+
+        On a wide page (viewport of *sheet_below_px* pixels or more) the sheet is an
+        ordinary block under the text, as the two separate cells were. On a narrower
+        one, once a word is chosen (*selected_word* is not empty), it is a sheet fixed
+        to the bottom of the screen (at most 55% of its height, scrolling inside), so
+        the table is in view without scrolling. A close button hides it with CSS only;
+        choosing a word again, also the same word (*click_seq* changes on every
+        click), shows it again.
+        """
+        table = self.render_gloss_table(period_tables, period_selector)
+        # The browser keeps the state of a checkbox while a cell reruns, so the sheet root
+        # changes its tag with every click: a different tag is a new element and starts open.
+        tag = "section" if click_seq % 2 else "div"
+        css = _GLOSS_SHEET_CSS.replace("__PX__", str(int(sheet_below_px) - 1))
+        close = self.ui_label('gloss_sheet_close', lang)
+        body = f'<div class="eee-sheet-table">{table}</div>' if table is not None else ""
+        return self._mo.Html(
+            f'{css}<{tag} class="eee-sheet{" on" if selected_word else ""}">'
+            f'<input type="checkbox" id="eee-sheet-x" class="eee-sheet-x" aria-label="{_html.escape(close)}">'
+            f'<label for="eee-sheet-x" class="eee-sheet-close" aria-hidden="true">×</label>'
+            f"{gloss_panel}{body}</{tag}>"
+        )
 
     @staticmethod
     def reset_quiz_state(renew_btn: Any, set_cv, set_remaining, set_score,

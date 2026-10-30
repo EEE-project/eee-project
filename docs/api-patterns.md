@@ -1543,6 +1543,38 @@ caption + dropdown, ready to display.
 period's header + description + table (or nothing, if the word has no
 tables at all).
 
+`gu.render_gloss_sheet(gloss_panel, period_tables, period_selector, *, selected_word, click_seq=0, lang="ru", sheet_below_px=750)`
+— shows the panel and the table as ONE sheet, in place of the bare
+expressions of the two cells above. On a phone, the table of a form sits far
+below the poem, so the reader has to scroll down after every tap; the sheet
+fixes this. On a wide page (viewport of `sheet_below_px` pixels or more) it
+is a block under the text, as before. On a narrower one, once a word is
+chosen it is a sheet fixed to the bottom of the screen (at most 55% of its
+height, scrolling inside), with a close button that works with CSS only;
+choosing a word again, also the same word, shows it again. Cell 1 then shows
+nothing (it ends with `return gloss_panel, period_selector, period_tables`),
+and the cell that shows the sheet takes `period_selector` as a parameter, for
+the same reason as `render_gloss_table`:
+
+```python
+# Cell 1 -- builds, shows nothing:
+period_tables, period_selector, gloss_panel = gu.render_gloss_selector(
+    QUIZ_WORDS_RAW, text_widget.widget.selected_word, build_period_tables, lang=lang_sel.value,
+)
+return gloss_panel, period_selector, period_tables
+
+# Cell 2 -- shows panel and table as one sheet; reruns on a word click and on a dropdown pick:
+gu.render_gloss_sheet(
+    gloss_panel, period_tables, period_selector, lang=lang_sel.value,
+    selected_word=text_widget.widget.selected_word, click_seq=text_widget.widget.click_seq,
+)
+```
+
+A browser keeps the state of a checkbox while marimo reruns the cell, so
+the sheet changes its root tag (`div` / `section`) with every click: a
+different tag is a new element, and a sheet that the reader closed is open
+again for the next word.
+
 Lower-level, if a notebook genuinely needs to build the tables/dropdown/table
 itself instead of using the two methods above:
 
@@ -1621,7 +1653,7 @@ text_widget = eee.interactive_text(
 translation = eee.find_stanza_translation(stanza["ref"], translations[trans_selector.value])
 ```
 
-- `interactive_text(mo, *, lines, clickable, homer_words=None, word_classes=None, css=None, ictus_html=None, show_ictus=True)`
+- `interactive_text(mo, *, lines, clickable, homer_words=None, word_classes=None, css=None, ictus_html=None, show_ictus=True, wrap=False)`
   — returns a real `mo.ui.anywidget` rendering `lines` with vocabulary words
   as permanent clickable spans. A panel cell that reacts to word clicks must
   take the *widget*, not this call's return value, as a parameter and read
@@ -1650,6 +1682,51 @@ translation = eee.find_stanza_translation(stanza["ref"], translations[trans_sele
 
   Class names must be plain CSS identifiers; anything else, or the reserved
   `gk-word`/`active`, raises `ValueError` — also for a set that is empty.
+
+  `wrap=True` is for a narrow screen. By default each line stays on one row
+  (`white-space: nowrap`), so the widget cannot be narrower than its longest
+  line: put it in a row next to a translation on a phone and the translation
+  is pushed off the screen. With `wrap=True` every line is its own block that
+  wraps inside the box it is given, and its continuation rows are indented (a
+  hanging indent), so the reader can tell a wrapped row from the next line of
+  the poem. Line height in wrap mode is 1.5 (2 in the default mode, which has
+  no wrapped rows to keep apart); a `css=` rule such as
+  `.eee-itext.wrap{line-height:1.7}` changes it. Everything else, the
+  clickable words, `homer` and the other highlight sets, the ictus markup and
+  `selected_word`, works as before.
+
+- `stanza_view(mo, text_widget, translation_lines=None, *, notes=None, two_columns_from_px=600)`
+  — the Greek text and the translation of a stanza as one block that fits any
+  screen width: beside each other when the box that holds the view is at least
+  `two_columns_from_px` wide (a container query, so what counts is the width
+  the notebook gives the view, not the width of the window), the translation
+  under the Greek when it is narrower. Give it the widget of
+  `interactive_text(..., wrap=True)`. `translation_lines` is the translator's
+  text for the whole stanza as a list of lines; their number need not equal
+  the number of Greek lines (a free verse translation, a prose translation),
+  which is why the translation is one card and not a line beside each Greek
+  line. `None` shows no translation. `notes` is the translator's margin
+  notes, `{line_index: [(word, meaning), ...]}`: each note is shown under its
+  line, and an asterisk in a line is coloured so that it points to the note.
+  All text is HTML-escaped. A lesson that lets the reader hide the
+  translation gives the translator dropdown a blank entry
+  (`mo.ui.dropdown(..., allow_select_none=True)`) and passes `None` when its
+  value is `None`:
+
+  ```python
+  text_widget = eee.interactive_text(
+      mo, lines=stanza["lines"], clickable=CLICKABLE_FORMS, wrap=True,
+  )
+  choice = trans_selector.value  # None: the blank entry
+  mo.vstack([
+      mo.hstack([stanza_selector, trans_selector], justify="start", wrap=True, gap=1.5),
+      eee.stanza_view(
+          mo, text_widget,
+          None if choice is None else stanza["translations"][choice].split("\n"),
+          notes=stanza.get("margin_glosses", {}).get(choice, {}),
+      ),
+  ])
+  ```
 
   Runnable demo (clickable words, overlapping sets, `css=` on/off, a
   click-reactive panel): `examples/interactive_text_notebook.py`, or
