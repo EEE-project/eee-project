@@ -5627,6 +5627,27 @@ class TestInteractiveText:
         w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["a*"], notes={0: [("a", "meaning")]})
         assert "meaning" not in w.translation_html
 
+    def test_an_empty_translation_is_an_empty_card_not_no_card(self):
+        # [] is a translation with no lines; only None means "no translation"
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=[])
+        assert w.translation_html == '<div class="eee-tr"></div>'
+
+    def test_notes_may_be_keyed_by_the_line_as_a_string(self):
+        # what a JSON round trip makes of {0: ...}
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["a*"], notes={"0": [("a", "m")]})
+        assert 'data-i="0" data-k="0"' in w.translation_html
+        assert w.notes == {"0": [["a", "m"]]}
+
+    def test_a_star_with_no_word_before_it_is_plain(self):
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["* a", "b **"],
+                             notes={0: [("x", "m")], 1: [("y", "m")]})
+        assert "gk-note" not in w.translation_html
+        assert w.translation_html.count('<span class="eee-star">*</span>') == 3
+
+    def test_the_word_of_a_button_is_escaped_too(self):
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["<i>*"], notes={0: [("i", "m")]})
+        assert ">&lt;i&gt;<span class=\"eee-star\">*</span></span>" in w.translation_html
+
     def test_translation_stylesheet_only_with_a_translation_and_between_base_and_callers_css(self):
         rule = ".eee-itext.wrap{line-height:1.8}"
         w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["a"], css=rule)

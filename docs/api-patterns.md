@@ -1544,7 +1544,7 @@ period's header + description + table (or nothing, if the word has no
 tables at all).
 
 `gu.render_gloss_sheet(gloss_panel, period_tables, period_selector, *, selected_word, click_seq=0, lang="ru", sheet_below_px=750, note=None)`
-— shows the panel and the table as ONE sheet, in place of the bare
+(new in 1.26.0) — shows the panel and the table as ONE sheet, in place of the bare
 expressions of the two cells above. On a phone, the table of a form sits far
 below the poem, so the reader has to scroll down after every tap; the sheet
 fixes this. On a wide page (viewport of `sheet_below_px` pixels or more) it
@@ -1689,7 +1689,7 @@ translation = eee.find_stanza_translation(stanza["ref"], translations[trans_sele
   Class names must be plain CSS identifiers; anything else, or the reserved
   `gk-word`/`active`, raises `ValueError` — also for a set that is empty.
 
-  `wrap=True` is for a narrow screen. By default each line stays on one row
+  `wrap=True` (new in 1.26.0) is for a narrow screen. By default each line stays on one row
   (`white-space: nowrap`), so the widget cannot be narrower than its longest
   line: put it in a row next to a translation on a phone and the translation
   is pushed off the screen. With `wrap=True` every line is its own block that
@@ -1701,7 +1701,7 @@ translation = eee.find_stanza_translation(stanza["ref"], translations[trans_sele
   clickable words, `homer` and the other highlight sets, the ictus markup and
   `selected_word`, works as before.
 
-  `translation=` and `notes=` draw the translation in the same widget, so the
+  `translation=` and `notes=` (new in 1.26.0) draw the translation in the same widget, so the
   poem and its translation fit any screen width and share one selection.
   `translation` is the translator's text for the whole stanza, a list of
   lines; their number need not equal the number of Greek lines (a free verse
@@ -1740,7 +1740,8 @@ translation = eee.find_stanza_translation(stanza["ref"], translations[trans_sele
   ```
 
   Runnable demo (clickable words, overlapping sets, `css=` on/off, a
-  click-reactive panel): `examples/interactive_text_notebook.py`, or
+  click-reactive panel, and `wrap=True` with `translation=`/`notes=` and
+  `render_gloss_sheet`): `examples/interactive_text_notebook.py`, or
   `make -C examples notebook-itext`.
 - `resolve_clicked_word(words_raw, selected_form) -> dict | None` — map the
   token that `interactive_text` reports in `.widget.selected_word` (tags and

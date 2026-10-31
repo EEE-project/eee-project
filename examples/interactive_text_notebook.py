@@ -2,7 +2,7 @@
 # requires-python = ">=3.12"
 # dependencies = [
 #     "marimo>=0.25.1",
-#     "eee-project>=1.22.0",
+#     "eee-project>=1.26.0",
 # ]
 # ///
 """interactive_text and mixed_language_notes demo — a poem with clickable words and highlight sets,
@@ -10,6 +10,8 @@ then the same poem beside a translation with comments tied to its words.
 
 Shows `interactive_text` with `word_classes={css_class: forms}` (any number of highlight
 sets) and `css=` (the rules that style them), plus the click-reactive panel pattern; then
+`wrap=True`, `translation=` and `notes=` with `GreekUtils.render_gloss_sheet`: a stanza that fits a
+phone, its translation as one card, and margin notes shown in the word panel; then
 `mixed_language_notes`: one card per comment, choosing a card highlights the words it is about.
 
 Run locally:
@@ -85,6 +87,85 @@ def _(SAMPLE, STYLES, mo):
         "`long` is computed (7 letters or more), so it overlaps the others — the classes compose. "
         "Switch `css=` off and the classes are still on the spans; the widget itself only styles "
         "`.homer`, the dotted underline and the clicked word (`.active`, always painted last)."
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    # `wrap`, `translation` and `notes` — a stanza that fits a phone
+
+    By default each line of the poem stays on one row, so on a screen 390 px wide the poem is wider than the
+    screen and pushes a translation out of sight. `wrap=True` lets every line wrap, with a hanging indent so that
+    a wrapped row is not taken for the next line. `translation=` draws the translation of the stanza in the same
+    widget, as one card for the whole stanza (a translator's lines need not match the Greek lines one to one):
+    beside the poem when the widget is 600 px wide or more, under it when narrower, so narrow the browser window
+    to see it move. `notes=` are the translator's margin notes: a star in a translation line points to one, the word
+    before the star is clickable, and a tap shows the note where a tap on a Greek word shows its forms. The blank
+    entry of the dropdown below passes `translation=None`.
+
+    ```python
+    stanza_widget = eee.interactive_text(
+        mo, lines=LINES, clickable=CLICKABLE, wrap=True,
+        translation=lines_or_None,   # ["Tell me, Muse, of the man* of many turns*, ...", ...]
+        notes={0: [("man", "ἀνήρ — ..."), ("turns", "τρόποι — ...")]},   # the k-th star of line i = the k-th note of line i
+    )
+    # the word panel, in two cells:
+    #   period_tables, period_selector, gloss_panel = gu.render_gloss_selector(WORDS, stanza_widget.widget.selected_word, build_period_tables)
+    #   gu.render_gloss_sheet(gloss_panel, period_tables, period_selector, selected_word=..., click_seq=..., note=stanza_widget.widget.selected_note)
+    ```
+
+    `render_gloss_sheet` shows the panel and its table as one sheet: a block under the text on a wide page, a sheet
+    fixed to the bottom of the screen on a narrow one once you tap a word, with a close button. Tap `ἔπερσεν` (two
+    periods, so a dropdown) or `πλάγχθη` (one), or a starred word of the translation.
+    """)
+    return
+
+
+@app.cell
+def _(mo):
+    trans_choice = mo.ui.dropdown(
+        options={"literal": "literal", "with margin notes": "with margin notes"},
+        value="with margin notes",
+        allow_select_none=True,  # the blank entry: value None, no translation
+        label="translation",
+    )
+    return (trans_choice,)
+
+
+@app.cell
+def _(LINES, NOTE_TRANSLATIONS, TOKENS, eee, mo, trans_choice):
+    _choice = trans_choice.value
+    stanza_widget = eee.interactive_text(
+        mo,
+        lines=LINES,
+        clickable=set(TOKENS),
+        wrap=True,
+        translation=None if _choice is None else NOTE_TRANSLATIONS[_choice]["lines"],
+        notes=None if _choice is None else NOTE_TRANSLATIONS[_choice]["notes"],
+    )
+    mo.vstack([trans_choice, stanza_widget])
+    return (stanza_widget,)
+
+
+@app.cell
+def _(GLOSS_WORDS, build_period_tables, gu, stanza_widget):
+    # builds the panel and its period dropdown; shows nothing (the next cell shows the sheet)
+    period_tables, period_selector, gloss_panel = gu.render_gloss_selector(
+        GLOSS_WORDS, stanza_widget.widget.selected_word, build_period_tables, lang="en",
+    )
+    return gloss_panel, period_selector, period_tables
+
+
+@app.cell
+def _(gloss_panel, gu, period_selector, period_tables, stanza_widget):
+    # takes period_selector as a parameter, so a pick in the dropdown reruns only this cell
+    gu.render_gloss_sheet(
+        gloss_panel, period_tables, period_selector, lang="en",
+        selected_word=stanza_widget.widget.selected_word,
+        click_seq=stanza_widget.widget.click_seq,
+        note=stanza_widget.widget.selected_note,
     )
     return
 
@@ -170,6 +251,43 @@ def _():
             },
         }
     ]
+    gu = eee.GreekUtils(mo_module=mo)
+
+    # The same two lines with margin notes (the demo's own glosses): the k-th star of a line is the k-th note of it.
+    NOTE_TRANSLATIONS = {
+        "literal": {"lines": STANZAS[0]["translations"]["literal"].split("\n"), "notes": {}},
+        "with margin notes": {
+            "lines": [
+                "Tell me, Muse, of the man* of many turns*, who very much",
+                "wandered*, after he sacked the holy citadel of Troy;",
+            ],
+            "notes": {
+                0: [("man", "ἀνήρ — the poem's first noun; Odysseus is not named in these lines"),
+                    ("turns", "τρόποι — ways; also the turns of a mind")],
+                1: [("wandered", "πλάγχθη — was driven off course (πλάζω)")],
+            },
+        },
+    }
+
+    # What a lesson takes from its vocabulary and its lexicons, in miniature: a word list for the gloss panel, and
+    # build_period_tables(word) -> [(period, html table), ...]. Two periods make a dropdown, one period does not.
+    GLOSS_WORDS = [
+        {"form": "ἔπερσεν", "lemma": "πέρθω", "context": "verb", "meaning": "sacked, destroyed", "grammar_label": "aorist, 3rd person singular"},
+        {"form": "πλάγχθη", "lemma": "πλάζω", "context": "verb", "meaning": "was driven off course", "grammar_label": "aorist passive, 3rd person singular"},
+    ]
+    _TABLES = {
+        "πέρθω": [
+            ("homer", "<table><tr><th></th><th>aorist</th></tr><tr><td>3 sg.</td><td><b>ἔπερσεν</b></td></tr></table>"),
+            ("lsj", "<table><tr><th></th><th>aorist</th></tr><tr><td>3 sg.</td><td><b>ἔπερσε(ν)</b></td></tr></table>"),
+        ],
+        "πλάζω": [
+            ("homer", "<table><tr><th></th><th>aorist passive</th></tr><tr><td>3 sg.</td><td><b>πλάγχθη</b></td></tr></table>"),
+        ],
+    }
+
+    def build_period_tables(word):
+        return _TABLES.get(word["lemma"])
+
     NOTES = [
         {
             "fragments": "ἔννεπε μοῦσα",
@@ -191,7 +309,7 @@ def _():
         },
     ]
     assert not eee.language_notes_problems(LINES, NOTES), "every fragment must occur in the text and none may overlap another"
-    return CSS, LINES, NOTES, SAMPLE, SETS, STANZAS, STYLES, TOKENS, eee, mo
+    return CSS, GLOSS_WORDS, LINES, NOTES, NOTE_TRANSLATIONS, SAMPLE, SETS, STANZAS, STYLES, TOKENS, build_period_tables, eee, gu, mo
 
 
 if __name__ == "__main__":

@@ -17,12 +17,14 @@
   and a click on the same word opens it again too. With `note=text_widget.widget.selected_note` a tapped margin note is shown in the sheet (the word, its meaning, the label "Margin note") in place of the panel and the table. The new UI labels
   `gloss_sheet_close` and `margin_note_label` (en, ru, el) name the close button and the note. `render_gloss_selector` and `render_gloss_table` are unchanged; a lesson that uses the sheet shows nothing in the cell of
   `render_gloss_selector` and calls `render_gloss_sheet` in the cell that took `period_selector` as a parameter.
-- Checked: new tests for `wrap`, the translation card (escaping, stars, the k-th star to the k-th note, the stylesheet and its place in the cascade), the JS guards (a tap on a note, a tap on a Greek word, the listeners, the single child without a
-  translation) and `render_gloss_sheet` (the sheet, the note, the close label, the tag that changes with every click, the breakpoint); the whole suite passes (1854 tests), `ruff check` is clean. The JS inside the widget is out of reach of pytest, so it was checked in a
-  real browser: the Odyssey lesson `2026_06_01` of `created_with_eee`, changed to use the new things, run with `marimo run` (marimo 0.25.2, anywidget 0.11.0) and driven by Chromium at 390 x 844 and 830 x 700. At 390 the Greek lines wrap with a
-  hanging indent and the card stands under them; at 830 the card stands beside them and the table under both. A tap on a word shows the sheet (fixed to the screen at 390, in the page at 830); a pick in the period dropdown keeps the sheet and the
-  dropdown's value; the close button hides the sheet and the next tap shows it again; the blank entry of the translator dropdown removes the card; a tap on a starred word of Σπανούδης (8 verses, 2 notes in I.1-5) shows its note in the sheet and a
-  tap on a Greek word shows the gloss again.
+- Checked: 38 new tests in `tests/test_notebook_utils.py` (`wrap`; the translation card: escaping, the k-th star to the k-th note, an empty translation, stars with no word, the stylesheet and its place in the cascade; the guards on the JS; and
+  `render_gloss_sheet`: the sheet, the note, the close label, the tag that changes with every click, the breakpoint) cover every statement of `_translation_card_html`, `interactive_text` and `render_gloss_sheet`. The JS and the placement
+  of the card and of the sheet are out of reach of those tests, so `tests/integration/test_interactive_text_browser.py` (8 tests, `-m integration`; it needs Playwright and a Chromium and is skipped without them) runs
+  `examples/interactive_text_notebook.py` with `marimo run` and drives Chromium at 390 and 1000 px: the lines wrap with a hanging indent and fit a phone, the card stands under the poem on a phone and beside it on a wide page, a tap on a starred word
+  shows its note and clears the Greek word (and the reverse), Enter works on a note, the sheet is fixed to the screen on a phone and in the page on a wide page, a closed sheet opens again for the next word, a pick in the period dropdown keeps the
+  sheet, and the blank translation entry removes the card. The same checks were made by hand in the Odyssey lesson `2026_06_01` of `created_with_eee` in the Greek, Russian and English interface (marimo 0.25.2, anywidget 0.11.0).
+  `examples/interactive_text_notebook.py` shows `wrap=True`, `translation=`, `notes=` and `render_gloss_sheet` (it runs from its first line to its last in `tests/test_examples_run.py`); its description in `examples/README.md`, the
+  `Makefile` and the hub page (en, ru, el) says so, and `docs/api-patterns.md` has the worked usage. The whole suite passes (1866 tests, with the browser tests), `ruff check` is clean; `uv.lock` names 1.26.0.
 
 ## 1.25.0 - 2026-10-28
 - New: `python -m eee_project.split_lesson NOTEBOOK.py` splits a multilingual lesson notebook into one notebook per UI language, so a translator can work in the notebook of one
