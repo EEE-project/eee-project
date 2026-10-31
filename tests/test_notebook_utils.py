@@ -3,6 +3,7 @@ import pytest
 
 import dataclasses
 import json
+import re
 from unittest.mock import patch, MagicMock
 
 import marimo as mo
@@ -5667,6 +5668,25 @@ class TestInteractiveText:
         rule = ".eee-itext.wrap{line-height:1.8}"
         w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), wrap=True, css=rule)
         assert w._css.index(".eee-itext.wrap{white-space:normal") < w._css.index(rule) < w._css.index(".gk-word.active")
+
+    def test_pale_highlights_bring_their_own_dark_text(self):
+        # the page's own text is light in a dark theme and would vanish on a pale background
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["a"])
+        for selector in (".eee-itext .gk-word.homer", ".eee-itext .gk-word.active", ".eee-tr .gk-note.active"):
+            rule = re.search(re.escape(selector) + r"\{([^}]*)\}", w._css).group(1)
+            assert "background:#" in rule and "color:#1d1d1b" in rule, selector
+
+    def test_light_dark_colours_sit_only_in_a_supports_block(self):
+        # an old browser drops `light-dark()` and must then keep the plain colours declared before it
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["a"])
+        guard = r"@supports \(color:light-dark\(#000,#fff\)\)\{\n.*?\n\}\n"
+        assert len(re.findall(guard, w._css, flags=re.S)) == 2
+        assert "light-dark(" not in re.sub(guard, "", w._css, flags=re.S)
+
+    def test_the_selected_note_rule_follows_the_dark_page_colours(self):
+        # equal specificity, so order decides: a hovered selected note keeps its navy underline
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["a"])
+        assert w._css.rindex("@supports") < w._css.index(".eee-tr .gk-note.active")
 
 
 class TestInteractiveTextEsm:

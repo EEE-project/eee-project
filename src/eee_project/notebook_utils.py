@@ -1540,12 +1540,18 @@ _ITEXT_CSS_BASE = """\
 .eee-itext .gk-word{cursor:pointer;border-bottom:1px dotted #7a7a7a;padding-bottom:0}
 .eee-itext .gk-word:hover{border-bottom-color:#003d82}
 .eee-itext .gk-word:focus{outline:2px solid #003d82;outline-offset:1px}
-.eee-itext .gk-word.homer{background:#f2ecd8}
+.eee-itext .gk-word.homer{background:#f2ecd8;color:#1d1d1b}
 .eee-itext.wrap{white-space:normal;flex-shrink:1;min-width:0;line-height:1.5}
 .eee-itext .eee-line{padding-left:1.1em;text-indent:-1.1em;text-wrap:balance}
+@supports (color:light-dark(#000,#fff)){
+.eee-itext .gk-word:hover{border-bottom-color:light-dark(#003d82,#9cc4f5)}
+.eee-itext .gk-word:focus{outline-color:light-dark(#003d82,#9cc4f5)}
+}
 """
 # Declared last, so the selected word beats every highlight class, including ones added via `css=`.
-_ITEXT_CSS_ACTIVE = ".eee-itext .gk-word.active{background:#dceeff;border-bottom:2px solid #003d82}\n"
+# The highlights are pale, so they bring their own dark text: in a dark theme the inherited text is light and
+# would disappear on them.
+_ITEXT_CSS_ACTIVE = ".eee-itext .gk-word.active{background:#dceeff;color:#1d1d1b;border-bottom:2px solid #003d82}\n"
 _ITEXT_CSS = _ITEXT_CSS_BASE + _ITEXT_CSS_ACTIVE
 # Only a widget made with a translation gets these rules (a container with inline-size containment has no
 # intrinsic width, which would collapse a nowrap widget in a row).
@@ -1560,7 +1566,13 @@ _ITEXT_CSS_TR = """\
 .eee-tr .gk-note{cursor:pointer;border-bottom:1px dotted var(--eee-note-color,#2b6cc4)}
 .eee-tr .gk-note:hover{border-bottom-color:#003d82}
 .eee-tr .gk-note:focus{outline:2px solid #003d82;outline-offset:1px}
-.eee-tr .gk-note.active{background:#dceeff;border-bottom:2px solid #003d82}
+@supports (color:light-dark(#000,#fff)){
+.eee-star{color:var(--eee-note-color,light-dark(#2b6cc4,#8ab8f0))}
+.eee-tr .gk-note{border-bottom-color:var(--eee-note-color,light-dark(#2b6cc4,#8ab8f0))}
+.eee-tr .gk-note:hover{border-bottom-color:light-dark(#003d82,#9cc4f5)}
+.eee-tr .gk-note:focus{outline-color:light-dark(#003d82,#9cc4f5)}
+}
+.eee-tr .gk-note.active{background:#dceeff;color:#1d1d1b;border-bottom:2px solid #003d82}
 """
 
 # Tokenizer/normalizer mirror norm_grc_surface (strip_diacritics + strip

@@ -3,7 +3,8 @@
 pytest cannot run the JavaScript inside the widget's `_esm` string, and the CSS that places the translation
 card and the word sheet only means something in a browser. This test runs the demo notebook
 (`examples/interactive_text_notebook.py`) with `marimo run`, opens it in Chromium at a phone width and at a
-wide width, and taps the words.
+wide width, taps the words, and does it once more in marimo's dark theme (the highlights are pale and the
+inherited text is light there).
 
 Run:
     uv run pytest tests/integration/test_interactive_text_browser.py -m integration -v
@@ -48,14 +49,18 @@ def _chromium():
     return None
 
 
-@pytest.fixture(scope="module")
-def base_url():
+@contextlib.contextmanager
+def _marimo(config_dir, theme):
+    """`marimo run` on the demo, with a marimo config of its own so the developer's settings cannot leak in."""
+    (config_dir / "marimo").mkdir()
+    (config_dir / "marimo" / "marimo.toml").write_text(f'[display]\ntheme = "{theme}"\n')
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
         port = s.getsockname()[1]
     proc = subprocess.Popen(
         [sys.executable, "-m", "marimo", "run", str(EXAMPLE), "--headless", "--host", "127.0.0.1", "--port", str(port)],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        env={**os.environ, "XDG_CONFIG_HOME": str(config_dir)},
     )
     url = f"http://127.0.0.1:{port}/"
     try:
@@ -71,6 +76,18 @@ def base_url():
     finally:
         proc.terminate()
         proc.wait(timeout=20)
+
+
+@pytest.fixture(scope="module")
+def base_url(tmp_path_factory):
+    with _marimo(tmp_path_factory.mktemp("marimo_light"), "light") as url:
+        yield url
+
+
+@pytest.fixture(scope="module")
+def dark_url(tmp_path_factory):
+    with _marimo(tmp_path_factory.mktemp("marimo_dark"), "dark") as url:
+        yield url
 
 
 @pytest.fixture(scope="module")
@@ -113,6 +130,49 @@ def _sheet(page):
             return {cls: el.className, position: cs.position, display: cs.display, text: el.innerText};
         }"""
     )
+
+
+def _luminance(rgb):
+    def channel(v):
+        v /= 255
+        return v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4
+
+    r, g, b = (channel(v) for v in rgb)
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def _contrast(a, b):
+    """WCAG contrast ratio of two [r, g, b] colours."""
+    hi, lo = sorted((_luminance(a), _luminance(b)), reverse=True)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+# every colour is read as [r, g, b] whatever notation the browser reports it in (rgb(), color(srgb ...))
+_RGB_JS = """
+    const g = document.createElement('canvas').getContext('2d');
+    const rgb = css => { g.fillStyle = '#000'; g.fillStyle = css; g.fillRect(0, 0, 1, 1); return [...g.getImageData(0, 0, 1, 1).data].slice(0, 3); };
+"""
+
+
+def _paint(locator):
+    """Text, background, outline and underline colour of one element, as computed by the browser."""
+    return locator.evaluate(
+        "el => {" + _RGB_JS + """
+            const cs = getComputedStyle(el);
+            return {color: rgb(cs.color), background: rgb(cs.backgroundColor), outline: rgb(cs.outlineColor),
+                    underline: rgb(cs.borderBottomColor)};
+        }"""
+    )
+
+
+def _page_background(page):
+    return page.evaluate("() => {" + _RGB_JS + " return rgb(getComputedStyle(document.body).backgroundColor); }")
+
+
+def _require_theme(page, dark):
+    """The theme comes from a config file of the test's own; a `~/.marimo.toml` of the developer would win over it."""
+    if (_luminance(_page_background(page)) < 0.1) != dark:
+        pytest.skip("marimo did not take the theme from the test's config")
 
 
 def test_wrap_mode_wraps_each_line_with_a_hanging_indent_and_fits_a_phone(browser, base_url):
@@ -204,3 +264,50 @@ def test_the_blank_translation_entry_removes_the_card(browser, base_url):
         _settle(page)
         assert page.locator(f"{STANZA} .eee-tr").count() == 0
         assert page.locator(".eee-itext.wrap .eee-line").count() == 2  # the poem stays, without the grid around it
+
+
+def test_in_a_dark_theme_the_chosen_word_and_note_stay_readable(browser, dark_url):
+    with _page(browser, dark_url, WIDE) as page:
+        _require_theme(page, dark=True)
+        page.locator(f"{STANZA} .gk-note").first.click()
+        _settle(page)
+        note = _paint(page.locator(f"{STANZA} .gk-note.active"))
+        assert _contrast(note["color"], note["background"]) >= 7
+        page.locator(f"{STANZA} .gk-word", has_text="ἔπερσεν").first.click()
+        _settle(page)
+        word = _paint(page.locator(f"{STANZA} .gk-word.active"))
+        assert _contrast(word["color"], word["background"]) >= 7
+
+
+def test_in_a_dark_theme_the_focus_ring_and_the_stars_show_against_the_page(browser, dark_url):
+    with _page(browser, dark_url, WIDE) as page:
+        _require_theme(page, dark=True)
+        page_background = _page_background(page)
+        word, note = page.locator(f"{STANZA} .gk-word").nth(1), page.locator(f"{STANZA} .gk-note").nth(1)
+        word.focus()
+        assert _contrast(_paint(word)["outline"], page_background) >= 3
+        note.focus()
+        assert _contrast(_paint(note)["outline"], page_background) >= 3
+        assert _contrast(_paint(page.locator(f"{STANZA} .eee-star").first)["color"], page_background) >= 3
+
+
+def test_in_a_light_theme_the_focus_ring_keeps_its_navy(browser, base_url):
+    with _page(browser, base_url, WIDE) as page:
+        _require_theme(page, dark=False)
+        word, note = page.locator(f"{STANZA} .gk-word").nth(1), page.locator(f"{STANZA} .gk-note").nth(1)
+        word.focus()
+        assert _paint(word)["outline"] == [0, 61, 130]
+        note.focus()
+        assert _paint(note)["outline"] == [0, 61, 130]
+        assert _paint(page.locator(f"{STANZA} .eee-star").first)["color"] == [43, 108, 196]
+
+
+def test_the_phone_sheet_takes_the_background_of_the_theme(browser, base_url, dark_url):
+    for url, dark in ((base_url, False), (dark_url, True)):
+        with _page(browser, url, PHONE) as page:
+            _require_theme(page, dark=dark)
+            page.locator(f"{STANZA} .gk-word", has_text="ἔπερσεν").first.click()
+            _settle(page)
+            sheet = _paint(page.locator(".eee-sheet").first)
+            assert (_luminance(sheet["background"]) < 0.1) == dark
+            assert _contrast(sheet["color"], sheet["background"]) >= 7

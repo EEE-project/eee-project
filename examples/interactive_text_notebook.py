@@ -38,7 +38,7 @@ def _(mo):
     text_widget = eee.interactive_text(
         mo, lines=LINES, clickable=CLICKABLE,
         word_classes={"verb": VERBS, "noun": NOUNS},
-        css=".eee-itext .gk-word.verb{background:#e3f0e3}",
+        css=".eee-itext .gk-word.verb{background:#e3f0e3;color:#1d1d1b}",
     )
     # a panel cell takes the *widget* and reads text_widget.widget.selected_word
     ```
@@ -233,9 +233,9 @@ def _():
     assert all(forms <= set(TOKENS) for forms in SETS.values()), "set forms must be normalized and occur in the text"
 
     STYLES = {
-        "verb": "background:#e3f0e3",
-        "noun": "background:#fff3c4",
-        "adjective": "background:#fce4ec",
+        "verb": "background:#e3f0e3;color:#1d1d1b",
+        "noun": "background:#fff3c4;color:#1d1d1b",
+        "adjective": "background:#fce4ec;color:#1d1d1b",
         "long": "border-bottom:2px solid #c0392b",
     }
     SAMPLE = {"verb": "ἔννεπε", "noun": "Τροίης", "adjective": "ἱερὸν", "long": "πτολίεθρον"}

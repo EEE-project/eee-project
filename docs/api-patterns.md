@@ -1682,12 +1682,20 @@ translation = eee.find_stanza_translation(stanza["ref"], translations[trans_sele
   eee.interactive_text(
       mo, lines=stanza["lines"], clickable=CLICKABLE_FORMS,
       word_classes={"homer": HOMER_WORDS, "lxx": LXX_WORDS},
-      css=".eee-itext .gk-word.lxx{background:#e3f0e3}",
+      css=".eee-itext .gk-word.lxx{background:#e3f0e3;color:#1d1d1b}",
   )
   ```
 
   Class names must be plain CSS identifiers; anything else, or the reserved
   `gk-word`/`active`, raises `ValueError` — also for a set that is empty.
+
+  **Dark theme.** The widget's own highlights (`.homer`, the selected word and
+  the selected note) are pale, so each carries dark text of its own; the page's
+  text is light in marimo's dark theme and would disappear on them. A `css=`
+  rule that sets a pale `background:` needs a `color:` for the same reason, as
+  in the example above. Where the browser knows `light-dark()`, the hover, focus
+  and star colours switch to lighter blues on a dark page (and stay as they were
+  on a light one).
 
   `wrap=True` (new in 1.26.0) is for a narrow screen. By default each line stays on one row
   (`white-space: nowrap`), so the widget cannot be narrower than its longest
