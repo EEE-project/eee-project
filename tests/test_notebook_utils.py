@@ -30,7 +30,6 @@ from eee_project.notebook_utils import (
     _PARA_ESM,
     _ITEXT_ESM,
     _ITEXT_CSS,
-    stanza_view,
     _UI_LABELS,
 )
 from conftest import (
@@ -5575,6 +5574,74 @@ class TestInteractiveText:
         assert ".eee-itext.wrap{white-space:normal" in _ITEXT_CSS
         assert ".eee-itext .eee-line{padding-left:1.1em;text-indent:-1.1em" in _ITEXT_CSS
 
+    def test_no_translation_means_no_card_no_notes_and_the_default_stylesheet(self):
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set())
+        assert w.translation_html == ""
+        assert w.notes == {}
+        assert w.selected_note == {}
+        assert w._css == _ITEXT_CSS
+
+    def test_translation_is_one_card_with_a_block_per_line_whatever_their_number(self):
+        # the translation need not have as many lines as the Greek
+        three = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["a", "b", "c"])
+        one = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["a"])
+        assert three.translation_html.count('class="eee-tr-line"') == 3
+        assert one.translation_html.count('class="eee-tr-line"') == 1
+        assert three.translation_html.count('class="eee-tr"') == 1
+
+    def test_translation_text_is_html_escaped(self):
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["<b>x</b> & y"],
+                             notes={0: [("<w>", "<m>")]})
+        assert "&lt;b&gt;x&lt;/b&gt; &amp; y" in w.translation_html
+        assert "<b>" not in w.translation_html
+        assert w.notes == {"0": [["<w>", "<m>"]]}  # data for the JS, not markup
+
+    def test_a_star_without_a_note_is_a_plain_coloured_star(self):
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["πολλοπάητον* άντραν"])
+        assert 'πολλοπάητον<span class="eee-star">*</span> άντραν' in w.translation_html
+        assert "gk-note" not in w.translation_html
+
+    def test_the_word_before_a_star_with_a_note_is_a_button(self):
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(),
+                             translation=["Μούσα", "τον πολλοπάητον* άντραν"],
+                             notes={1: [("πολλοπάητον", "παμπόνηρος")]})
+        assert ('<span class="gk-note" role="button" tabindex="0" data-i="1" data-k="0">'
+                'πολλοπάητον<span class="eee-star">*</span></span> άντραν') in w.translation_html
+        assert w.translation_html.count("gk-note") == 1
+
+    def test_the_kth_star_of_a_line_belongs_to_the_kth_note(self):
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["α* β γ* δ*"],
+                             notes={0: [("α", "1"), ("γ", "2")]})
+        html = w.translation_html
+        assert 'data-i="0" data-k="0">α<span' in html
+        assert 'data-i="0" data-k="1">γ<span' in html
+        assert "δ<span" in html and html.count("gk-note") == 2  # the third star has no note: plain
+
+    def test_a_note_of_a_line_that_does_not_exist_is_kept_but_linked_to_nothing(self):
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["a*"], notes={5: [("w", "m")]})
+        assert "gk-note" not in w.translation_html
+        assert w.notes == {"5": [["w", "m"]]}
+
+    def test_notes_are_not_printed_under_the_lines(self):
+        # a note is shown in the word panel after a tap, not in the card
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["a*"], notes={0: [("a", "meaning")]})
+        assert "meaning" not in w.translation_html
+
+    def test_translation_stylesheet_only_with_a_translation_and_between_base_and_callers_css(self):
+        rule = ".eee-itext.wrap{line-height:1.8}"
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["a"], css=rule)
+        assert w._css.index(".gk-word.homer") < w._css.index(".eee-stanza-wrap{container-type:inline-size}") \
+            < w._css.index(rule) < w._css.index(".eee-itext .gk-word.active")
+        assert w._css.rstrip().splitlines()[-1].startswith(".eee-itext .gk-word.active")
+        assert "eee-stanza" not in _ITEXT_CSS
+
+    def test_two_columns_threshold_is_a_container_query(self):
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["a"])
+        assert "@container (min-width: 600px)" in w._css
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["a"], two_columns_from_px=480)
+        assert "@container (min-width: 480px)" in w._css
+        assert "__PX__" not in w._css
+
     def test_wrap_rules_stay_before_a_callers_css(self):
         rule = ".eee-itext.wrap{line-height:1.8}"
         w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), wrap=True, css=rule)
@@ -5597,8 +5664,33 @@ class TestInteractiveTextEsm:
     def test_wrap_change_redraws(self):
         assert "model.on('change:wrap', draw)" in _ITEXT_ESM
 
+    def test_a_tap_on_a_note_selects_it_and_clears_the_greek_word(self):
+        note = _ITEXT_ESM.split("function activateNote", 1)[1].split("\n  }\n", 1)[0]
+        assert "model.set('selected_note', {" in note
+        assert "model.set('selected_word', '')" in note
+        assert "model.set('click_seq'" in note and "model.save_changes()" in note
+
+    def test_a_tap_on_a_greek_word_clears_the_selected_note(self):
+        word = _ITEXT_ESM.split("function activate(span)", 1)[1].split("\n  }\n", 1)[0]
+        assert "model.set('selected_note', {})" in word
+
+    def test_the_card_listens_for_clicks_and_keys_like_the_greek_words(self):
+        assert _ITEXT_ESM.count("trHost.addEventListener('click'") == 1
+        assert _ITEXT_ESM.count("trHost.addEventListener('keydown'") == 1
+        assert "closest('.gk-note')" in _ITEXT_ESM
+
+    def test_translation_redraws_on_change_and_marks_the_selected_note(self):
+        assert "model.on('change:translation_html', draw)" in _ITEXT_ESM
+        assert "model.on('change:notes', draw)" in _ITEXT_ESM
+        assert "classList.add('active')" in _ITEXT_ESM
+
+    def test_without_a_translation_the_greek_text_is_the_only_child(self):
+        # a container with inline-size containment has no intrinsic width: only a widget with a card gets one
+        assert "el.replaceChildren(container)" in _ITEXT_ESM
+        assert "el.replaceChildren(root)" in _ITEXT_ESM
+
     def test_delegates_single_click_listener(self):
-        assert _ITEXT_ESM.count("addEventListener('click'") == 1
+        assert _ITEXT_ESM.count("container.addEventListener('click'") == 1
         assert "closest('.gk-word')" in _ITEXT_ESM
 
     def test_keydown_handles_enter_and_space(self):
@@ -8337,63 +8429,6 @@ class TestTranslationPresenceForm:
         assert "correct" in str(result)
 
 
-# ──────────────────────────────── stanza_view (text + translation block) ──
-
-class _FakeTextWidget:
-    """Stands for the mo.ui.anywidget that interactive_text returns: str() is its markup."""
-    def __str__(self):
-        return "<WIDGET>"
-
-
-class TestStanzaView:
-    def _view(self, *args, **kw):
-        return str(stanza_view(_StubHtmlMo, _FakeTextWidget(), *args, **kw))
-
-    def test_returns_mo_html_holding_the_widget(self):
-        out = stanza_view(_StubHtmlMo, _FakeTextWidget())
-        assert isinstance(out, _StubHtmlMo.Html)
-        assert "<div><WIDGET></div>" in str(out)
-
-    def test_no_translation_means_no_card(self):
-        out = self._view(None)
-        assert 'class="eee-tr"' not in out
-        assert "eee-tr-line" not in out.split("</style>", 1)[1]
-
-    def test_card_has_a_block_per_line_whatever_their_number(self):
-        # the translation need not have as many lines as the Greek
-        assert self._view(["a", "b", "c"]).count('class="eee-tr-line"') == 3
-        assert self._view(["a"]).count('class="eee-tr-line"') == 1
-
-    def test_lines_are_html_escaped(self):
-        out = self._view(["<b>x</b> & y"])
-        assert "&lt;b&gt;x&lt;/b&gt; &amp; y" in out
-        assert "<b>x</b>" not in out
-
-    def test_asterisk_becomes_a_coloured_pointer(self):
-        out = self._view(["πολλοπάητον* άντραν"])
-        assert 'πολλοπάητον<span class="eee-star">*</span> άντραν' in out
-
-    def test_notes_stand_under_their_line_and_not_elsewhere(self):
-        out = self._view(["l0", "l1", "l2"], notes={1: [("w", "m"), ("w2", "m2")]})
-        body = out.split("</style>", 1)[1]
-        assert body.count('class="eee-tr-note"') == 1
-        assert body.index("l0") < body.index("l1") < body.index('class="eee-tr-note"') < body.index("l2")
-        assert '<span class="eee-star">*</span> w — m · <span class="eee-star">*</span> w2 — m2' in body
-
-    def test_notes_are_html_escaped(self):
-        out = self._view(["l0"], notes={0: [("<w>", "a & b")]})
-        assert "&lt;w&gt; — a &amp; b" in out
-
-    def test_notes_of_a_line_that_does_not_exist_are_ignored(self):
-        assert 'class="eee-tr-note"' not in self._view(["l0"], notes={5: [("w", "m")]}).split("</style>", 1)[1]
-
-    def test_two_columns_threshold_is_a_container_query(self):
-        out = self._view(["a"])
-        assert ".eee-stanza-wrap{container-type:inline-size}" in out
-        assert "@container (min-width: 600px)" in out
-        assert "@container (min-width: 480px)" in self._view(["a"], two_columns_from_px=480)
-
-
 # ──────────────────────────────── render_gloss_sheet (panel + table in one) ──
 
 class TestRenderGlossSheet:
@@ -8450,3 +8485,30 @@ class TestRenderGlossSheet:
     def test_the_sheet_label_exists_in_every_ui_language(self, gu_form):
         for lang in ("en", "ru", "el"):
             assert gu_form.ui_label("gloss_sheet_close", lang) != "gloss_sheet_close"
+            assert gu_form.ui_label("margin_note_label", lang) != "margin_note_label"
+
+    def test_a_margin_note_replaces_the_gloss_panel_and_the_table(self, gu_form):
+        tables, selector, panel = self._parts(gu_form)
+        out = str(gu_form.render_gloss_sheet(
+            panel, tables, selector, selected_word="", click_seq=1, lang="en",
+            note={"line": 0, "k": 0, "word": "πολλοπάητον", "meaning": "παμπόνηρος"},
+        ))
+        assert "<b>πολλοπάητον</b> — παμπόνηρος" in out
+        assert "Margin note" in out
+        assert "HOMER" not in out and "λόγος" not in out
+        assert 'class="eee-sheet on"' in out  # a sheet although no Greek word is chosen
+
+    def test_a_margin_note_is_html_escaped(self, gu_form):
+        out = str(gu_form.render_gloss_sheet("p", None, None, selected_word="",
+                                             note={"word": "<w>", "meaning": "a & b"}))
+        assert "<b>&lt;w&gt;</b> — a &amp; b" in out
+
+    def test_an_empty_note_shows_the_gloss_panel_as_before(self, gu_form):
+        for empty in (None, {}):
+            out = self._sheet(gu_form, note=empty)
+            assert "HOMER" in out and "eee-note-word\"" not in out.split("</style>", 1)[1]
+
+    def test_a_note_label_follows_the_language(self, gu_form):
+        note = {"word": "w", "meaning": "m"}
+        assert "Примечание на полях" in str(gu_form.render_gloss_sheet("p", None, None, selected_word="", note=note, lang="ru"))
+        assert "Σημείωση στο περιθώριο" in str(gu_form.render_gloss_sheet("p", None, None, selected_word="", note=note, lang="el"))

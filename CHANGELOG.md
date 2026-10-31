@@ -1,23 +1,28 @@
 # Changelog
 
-## 1.26.0 - 2026-10-30
+## 1.26.0 - 2026-10-31
 - New: `interactive_text(..., wrap=True)`. By default each line of the poem stays on one row (`white-space: nowrap`), so the widget cannot be narrower than its longest line. Put next to a translation on a phone (390 px wide), it was
   wider than the screen and pushed the translation out of sight. With `wrap=True` every line is its own block that wraps inside the box it gets, and its continuation rows are indented (a hanging indent), so a wrapped row cannot be
   taken for the next line of the poem. The default is unchanged: the new rules in the widget's stylesheet select classes that only a widget drawn with `wrap=True` has.
-- New: `stanza_view(mo, text_widget, translation_lines=None, *, notes=None, two_columns_from_px=600)`: the Greek text and the translation of a stanza as one block that fits any width. The translation is one card for the whole
-  stanza, not a line beside each Greek line, because a translator's lines need not match the Greek lines (the Σπανούδης verses of I.1-5 are 8 for 5 Greek lines; IX.29-33 has 2 for 5). The card stands beside the text when the box that
-  holds the view is at least `two_columns_from_px` wide (a container query: what counts is the width the notebook gives the view, not the window) and under it when narrower. `translation_lines=None` shows no translation, for a
-  translator dropdown with a blank entry (`mo.ui.dropdown(..., allow_select_none=True)`); `notes` puts a translator's margin notes under their lines, and an asterisk in a line is coloured so that it points to its note.
-- New: `GreekUtils.render_gloss_sheet(gloss_panel, period_tables, period_selector, *, selected_word, click_seq, lang, sheet_below_px=750)`: the gloss panel and the period table as one sheet. On a phone the table of a form sat far below
+- New: `interactive_text(..., translation=lines, notes=..., two_columns_from_px=600)` draws the translation of the stanza in the same widget, as one card for the whole stanza and not a line beside each Greek line, because a translator's
+  lines need not match the Greek lines (the Σπανούδης verses of I.1-5 are 8 for 5 Greek lines; IX.29-33 has 2 for 5). The card stands beside the Greek when the box that holds the widget is at least `two_columns_from_px` wide (a container
+  query: what counts is the width the notebook gives the widget, not the window) and under it when narrower. `translation=None` draws the Greek alone, for a translator dropdown with a blank entry
+  (`mo.ui.dropdown(..., allow_select_none=True)`). `notes={line_index: [(word, meaning), ...]}` are the translator's margin notes: a star in a line is coloured, and the word before a star that has a note is clickable like a Greek word.
+  A tap on it sets `.widget.selected_note` (`{"line", "k", "word", "meaning"}`), clears `selected_word`, and bumps `click_seq`; a tap on a Greek word clears `selected_note`, so there is one selection for the poem and its translation.
+  The note is not printed under its line; the word panel shows it. All translation text is escaped in Python, so `tests/` covers the card; the JS only inserts it and wires the taps. The stylesheet of the card is added only to a widget that has
+  a translation: a container with inline-size containment has no intrinsic width, which would collapse the default nowrap widget inside a row.
+- New: `GreekUtils.render_gloss_sheet(gloss_panel, period_tables, period_selector, *, selected_word, click_seq, lang, sheet_below_px=750, note=None)`: the gloss panel and the period table as one sheet. On a phone the table of a form sat far below
   the poem, so every tap was followed by a scroll. On a wide page the sheet is still a block under the text; on a narrower one it is fixed to the bottom of the screen once a word is chosen (at most 55% of its height, scrolling inside), with
   a close button that works with CSS only. The browser keeps a checkbox's state while marimo reruns a cell, so a sheet that was closed never opened again; the sheet's root tag now changes with every click, which makes a new element,
-  and a click on the same word opens it again too. The new UI label `gloss_sheet_close` (en, ru, el) names the close button. `render_gloss_selector` and `render_gloss_table` are unchanged; a lesson that uses the sheet shows nothing in
-  the cell of `render_gloss_selector` and calls `render_gloss_sheet` in the cell that took `period_selector` as a parameter.
-- Checked: 24 new tests (`wrap`: 4 in `TestInteractiveText` and 3 JS/CSS guards in `TestInteractiveTextEsm`; 9 in `TestStanzaView`; 8 in `TestRenderGlossSheet`), the whole suite passes (1844 tests), `ruff check` is clean. The JS inside the
-  widget is out of reach of pytest, so it was checked in a real browser: the Odyssey lesson `2026_06_01` of `created_with_eee`, changed to use the three new things, run with `marimo run` (marimo 0.25.2, anywidget 0.11.0) and driven by
-  Chromium at 390 x 844 and 830 x 700. At 390 the Greek lines wrap with a hanging indent and the card stands under them; at 830 the card stands beside them and the table under both. A tap on a word shows the sheet (fixed to the screen at 390, in
-  the page at 830); a pick in the period dropdown keeps the sheet and the dropdown's value; the close button hides the sheet and the next tap shows it again; the blank entry of the translator dropdown removes the card; Σπανούδης shows its
-  8 verses and 2 notes.
+  and a click on the same word opens it again too. With `note=text_widget.widget.selected_note` a tapped margin note is shown in the sheet (the word, its meaning, the label "Margin note") in place of the panel and the table. The new UI labels
+  `gloss_sheet_close` and `margin_note_label` (en, ru, el) name the close button and the note. `render_gloss_selector` and `render_gloss_table` are unchanged; a lesson that uses the sheet shows nothing in the cell of
+  `render_gloss_selector` and calls `render_gloss_sheet` in the cell that took `period_selector` as a parameter.
+- Checked: new tests for `wrap`, the translation card (escaping, stars, the k-th star to the k-th note, the stylesheet and its place in the cascade), the JS guards (a tap on a note, a tap on a Greek word, the listeners, the single child without a
+  translation) and `render_gloss_sheet` (the sheet, the note, the close label, the tag that changes with every click, the breakpoint); the whole suite passes (1854 tests), `ruff check` is clean. The JS inside the widget is out of reach of pytest, so it was checked in a
+  real browser: the Odyssey lesson `2026_06_01` of `created_with_eee`, changed to use the new things, run with `marimo run` (marimo 0.25.2, anywidget 0.11.0) and driven by Chromium at 390 x 844 and 830 x 700. At 390 the Greek lines wrap with a
+  hanging indent and the card stands under them; at 830 the card stands beside them and the table under both. A tap on a word shows the sheet (fixed to the screen at 390, in the page at 830); a pick in the period dropdown keeps the sheet and the
+  dropdown's value; the close button hides the sheet and the next tap shows it again; the blank entry of the translator dropdown removes the card; a tap on a starred word of Σπανούδης (8 verses, 2 notes in I.1-5) shows its note in the sheet and a
+  tap on a Greek word shows the gloss again.
 
 ## 1.25.0 - 2026-10-28
 - New: `python -m eee_project.split_lesson NOTEBOOK.py` splits a multilingual lesson notebook into one notebook per UI language, so a translator can work in the notebook of one

@@ -83,6 +83,7 @@ homer_lexicon_note	Слова из гомеровского лексикона, 
 eee_engine_accordion_label	О морфологическом движке EEE
 gloss_panel_empty	*Выберите слово в тексте, чтобы увидеть перевод и формы слов из гомеровскго лексикона…*
 gloss_sheet_close	Закрыть
+margin_note_label	Примечание на полях
 gloss_panel_era_caption	*Формы слова по эпохам — только простейшее морфологическое соответствие по леммам, смысл может меняться*
 period_selector_label	Период
 word_missing_in_paradigm	{word} — отсутствует в парадигме {lemma}

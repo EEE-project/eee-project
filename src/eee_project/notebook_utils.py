@@ -1547,6 +1547,21 @@ _ITEXT_CSS_BASE = """\
 # Declared last, so the selected word beats every highlight class, including ones added via `css=`.
 _ITEXT_CSS_ACTIVE = ".eee-itext .gk-word.active{background:#dceeff;border-bottom:2px solid #003d82}\n"
 _ITEXT_CSS = _ITEXT_CSS_BASE + _ITEXT_CSS_ACTIVE
+# Only a widget made with a translation gets these rules (a container with inline-size containment has no
+# intrinsic width, which would collapse a nowrap widget in a row).
+_ITEXT_CSS_TR = """\
+.eee-stanza-wrap{container-type:inline-size}
+.eee-stanza{display:grid;grid-template-columns:minmax(0,1fr);gap:1.2em;align-items:start}
+@container (min-width: __PX__px){.eee-stanza{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr)}}
+.eee-tr{border:1px solid rgba(127,127,127,.45);border-radius:10px;background:rgba(127,127,127,.08);padding:.75em .9em;line-height:1.5}
+.eee-tr-line{padding-left:1.1em;text-indent:-1.1em}
+.eee-tr-line + .eee-tr-line{margin-top:.2em}
+.eee-star{color:var(--eee-note-color,#2b6cc4);font-weight:700}
+.eee-tr .gk-note{cursor:pointer;border-bottom:1px dotted var(--eee-note-color,#2b6cc4)}
+.eee-tr .gk-note:hover{border-bottom-color:#003d82}
+.eee-tr .gk-note:focus{outline:2px solid #003d82;outline-offset:1px}
+.eee-tr .gk-note.active{background:#dceeff;border-bottom:2px solid #003d82}
+"""
 
 # Tokenizer/normalizer mirror norm_grc_surface (strip_diacritics + strip
 # "',.··᾽᾿ʼ", including both the middle dot U+00B7 and Greek ano teleia
@@ -1593,6 +1608,16 @@ function escapeHtml(s) {
 function render({ model, el }) {
   const container = document.createElement('div');
   container.className = 'eee-itext';
+  // With a translation the Greek text and the translation card sit in one grid (root); without one
+  // the Greek text is the only child of el, as it always was.
+  const root = document.createElement('div');
+  root.className = 'eee-stanza-wrap';
+  const grid = document.createElement('div');
+  grid.className = 'eee-stanza';
+  const trHost = document.createElement('div');
+  grid.appendChild(container);
+  grid.appendChild(trHost);
+  root.appendChild(grid);
 
   function draw() {
     const lines = model.get('lines') || [];
@@ -1630,10 +1655,41 @@ function render({ model, el }) {
     container.innerHTML = wrap
       ? lineHtml.map(l => '<div class="eee-line">' + (l || '&nbsp;') + '</div>').join('')
       : lineHtml.join('<br>');
+
+    // translation_html is built (and escaped) by Python; a starred word that has a margin note is a
+    // .gk-note span with the line (data-i) and the number of its star in the line (data-k).
+    const trHtml = model.get('translation_html') || '';
+    if (trHtml) {
+      trHost.innerHTML = trHtml;
+      const sn = model.get('selected_note') || {};
+      if (sn.word !== undefined) {
+        const sp = trHost.querySelector('.gk-note[data-i="' + sn.line + '"][data-k="' + sn.k + '"]');
+        if (sp) sp.classList.add('active');
+      }
+      if (container.parentNode !== grid) grid.insertBefore(container, trHost);
+      if (el.firstChild !== root) el.replaceChildren(root);
+    } else {
+      trHost.innerHTML = '';
+      if (el.firstChild !== container) el.replaceChildren(container);
+    }
   }
 
   function activate(span) {
     model.set('selected_word', span.dataset.w);
+    model.set('selected_note', {});
+    model.set('click_seq', (model.get('click_seq') || 0) + 1);
+    model.save_changes();
+    draw();
+  }
+
+  // A tap on a starred word of the translation selects its margin note and, so that the panel shows
+  // one thing at a time, clears the selected Greek word (a tap on a Greek word clears the note).
+  function activateNote(span) {
+    const i = span.dataset.i, k = Number(span.dataset.k);
+    const note = ((model.get('notes') || {})[i] || [])[k];
+    if (!note) return;
+    model.set('selected_note', { line: Number(i), k: k, word: note[0], meaning: note[1] });
+    model.set('selected_word', '');
     model.set('click_seq', (model.get('click_seq') || 0) + 1);
     model.save_changes();
     draw();
@@ -1650,6 +1706,17 @@ function render({ model, el }) {
     e.preventDefault();
     activate(span);
   });
+  trHost.addEventListener('click', e => {
+    const span = e.target.closest('.gk-note');
+    if (span) activateNote(span);
+  });
+  trHost.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const span = e.target.closest('.gk-note');
+    if (!span) return;
+    e.preventDefault();
+    activateNote(span);
+  });
 
   // Python swapping lines/clickable/word_classes/show_ictus/ictus_html must
   // redraw so the new content (and the persisted .active highlight) render.
@@ -1662,9 +1729,10 @@ function render({ model, el }) {
   model.on('change:show_ictus', draw);
   model.on('change:ictus_html', draw);
   model.on('change:wrap', draw);
+  model.on('change:translation_html', draw);
+  model.on('change:notes', draw);
 
   draw();
-  el.appendChild(container);
 }
 export default { render };
 """
@@ -1684,11 +1752,42 @@ if _ANYWIDGET_OK:
         ictus_html = _traitlets.Dict().tag(sync=True)
         show_ictus = _traitlets.Bool(True).tag(sync=True)
         wrap = _traitlets.Bool(False).tag(sync=True)
+        translation_html = _traitlets.Unicode("").tag(sync=True)
+        notes = _traitlets.Dict().tag(sync=True)
+        selected_note = _traitlets.Dict().tag(sync=True)
         selected_word = _traitlets.Unicode("").tag(sync=True)
         click_seq = _traitlets.Int(0).tag(sync=True)
 
 
-def interactive_text(mo, *, lines, clickable, homer_words=None, word_classes=None, css=None, ictus_html=None, show_ictus=True, wrap=False) -> Any:
+def _translation_card_html(lines, notes) -> str:
+    """The translation card of :func:`interactive_text`: one block per line, all text HTML-escaped. A star
+    (``*``) in a line is coloured; the word before it is a button (``.gk-note``) when the line has a note for
+    that star -- the k-th star of line i belongs to the k-th note of line i."""
+    def esc(text):
+        return _html.escape(str(text), quote=False)
+
+    star = '<span class="eee-star">*</span>'
+    rows = []
+    for i, line in enumerate(lines):
+        line = str(line)
+        line_notes = notes.get(i) or []
+        out, pos, k = [], 0, 0
+        for m in re.finditer(r"([^\s*]+)\*", line):
+            out.append(esc(line[pos:m.start()]).replace("*", star))
+            word = esc(m.group(1))
+            if k < len(line_notes):
+                out.append(f'<span class="gk-note" role="button" tabindex="0" data-i="{i}" data-k="{k}">{word}{star}</span>')
+            else:
+                out.append(word + star)
+            k += 1
+            pos = m.end()
+        out.append(esc(line[pos:]).replace("*", star))
+        rows.append(f'<div class="eee-tr-line">{"".join(out)}</div>')
+    return f'<div class="eee-tr">{"".join(rows)}</div>'
+
+
+def interactive_text(mo, *, lines, clickable, homer_words=None, word_classes=None, css=None, ictus_html=None, show_ictus=True, wrap=False,
+                     translation=None, notes=None, two_columns_from_px: int = 600) -> Any:
     """Render poem `lines` with vocabulary words as permanent clickable spans.
 
     Returns the real ``mo.ui.anywidget`` — a panel cell must reference
@@ -1735,6 +1834,24 @@ def interactive_text(mo, *, lines, clickable, homer_words=None, word_classes=Non
     fits a narrow screen. The default (false) keeps each line on one row
     (``white-space: nowrap``), as in a wide two-column layout; the widget
     then cannot shrink below its longest line.
+
+    ``translation``: optional list of the translator's lines for the whole
+    stanza; their number need not equal the number of Greek lines (a free verse
+    translation, a prose translation). The widget then draws the Greek text and
+    the translation as one block: beside each other when the box that holds the
+    widget is at least ``two_columns_from_px`` wide (a container query: what
+    counts is the width the notebook gives the widget, not the window), the
+    translation under the Greek when it is narrower. ``None`` (the default)
+    draws the Greek text alone. Use it with ``wrap=True``.
+
+    ``notes``: the translator's margin notes, ``{line_index: [(word, meaning), ...]}``
+    (needs ``translation``). A star in a translation line is coloured; when the
+    line has a note for it, the word before the star is clickable like a Greek
+    word. A tap on it sets ``.widget.selected_note`` to
+    ``{"line": i, "k": k, "word": ..., "meaning": ...}`` and clears
+    ``selected_word`` (a tap on a Greek word clears ``selected_note``), and
+    bumps ``click_seq``. The k-th star of a line belongs to the k-th note of
+    that line. All translation text is HTML-escaped.
     """
     if not _ANYWIDGET_OK:
         raise ImportError("anywidget is required for interactive_text")
@@ -1742,7 +1859,10 @@ def interactive_text(mo, *, lines, clickable, homer_words=None, word_classes=Non
         if name in _ITEXT_RESERVED_CLASSES or not _ITEXT_CLASS_RE.fullmatch(name):
             raise ValueError(f"invalid word_classes key {name!r}")
     w = _InteractiveTextWidget()
-    if css:
+    if translation is not None:
+        w._css = (_ITEXT_CSS_BASE + _ITEXT_CSS_TR.replace("__PX__", str(int(two_columns_from_px)))
+                  + (css + "\n" if css else "") + _ITEXT_CSS_ACTIVE)
+    elif css:
         w._css = _ITEXT_CSS_BASE + css + "\n" + _ITEXT_CSS_ACTIVE
     w.lines = list(lines)
     w.clickable = list(clickable)
@@ -1750,27 +1870,19 @@ def interactive_text(mo, *, lines, clickable, homer_words=None, word_classes=Non
     w.ictus_html = dict(ictus_html) if ictus_html else {}
     w.show_ictus = bool(show_ictus)
     w.wrap = bool(wrap)
+    if translation is not None:
+        by_line = {int(i): [(str(word), str(meaning)) for word, meaning in lst] for i, lst in (notes or {}).items()}
+        w.translation_html = _translation_card_html(list(translation), by_line)
+        w.notes = {str(i): [[word, meaning] for word, meaning in lst] for i, lst in by_line.items()}
     return mo.ui.anywidget(w)
-
-
-_STANZA_CSS = """\
-<style>
-.eee-stanza-wrap{container-type:inline-size}
-.eee-stanza{display:grid;grid-template-columns:minmax(0,1fr);gap:1.2em;align-items:start}
-@container (min-width: __PX__px){.eee-stanza{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr)}}
-.eee-tr{border:1px solid rgba(127,127,127,.45);border-radius:10px;background:rgba(127,127,127,.08);padding:.75em .9em}
-.eee-tr-line{padding-left:1.1em;text-indent:-1.1em}
-.eee-tr-line + .eee-tr-line,.eee-tr-note + .eee-tr-line{margin-top:.2em}
-.eee-tr-note{padding-left:1.1em;font-size:.88em;opacity:.8}
-.eee-star{color:#003d82;font-weight:700}
-.dark .eee-star{color:#8ab4ff}
-</style>"""
 
 
 _GLOSS_SHEET_CSS = """\
 <style>
 .eee-sheet{margin-top:1em}
 .eee-sheet-table{margin-top:1.5em}
+.eee-note-word{font-size:1.15em}
+.eee-note-src{opacity:.7;font-size:.85em;margin-top:.3em}
 .eee-sheet-x{position:absolute;opacity:0;width:1px;height:1px}
 .eee-sheet-close{display:none}
 @media (max-width: __PX__px){
@@ -1780,47 +1892,6 @@ _GLOSS_SHEET_CSS = """\
 .eee-sheet.on:has(.eee-sheet-x:checked){display:none}
 }
 </style>"""
-
-
-def stanza_view(mo, text_widget, translation_lines=None, *, notes=None, two_columns_from_px: int = 600) -> Any:
-    """A stanza's Greek text and its translation as one block that fits any screen width.
-
-    *text_widget* is the result of :func:`interactive_text` (build it with
-    ``wrap=True``). *translation_lines* is the translator's text for the whole
-    stanza, a list of lines; its number of lines need not equal the number of
-    Greek lines (a free verse translation, a prose translation). ``None`` shows
-    no translation: pass it when the reader chose the blank entry of the
-    translation dropdown. *notes* is the translator's margin notes,
-    ``{line_index: [(word, meaning), ...]}``: each note is shown under the line it
-    belongs to, and an asterisk in a line is coloured so that it points to its note.
-
-    The translation sits in a card. When the box that holds the view is at
-    least *two_columns_from_px* wide (a container query, so the page width does
-    not matter, only the width the notebook gives the view) the card stands
-    beside the Greek; below that it stands under it. All text is HTML-escaped.
-    """
-    def esc(text):
-        return _html.escape(str(text), quote=False)
-
-    def star(text):
-        return esc(text).replace("*", '<span class="eee-star">*</span>')
-
-    card = ""
-    if translation_lines is not None:
-        notes = notes or {}
-        rows = []
-        for i, line in enumerate(translation_lines):
-            rows.append(f'<div class="eee-tr-line">{star(line)}</div>')
-            if notes.get(i):
-                items = " · ".join(
-                    f'<span class="eee-star">*</span> {esc(word)} — {esc(meaning)}' for word, meaning in notes[i]
-                )
-                rows.append(f'<div class="eee-tr-note">{items}</div>')
-        card = f'<div class="eee-tr">{"".join(rows)}</div>'
-    css = _STANZA_CSS.replace("__PX__", str(int(two_columns_from_px)))
-    return mo.Html(
-        f'{css}<div class="eee-stanza-wrap"><div class="eee-stanza"><div>{text_widget}</div>{card}</div></div>'
-    )
 
 
 # ════════════════════════════════════════════════════ greek configs ══
@@ -3603,7 +3674,7 @@ class GreekUtils:
 
     def render_gloss_sheet(self, gloss_panel: Any, period_tables: "list | None", period_selector: Any, *,
                             selected_word: str, click_seq: int = 0, lang: str = "ru",
-                            sheet_below_px: int = 750) -> Any:
+                            sheet_below_px: int = 750, note: "dict | None" = None) -> Any:
         """The gloss panel and its period table as ONE sheet -- the cell that shows them.
 
         Call it from a cell that takes *period_selector* as a parameter (like
@@ -3623,6 +3694,13 @@ class GreekUtils:
         the table is in view without scrolling. A close button hides it with CSS only;
         choosing a word again, also the same word (*click_seq* changes on every
         click), shows it again.
+
+        *note* is ``text_widget.widget.selected_note`` of an :func:`interactive_text`
+        made with a translation and its margin notes: when a starred word of the
+        translation was tapped it holds ``{"word": ..., "meaning": ...}``, and the
+        sheet then shows that note (the word, its meaning and the label
+        ``margin_note_label``) in place of the gloss panel and the table. An empty
+        dict or ``None`` shows the gloss panel as before.
         """
         table = self.render_gloss_table(period_tables, period_selector)
         # The browser keeps the state of a checkbox while a cell reruns, so the sheet root
@@ -3630,12 +3708,20 @@ class GreekUtils:
         tag = "section" if click_seq % 2 else "div"
         css = _GLOSS_SHEET_CSS.replace("__PX__", str(int(sheet_below_px) - 1))
         close = self.ui_label('gloss_sheet_close', lang)
-        body = f'<div class="eee-sheet-table">{table}</div>' if table is not None else ""
+        if note:
+            word = _html.escape(str(note.get("word", "")), quote=False)
+            meaning = _html.escape(str(note.get("meaning", "")), quote=False)
+            label = _html.escape(self.ui_label("margin_note_label", lang), quote=False)
+            inner = (f'<div class="eee-note"><div class="eee-note-word"><b>{word}</b> — {meaning}</div>'
+                     f'<div class="eee-note-src">{label}</div></div>')
+        else:
+            body = f'<div class="eee-sheet-table">{table}</div>' if table is not None else ""
+            inner = f"{gloss_panel}{body}"
         return self._mo.Html(
-            f'{css}<{tag} class="eee-sheet{" on" if selected_word else ""}">'
+            f'{css}<{tag} class="eee-sheet{" on" if (selected_word or note) else ""}">'
             f'<input type="checkbox" id="eee-sheet-x" class="eee-sheet-x" aria-label="{_html.escape(close)}">'
             f'<label for="eee-sheet-x" class="eee-sheet-close" aria-hidden="true">×</label>'
-            f"{gloss_panel}{body}</{tag}>"
+            f"{inner}</{tag}>"
         )
 
     @staticmethod
