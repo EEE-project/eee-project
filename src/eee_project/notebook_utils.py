@@ -49,6 +49,7 @@ from __future__ import annotations
 
 import csv
 import functools
+import html as _html
 import io
 import random as _random
 import re
@@ -82,6 +83,8 @@ from eee_project.content import (
     strip_comment_lines as strip_comment_lines, greek_compare as greek_compare,
     _load_tense_labels as _load_tense_labels, _load_ui_labels as _load_ui_labels,
     _UI_LABELS as _UI_LABELS, _UI_LANGS as _UI_LANGS, _ui_label as _ui_label,
+    _translator_display_name as _translator_display_name,
+    _without_note_stars as _without_note_stars,
     _LANGUAGE_OPTIONS as _LANGUAGE_OPTIONS,
     _lang_map as _lang_map, setup_ancient_greek as setup_ancient_greek,
     _GRC_NL as _GRC_NL, _GRC_DL as _GRC_DL, _GRC_TCOL as _GRC_TCOL,
@@ -1539,11 +1542,36 @@ _ITEXT_CSS_BASE = """\
 .eee-itext .gk-word{cursor:pointer;border-bottom:1px dotted #7a7a7a;padding-bottom:0}
 .eee-itext .gk-word:hover{border-bottom-color:#003d82}
 .eee-itext .gk-word:focus{outline:2px solid #003d82;outline-offset:1px}
-.eee-itext .gk-word.homer{background:#f2ecd8}
+.eee-itext .gk-word.homer{background:#f2ecd8;color:#1d1d1b}
+.eee-itext.wrap{white-space:normal;flex-shrink:1;min-width:0;line-height:1.5}
+.eee-itext .eee-line{padding-left:1.1em;text-indent:-1.1em;text-wrap:balance}
+@supports (color:light-dark(#000,#fff)){
+.eee-itext .gk-word:hover{border-bottom-color:light-dark(#003d82,#9cc4f5)}
+.eee-itext .gk-word:focus{outline-color:light-dark(#003d82,#9cc4f5)}
+}
 """
 # Declared last, so the selected word beats every highlight class, including ones added via `css=`.
-_ITEXT_CSS_ACTIVE = ".eee-itext .gk-word.active{background:#dceeff;border-bottom:2px solid #003d82}\n"
+# Pale highlights carry dark text: the inherited text is light in a dark theme.
+_ITEXT_CSS_ACTIVE = ".eee-itext .gk-word.active{background:#dceeff;color:#1d1d1b;border-bottom:2px solid #003d82}\n"
 _ITEXT_CSS = _ITEXT_CSS_BASE + _ITEXT_CSS_ACTIVE
+# Only a widget with a translation gets these: inline-size containment would collapse a nowrap widget in a row.
+_ITEXT_CSS_TR = """\
+.eee-stanza-wrap{container-type:inline-size}
+.eee-stanza{display:grid;grid-template-columns:minmax(0,1fr);gap:1.2em;align-items:start}
+@container (min-width: __PX__px){.eee-stanza{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr)}}
+.eee-tr{border:1px solid rgba(127,127,127,.45);border-radius:10px;background:rgba(127,127,127,.08);padding:.75em .9em;line-height:1.5}
+.eee-tr-line{padding-left:1.1em;text-indent:-1.1em}
+.eee-tr-line + .eee-tr-line{margin-top:.2em}
+.eee-tr .gk-note{cursor:pointer;color:var(--eee-note-color,#2b6cc4);border-bottom:1px dotted var(--eee-note-color,#2b6cc4)}
+.eee-tr .gk-note:hover{border-bottom-color:#003d82}
+.eee-tr .gk-note:focus{outline:2px solid #003d82;outline-offset:1px}
+@supports (color:light-dark(#000,#fff)){
+.eee-tr .gk-note{color:var(--eee-note-color,light-dark(#2b6cc4,#8ab8f0));border-bottom-color:var(--eee-note-color,light-dark(#2b6cc4,#8ab8f0))}
+.eee-tr .gk-note:hover{border-bottom-color:light-dark(#003d82,#9cc4f5)}
+.eee-tr .gk-note:focus{outline-color:light-dark(#003d82,#9cc4f5)}
+}
+.eee-tr .gk-note.active{background:#dceeff;color:#1d1d1b;border-bottom:2px solid #003d82}
+"""
 
 # Tokenizer/normalizer mirror norm_grc_surface (strip_diacritics + strip
 # "',.··᾽᾿ʼ", including both the middle dot U+00B7 and Greek ano teleia
@@ -1588,8 +1616,27 @@ function escapeHtml(s) {
 }
 
 function render({ model, el }) {
+  // marimo can replace the adopted style sheets of the shadow root after the widget has added its own: keep the rules in a <style> too.
+  const shadow = el.getRootNode();
+  if (shadow instanceof ShadowRoot) {
+    const style = shadow.querySelector('style[data-eee-itext]') || shadow.appendChild(document.createElement('style'));
+    style.setAttribute('data-eee-itext', '');
+    const applyCss = () => { style.textContent = model.get('_css') || ''; };
+    applyCss();
+    model.on('change:_css', applyCss);
+  }
+
   const container = document.createElement('div');
   container.className = 'eee-itext';
+  // With a translation, text and card sit in one grid (root); without one, the text is el's only child.
+  const root = document.createElement('div');
+  root.className = 'eee-stanza-wrap';
+  const grid = document.createElement('div');
+  grid.className = 'eee-stanza';
+  const trHost = document.createElement('div');
+  grid.appendChild(container);
+  grid.appendChild(trHost);
+  root.appendChild(grid);
 
   function draw() {
     const lines = model.get('lines') || [];
@@ -1599,6 +1646,8 @@ function render({ model, el }) {
     const showIctus = model.get('show_ictus');
     const ictusHtml = model.get('ictus_html') || {};
     const selected = model.get('selected_word') || '';
+    const wrap = !!model.get('wrap');
+    container.className = wrap ? 'eee-itext wrap' : 'eee-itext';
 
     const lineHtml = lines.map(line => {
       // ictusHtml values are trusted, internally-authored markup (e.g. <b>
@@ -1620,11 +1669,43 @@ function render({ model, el }) {
       return parts.join(' ');
     });
 
-    container.innerHTML = lineHtml.join('<br>');
+    // wrap: one block per line (hanging indent); otherwise one nowrap run separated by <br>.
+    container.innerHTML = wrap
+      ? lineHtml.map(l => '<div class="eee-line">' + (l || '&nbsp;') + '</div>').join('')
+      : lineHtml.join('<br>');
+
+    // translation_html comes escaped from Python; a word with a note is a .gk-note span (data-i line, data-k number of its star in the text).
+    const trHtml = model.get('translation_html') || '';
+    if (trHtml) {
+      trHost.innerHTML = trHtml;
+      const sn = model.get('selected_note') || {};
+      if (sn.word !== undefined) {
+        const sp = trHost.querySelector('.gk-note[data-i="' + sn.line + '"][data-k="' + sn.k + '"]');
+        if (sp) sp.classList.add('active');
+      }
+      if (container.parentNode !== grid) grid.insertBefore(container, trHost);
+      if (el.firstChild !== root) el.replaceChildren(root);
+    } else {
+      trHost.innerHTML = '';
+      if (el.firstChild !== container) el.replaceChildren(container);
+    }
   }
 
   function activate(span) {
     model.set('selected_word', span.dataset.w);
+    model.set('selected_note', {});
+    model.set('click_seq', (model.get('click_seq') || 0) + 1);
+    model.save_changes();
+    draw();
+  }
+
+  // A tap on a word with a note selects its note and clears the Greek word: the panel shows one thing at a time.
+  function activateNote(span) {
+    const i = span.dataset.i, k = Number(span.dataset.k);
+    const note = ((model.get('notes') || {})[i] || [])[k];
+    if (!note) return;
+    model.set('selected_note', { line: Number(i), k: k, word: note[0], meaning: note[1] });
+    model.set('selected_word', '');
     model.set('click_seq', (model.get('click_seq') || 0) + 1);
     model.save_changes();
     draw();
@@ -1641,6 +1722,17 @@ function render({ model, el }) {
     e.preventDefault();
     activate(span);
   });
+  trHost.addEventListener('click', e => {
+    const span = e.target.closest('.gk-note');
+    if (span) activateNote(span);
+  });
+  trHost.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const span = e.target.closest('.gk-note');
+    if (!span) return;
+    e.preventDefault();
+    activateNote(span);
+  });
 
   // Python swapping lines/clickable/word_classes/show_ictus/ictus_html must
   // redraw so the new content (and the persisted .active highlight) render.
@@ -1652,9 +1744,11 @@ function render({ model, el }) {
   model.on('change:word_classes', draw);
   model.on('change:show_ictus', draw);
   model.on('change:ictus_html', draw);
+  model.on('change:wrap', draw);
+  model.on('change:translation_html', draw);
+  model.on('change:notes', draw);
 
   draw();
-  el.appendChild(container);
 }
 export default { render };
 """
@@ -1673,11 +1767,47 @@ if _ANYWIDGET_OK:
         word_classes = _traitlets.Dict(value_trait=_traitlets.List(_traitlets.Unicode())).tag(sync=True)
         ictus_html = _traitlets.Dict().tag(sync=True)
         show_ictus = _traitlets.Bool(True).tag(sync=True)
+        wrap = _traitlets.Bool(False).tag(sync=True)
+        translation_html = _traitlets.Unicode("").tag(sync=True)
+        notes = _traitlets.Dict().tag(sync=True)
+        selected_note = _traitlets.Dict().tag(sync=True)
         selected_word = _traitlets.Unicode("").tag(sync=True)
         click_seq = _traitlets.Int(0).tag(sync=True)
 
 
-def interactive_text(mo, *, lines, clickable, homer_words=None, word_classes=None, css=None, ictus_html=None, show_ictus=True) -> Any:
+def _esc(text) -> str:
+    return _html.escape(str(text), quote=False)
+
+
+def _note_star_chunks(line: str):
+    """Split a translation line at its margin-note stars: ``(text, k)`` pairs, ``k`` None for plain text, else the 0-based number of the star that ends the word ``text``."""
+    pos, k = 0, 0
+    for m in re.finditer(r"([^\s*]+)\*", line):
+        yield line[pos:m.start()], None
+        yield m.group(1), k
+        k += 1
+        pos = m.end()
+    yield line[pos:], None
+
+
+def _translation_card_html(lines, notes) -> str:
+    """Escaped HTML of the translation card: no star is drawn; the word before the k-th star of line i is a button if line i has a k-th note."""
+    rows = []
+    for i, line in enumerate(lines):
+        line_notes = notes.get(i) or []
+        out = []
+        for text, k in _note_star_chunks(str(line)):
+            word = _esc(_without_note_stars(text))
+            if k is not None and k < len(line_notes):
+                out.append(f'<span class="gk-note" role="button" tabindex="0" data-i="{i}" data-k="{k}">{word}</span>')
+            else:
+                out.append(word)
+        rows.append(f'<div class="eee-tr-line">{"".join(out)}</div>')
+    return f'<div class="eee-tr">{"".join(rows)}</div>'
+
+
+def interactive_text(mo, *, lines, clickable, homer_words=None, word_classes=None, css=None, ictus_html=None, show_ictus=True, wrap=False,
+                     translation=None, notes=None, two_columns_from_px: int = 600) -> Any:
     """Render poem `lines` with vocabulary words as permanent clickable spans.
 
     Returns the real ``mo.ui.anywidget`` — a panel cell must reference
@@ -1714,10 +1844,35 @@ def interactive_text(mo, *, lines, clickable, homer_words=None, word_classes=Non
     selected-word rule (so a clicked word still stands out). A ``<style>``
     emitted by another cell cannot reach the widget (marimo mounts anywidgets
     in a shadow root), so the rules for ``word_classes`` sets go here, e.g.
-    ``css=".eee-itext .gk-word.lxx{background:#e3f0e3}"``.
+    ``css=".eee-itext .gk-word.lxx{background:#e3f0e3;color:#1d1d1b}"`` (a pale
+    ``background:`` needs a ``color:`` too: the page's text is light in a dark theme).
 
     ``ictus_html``: optional ``{raw_line: html_with_markup}`` map; shown per
     line when ``show_ictus`` is true, else the plain line text.
+
+    ``wrap``: when true, every line is its own block that wraps inside its
+    box and indents the continuation lines (a hanging indent), so the poem
+    fits a narrow screen. The default (false) keeps each line on one row
+    (``white-space: nowrap``), as in a wide two-column layout; the widget
+    then cannot shrink below its longest line.
+
+    ``translation``: optional list of the translator's lines for the whole
+    stanza; their number need not equal the number of Greek lines (a free verse
+    translation, a prose translation). The widget then draws the Greek text and
+    the translation as one block: beside each other when the box that holds the
+    widget is at least ``two_columns_from_px`` wide (a container query: what
+    counts is the width the notebook gives the widget, not the window), the
+    translation under the Greek when it is narrower. ``None`` (the default)
+    draws the Greek text alone. Use it with ``wrap=True``.
+
+    ``notes``: the translator's margin notes, ``{line_index: [(word, meaning), ...]}``
+    (needs ``translation``). The star of a translation line is not drawn; when the
+    line has a note for it, the word before the star is a link (in a link's colour,
+    with a dotted underline) that is clickable like a Greek word. A tap on it sets ``.widget.selected_note`` to
+    ``{"line": i, "k": k, "word": ..., "meaning": ...}`` and clears
+    ``selected_word`` (a tap on a Greek word clears ``selected_note``), and
+    bumps ``click_seq``. The k-th star of a line belongs to the k-th note of
+    that line. All translation text is HTML-escaped.
     """
     if not _ANYWIDGET_OK:
         raise ImportError("anywidget is required for interactive_text")
@@ -1725,14 +1880,39 @@ def interactive_text(mo, *, lines, clickable, homer_words=None, word_classes=Non
         if name in _ITEXT_RESERVED_CLASSES or not _ITEXT_CLASS_RE.fullmatch(name):
             raise ValueError(f"invalid word_classes key {name!r}")
     w = _InteractiveTextWidget()
+    extra = _ITEXT_CSS_TR.replace("__PX__", str(int(two_columns_from_px))) if translation is not None else ""
     if css:
-        w._css = _ITEXT_CSS_BASE + css + "\n" + _ITEXT_CSS_ACTIVE
+        extra += css + "\n"
+    if extra:
+        w._css = _ITEXT_CSS_BASE + extra + _ITEXT_CSS_ACTIVE
     w.lines = list(lines)
     w.clickable = list(clickable)
     w.word_classes = {name: list(forms) for name, forms in {"homer": homer_words, **(word_classes or {})}.items() if forms}
     w.ictus_html = dict(ictus_html) if ictus_html else {}
     w.show_ictus = bool(show_ictus)
+    w.wrap = bool(wrap)
+    if translation is not None:
+        by_line = {int(i): [(str(word), str(meaning)) for word, meaning in lst] for i, lst in (notes or {}).items()}
+        w.translation_html = _translation_card_html(list(translation), by_line)
+        w.notes = {str(i): [[word, meaning] for word, meaning in lst] for i, lst in by_line.items()}
     return mo.ui.anywidget(w)
+
+
+_GLOSS_SHEET_CSS = """\
+<style>
+.eee-sheet{margin-top:1em}
+.eee-sheet-table{margin-top:1.5em}
+.eee-note-word{font-size:1.15em}
+.eee-note-src{opacity:.7;font-size:.85em;margin-top:.3em}
+.eee-sheet-x{position:absolute;opacity:0;width:1px;height:1px}
+.eee-sheet-close{display:none}
+@media (max-width: __PX__px){
+.eee-sheet.on{position:fixed;left:0;right:0;bottom:0;z-index:40;box-sizing:border-box;max-height:55vh;overflow-y:auto;margin:0;padding:14px 16px 16px;background:var(--background,#fff);border-top:1px solid rgba(127,127,127,.4);border-radius:16px 16px 0 0;box-shadow:0 -10px 30px rgba(0,0,0,.14)}
+.eee-sheet.on .eee-sheet-close{display:flex;position:absolute;top:2px;right:4px;width:44px;height:44px;align-items:center;justify-content:center;font-size:26px;line-height:1;cursor:pointer}
+.eee-sheet.on .eee-sheet-x:focus-visible + .eee-sheet-close{outline:2px solid #003d82}
+.eee-sheet.on:has(.eee-sheet-x:checked){display:none}
+}
+</style>"""
 
 
 # ════════════════════════════════════════════════════ greek configs ══
@@ -3512,6 +3692,58 @@ class GreekUtils:
         return self._mo.Html(render_grc_period_table(
             period_tables, period_selector.value if period_selector is not None else None,
         ))
+
+    def render_gloss_sheet(self, gloss_panel: Any, period_tables: "list | None", period_selector: Any, *,
+                            selected_word: str, click_seq: int = 0, lang: str = "ru",
+                            sheet_below_px: int = 750, note: "dict | None" = None) -> Any:
+        """The gloss panel and its period table as ONE sheet -- the cell that shows them.
+
+        Call it from a cell that takes *period_selector* as a parameter (like
+        :meth:`render_gloss_table`, so that only this cell reruns when the dropdown
+        changes), with the three values of :meth:`render_gloss_selector`, whose own
+        cell then shows nothing::
+
+            gu.render_gloss_sheet(
+                gloss_panel, period_tables, period_selector, lang=lang_sel.value,
+                selected_word=text_widget.widget.selected_word, click_seq=text_widget.widget.click_seq,
+            )
+
+        On a wide page (viewport of *sheet_below_px* pixels or more) the sheet is an
+        ordinary block under the text, as the two separate cells were. On a narrower
+        one, once a word is chosen (*selected_word* is not empty), it is a sheet fixed
+        to the bottom of the screen (at most 55% of its height, scrolling inside), so
+        the table is in view without scrolling. A close button hides it with CSS only;
+        choosing a word again, also the same word (*click_seq* changes on every
+        click), shows it again.
+
+        *note* is ``text_widget.widget.selected_note`` of an :func:`interactive_text`
+        made with a translation and its margin notes: when a word with a note in the
+        translation was tapped it holds ``{"word": ..., "meaning": ...}``, and the
+        sheet then shows that note (the word, its meaning and the label
+        ``margin_note_label``) in place of the gloss panel and the table. An empty
+        dict or ``None`` shows the gloss panel as before.
+        """
+        # A checkbox keeps its state across reruns, so the root tag changes with every click: a new element starts open.
+        tag = "section" if click_seq % 2 else "div"
+        css = _GLOSS_SHEET_CSS.replace("__PX__", str(int(sheet_below_px) - 1))
+        close = self.ui_label('gloss_sheet_close', lang)
+        if note:
+            word = _esc(note.get("word", ""))
+            meaning = _esc(note.get("meaning", ""))
+            label = _esc(self.ui_label("margin_note_label", lang))
+            inner = (f'<div class="eee-note"><div class="eee-note-word"><b>{word}</b> — {meaning}</div>'
+                     f'<div class="eee-note-src">{label}</div></div>')
+        else:
+            table = self.render_gloss_table(period_tables, period_selector)
+            body = f'<div class="eee-sheet-table">{table}</div>' if table is not None else ""
+            # an f-string would print mo.md(...) as its markdown source, so take .text (a plain str has none)
+            inner = f"{getattr(gloss_panel, 'text', gloss_panel)}{body}"
+        return self._mo.Html(
+            f'{css}<{tag} class="eee-sheet{" on" if (selected_word or note) else ""}">'
+            f'<input type="checkbox" id="eee-sheet-x" class="eee-sheet-x" aria-label="{_html.escape(close)}">'
+            f'<label for="eee-sheet-x" class="eee-sheet-close" aria-hidden="true">×</label>'
+            f"{inner}</{tag}>"
+        )
 
     @staticmethod
     def reset_quiz_state(renew_btn: Any, set_cv, set_remaining, set_score,
@@ -5368,6 +5600,19 @@ class GreekUtils:
         """
         return valid_translators is None or translator in valid_translators
 
+    def translator_multiselect(self, translators: "list[str]", lang: str) -> Any:
+        """Multi-select of *translators* for the two translation exercises, every one selected at the start.
+
+        ``.value`` is the list of the chosen translator keys: pass it as *valid_translators* to
+        :meth:`stanza_match_widgets` and :meth:`stanza_match_form` (with ``translator_choice=True``),
+        to :meth:`build_translation_presence_items` and to :meth:`translation_presence_form`.
+        A crib key (``interlinear_<lang>``) shows as its label; the label of the selector is
+        in *lang*.
+        """
+        shown = {_translator_display_name(t): t for t in translators}
+        return self._mo.ui.multiselect(options=shown, value=list(shown),
+                                       label=self.ui_label('translators_selector_label', lang))
+
     def _stanza_match_pick_translation(self, stanza: dict,
                                         valid_translators: "list[str] | set[str] | None" = None
                                         ) -> "tuple[str, str] | None":
@@ -5397,8 +5642,9 @@ class GreekUtils:
     @staticmethod
     def _blockquote_cite(text: str, attribution: str) -> str:
         """"> text\\n> — attribution" Markdown blockquote citation, shared by
-        :meth:`_stanza_match_attribute_prompt` and :meth:`_presence_passage_md`."""
-        return f"> {text}\n> — {attribution}"
+        :meth:`_stanza_match_attribute_prompt` and :meth:`_presence_passage_md`.
+        The text shows without margin-note stars and a crib key shows as its label."""
+        return f"> {_without_note_stars(text)}\n> — {_translator_display_name(attribution)}"
 
     def _stanza_match_attribute_prompt(self, text: str, translator: "str | None") -> str:
         """Blockquote-cite a translation shown as the stanza-match prompt."""
@@ -5410,10 +5656,11 @@ class GreekUtils:
     def _stanza_match_attribute_option(text: str, translator: "str | None") -> str:
         """Inline-suffix a translation shown as a stanza-match answer option.
         Applied to every option (correct and distractors alike) so no
-        option is singled out by having, or lacking, attribution."""
+        option is singled out by having, or lacking, attribution. Like
+        :meth:`_blockquote_cite`, it drops margin-note stars and shows a crib key as its label."""
         if not translator:
             return text
-        return f"{text} — {translator}"
+        return f"{_without_note_stars(text)} — {_translator_display_name(translator)}"
 
     def _stanza_match_prompt_and_correct(self, stanza: dict, direction: str,
                                           *, _picked: "tuple[str, str] | None" = ...,
@@ -5610,6 +5857,7 @@ class GreekUtils:
         lang: str = "ru",
         renew_btn: "Any | None" = None,
         valid_translators: "list[str] | set[str] | None" = None,
+        translator_choice: bool = False,
     ) -> Any:
         """Standalone stanza↔translation matcher: initialization, navigation, display.
 
@@ -5627,8 +5875,14 @@ class GreekUtils:
         :meth:`word_quiz_form`). *valid_translators* must match whatever
         :meth:`stanza_match_widgets` was called with, so grading agrees with
         the options actually shown — see :meth:`_stanza_match_pick_translation`.
+
+        ``translator_choice=True``: *valid_translators* is what a learner chose
+        (see :meth:`translator_multiselect`), and fewer than 2 translators give
+        a warning in place of the exercise, with no state started or changed.
         """
         mo = self._mo
+        if translator_choice and valid_translators is not None and len(valid_translators) < 2:
+            return mo.callout(mo.md(self.ui_label('stanza_match_min_translators', lang)), kind="warn")
         cv = get_cv()
         remaining = get_remaining()
         score = get_score()
@@ -5848,7 +6102,7 @@ class GreekUtils:
         return items
 
     def balance_presence_items(self, items: "list[dict]", *, no_ratio: float = 0.5,
-                                n: "int | None" = 10) -> "list[dict]":
+                                n: "int | None" = 10, by_translator: bool = False) -> "list[dict]":
         """Subsample *items* (from :meth:`build_translation_presence_items`) so
         answering "yes" to everything stops being a winning strategy.
 
@@ -5870,6 +6124,14 @@ class GreekUtils:
         so a small cap can't quietly serve every "no" item while dropping
         the ratio guarantee.
 
+        With ``by_translator=True`` the session is also split evenly between
+        the translators in *items*. By class alone a translator whose
+        rendering omits many words (a free, abridged one) supplies most of
+        the ``"no"`` half and so most of the session. Each pick, ``"no"``
+        items first, goes to the translator with the fewest items so far
+        (ties random), so the totals differ by at most one whenever each
+        translator has enough rows of the class. Needs a numeric *n*.
+
         Returns *items* unchanged if there are no reviewed items of either
         class — nothing to balance against. Order is NOT shuffled here —
         :meth:`translation_presence_form` already shuffles via
@@ -5883,14 +6145,34 @@ class GreekUtils:
                 no_items.append(it)
             elif reflected == "yes":
                 yes_items.append(it)
+        if by_translator and n is None:
+            raise ValueError("by_translator needs a numeric n")
         if not no_items or not yes_items:
             return items
+        sample = self.sample_session_items
+        if by_translator:
+            order = self._shuffle(list(dict.fromkeys(it["translator"] for it in no_items + yes_items)))
+            sample = functools.partial(self._draw_balanced, counts=dict.fromkeys(order, 0), order=order)
         if n is not None:
-            no_items = self.sample_session_items(no_items, round(n * no_ratio))
+            no_items = sample(no_items, round(n * no_ratio))
         target_yes = round(len(no_items) * (1 - no_ratio) / no_ratio)
         if n is not None:
             target_yes = min(target_yes, n - len(no_items))
-        return no_items + self.sample_session_items(yes_items, target_yes)
+        return no_items + sample(yes_items, target_yes)
+
+    def _draw_balanced(self, items: "list[dict]", count: int, counts: dict,
+                       order: "list[str]") -> "list[dict]":
+        """Pick up to *count* of *items*, each time from the translator with the fewest picks in *counts* (updated here; ties by *order*)."""
+        pools = {t: self._shuffle([it for it in items if it["translator"] == t]) for t in order}
+        picked: list[dict] = []
+        while len(picked) < count:
+            ready = [t for t in order if pools[t]]
+            if not ready:
+                break
+            t = min(ready, key=counts.__getitem__)
+            picked.append(pools[t].pop())
+            counts[t] += 1
+        return picked
 
     def _presence_passage_md(self, item: dict, show_source: bool, lang: str) -> str:
         """Blockquote + word markdown for one translation-presence round.
@@ -5974,6 +6256,7 @@ class GreekUtils:
         title: str = "",
         lang: str = "ru",
         renew_btn: "Any | None" = None,
+        valid_translators: "list[str] | set[str] | None" = None,
     ) -> Any:
         """Standalone yes/no translation-presence quiz: initialization, navigation, display.
 
@@ -5986,8 +6269,15 @@ class GreekUtils:
         the translation and the original Greek (see :meth:`_presence_passage_md`)
         without affecting grading or the yes/no selection. ``renew_btn``, if
         given, renders alongside prev/next (see :meth:`word_quiz_form`).
+
+        *valid_translators*, when given, is what a learner chose (see
+        :meth:`translator_multiselect`) and *items* were built from; an empty
+        choice gives a warning in place of the exercise, with no state started
+        or changed.
         """
         mo = self._mo
+        if valid_translators is not None and not valid_translators:
+            return mo.callout(mo.md(self.ui_label('presence_min_translators', lang)), kind="warn")
         cv = get_cv()
         remaining = get_remaining()
         score = get_score()

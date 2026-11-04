@@ -3,6 +3,8 @@ import pytest
 
 import dataclasses
 import json
+import re
+from collections import Counter
 from unittest.mock import patch, MagicMock
 
 import marimo as mo
@@ -1462,6 +1464,14 @@ class _FakeRadio:
         self.label = label
 
 
+class _FakeMultiselect:
+    """``mo.ui.multiselect`` stand-in: ``.options`` maps what is shown to what ``.value`` gives back, as marimo's does."""
+    def __init__(self, options=None, value=None, label=""):
+        self.options = dict(options) if isinstance(options, dict) else {o: o for o in options or []}
+        self.value = [self.options[shown] for shown in value or []]
+        self.label = label
+
+
 class _FakeDiaUI:
     value = {"enter_pressed": 0}
 
@@ -1492,6 +1502,9 @@ class _FormMo(_StubMoLayout):
         @staticmethod
         def radio(options=None, value=None, label=""):
             return _FakeRadio(options, value, label)
+        @staticmethod
+        def multiselect(options=None, value=None, label=""):
+            return _FakeMultiselect(options, value, label)
         @staticmethod
         def text(placeholder="", full_width=False, value=""):
             return type("_FT", (), {"value": value or ""})()
@@ -5558,14 +5571,191 @@ class TestInteractiveText:
         lines.append("ἔννεπε")
         assert len(w.lines) == 2
 
+    def test_wrap_defaults_false(self):
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set())
+        assert w.wrap is False
+
+    def test_wrap_true_is_stored(self):
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), wrap=True)
+        assert w.wrap is True
+
+    def test_wrap_does_not_change_the_default_stylesheet(self):
+        # the wrap rules are in every stylesheet; only a widget drawn with wrap=True has the classes they select
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), wrap=True)
+        assert w._css == _ITEXT_CSS
+        assert ".eee-itext.wrap{white-space:normal" in _ITEXT_CSS
+        assert ".eee-itext .eee-line{padding-left:1.1em;text-indent:-1.1em" in _ITEXT_CSS
+
+    def test_no_translation_means_no_card_no_notes_and_the_default_stylesheet(self):
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set())
+        assert w.translation_html == ""
+        assert w.notes == {}
+        assert w.selected_note == {}
+        assert w._css == _ITEXT_CSS
+
+    def test_translation_is_one_card_with_a_block_per_line_whatever_their_number(self):
+        # the translation need not have as many lines as the Greek
+        three = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["a", "b", "c"])
+        one = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["a"])
+        assert three.translation_html.count('class="eee-tr-line"') == 3
+        assert one.translation_html.count('class="eee-tr-line"') == 1
+        assert three.translation_html.count('class="eee-tr"') == 1
+
+    def test_translation_text_is_html_escaped(self):
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["<b>x</b> & y"],
+                             notes={0: [("<w>", "<m>")]})
+        assert "&lt;b&gt;x&lt;/b&gt; &amp; y" in w.translation_html
+        assert "<b>" not in w.translation_html
+        assert w.notes == {"0": [["<w>", "<m>"]]}  # data for the JS, not markup
+
+    def test_a_star_without_a_note_is_not_drawn(self):
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["πολλοπάητον* άντραν"])
+        assert "πολλοπάητον άντραν" in w.translation_html
+        assert "*" not in w.translation_html and "eee-star" not in w.translation_html
+        assert "gk-note" not in w.translation_html
+
+    def test_the_word_before_a_star_with_a_note_is_a_button_without_the_star(self):
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(),
+                             translation=["Μούσα", "τον πολλοπάητον* άντραν"],
+                             notes={1: [("πολλοπάητον", "παμπόνηρος")]})
+        assert ('<span class="gk-note" role="button" tabindex="0" data-i="1" data-k="0">'
+                'πολλοπάητον</span> άντραν') in w.translation_html
+        assert w.translation_html.count("gk-note") == 1
+        assert "*" not in w.translation_html and "eee-star" not in w.translation_html
+
+    def test_the_kth_star_of_a_line_belongs_to_the_kth_note(self):
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["α* β γ* δ*"],
+                             notes={0: [("α", "1"), ("γ", "2")]})
+        html = w.translation_html
+        assert 'data-i="0" data-k="0">α</span>' in html
+        assert 'data-i="0" data-k="1">γ</span>' in html
+        assert html.count("gk-note") == 2 and "β" in html and html.endswith(" δ</div></div>")  # the third star has no note: plain
+
+    def test_a_note_of_a_line_that_does_not_exist_is_kept_but_linked_to_nothing(self):
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["a*"], notes={5: [("w", "m")]})
+        assert "gk-note" not in w.translation_html
+        assert w.notes == {"5": [["w", "m"]]}
+
+    def test_notes_are_not_printed_under_the_lines(self):
+        # a note is shown in the word panel after a tap, not in the card
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["a*"], notes={0: [("a", "meaning")]})
+        assert "meaning" not in w.translation_html
+
+    def test_an_empty_translation_is_an_empty_card_not_no_card(self):
+        # [] is a translation with no lines; only None means "no translation"
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=[])
+        assert w.translation_html == '<div class="eee-tr"></div>'
+
+    def test_notes_may_be_keyed_by_the_line_as_a_string(self):
+        # what a JSON round trip makes of {0: ...}
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["a*"], notes={"0": [("a", "m")]})
+        assert 'data-i="0" data-k="0"' in w.translation_html
+        assert w.notes == {"0": [["a", "m"]]}
+
+    def test_a_star_with_no_word_before_it_is_dropped_and_links_nothing(self):
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["* a", "b **"],
+                             notes={0: [("x", "m")], 1: [("y", "m")]})
+        assert "gk-note" not in w.translation_html
+        assert w.translation_html == '<div class="eee-tr"><div class="eee-tr-line"> a</div><div class="eee-tr-line">b </div></div>'
+
+    def test_the_word_of_a_button_is_escaped_too(self):
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["<i>*"], notes={0: [("i", "m")]})
+        assert ">&lt;i&gt;</span>" in w.translation_html
+
+    def test_a_noted_word_has_the_colour_of_a_link_and_there_is_no_star_rule(self):
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["a"])
+        assert "color:var(--eee-note-color,#2b6cc4)" in re.search(r"\.eee-tr \.gk-note\{([^}]*)\}", w._css).group(1)
+        assert "eee-star" not in w._css
+
+    def test_translation_stylesheet_only_with_a_translation_and_between_base_and_callers_css(self):
+        rule = ".eee-itext.wrap{line-height:1.8}"
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["a"], css=rule)
+        assert w._css.index(".gk-word.homer") < w._css.index(".eee-stanza-wrap{container-type:inline-size}") \
+            < w._css.index(rule) < w._css.index(".eee-itext .gk-word.active")
+        assert w._css.rstrip().splitlines()[-1].startswith(".eee-itext .gk-word.active")
+        assert "eee-stanza" not in _ITEXT_CSS
+
+    def test_two_columns_threshold_is_a_container_query(self):
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["a"])
+        assert "@container (min-width: 600px)" in w._css
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["a"], two_columns_from_px=480)
+        assert "@container (min-width: 480px)" in w._css
+        assert "__PX__" not in w._css
+
+    def test_wrap_rules_stay_before_a_callers_css(self):
+        rule = ".eee-itext.wrap{line-height:1.8}"
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), wrap=True, css=rule)
+        assert w._css.index(".eee-itext.wrap{white-space:normal") < w._css.index(rule) < w._css.index(".gk-word.active")
+
+    def test_pale_highlights_bring_their_own_dark_text(self):
+        # the page's own text is light in a dark theme and would vanish on a pale background
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["a"])
+        for selector in (".eee-itext .gk-word.homer", ".eee-itext .gk-word.active", ".eee-tr .gk-note.active"):
+            rule = re.search(re.escape(selector) + r"\{([^}]*)\}", w._css).group(1)
+            assert "background:#" in rule and "color:#1d1d1b" in rule, selector
+
+    def test_light_dark_colours_sit_only_in_a_supports_block(self):
+        # an old browser drops `light-dark()` and must then keep the plain colours declared before it
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["a"])
+        guard = r"@supports \(color:light-dark\(#000,#fff\)\)\{\n.*?\n\}\n"
+        assert len(re.findall(guard, w._css, flags=re.S)) == 2
+        assert "light-dark(" not in re.sub(guard, "", w._css, flags=re.S)
+
+    def test_the_selected_note_rule_follows_the_dark_page_colours(self):
+        # equal specificity, so order decides: a hovered selected note keeps its navy underline
+        w = interactive_text(self._mo(), lines=["ἄνδρα"], clickable=set(), translation=["a"])
+        assert w._css.rindex("@supports") < w._css.index(".eee-tr .gk-note.active")
+
 
 class TestInteractiveTextEsm:
     """Static _ITEXT_ESM guards — the click/keydown JS can't run headlessly
     (see [[feedback_marimo_reactivity_testing]]); marimo-pair + a human browser
     verifies actual click/keyboard behaviour (section-08)."""
 
+    def test_wrap_mode_draws_one_block_per_line(self):
+        assert "model.get('wrap')" in _ITEXT_ESM
+        assert "'eee-itext wrap'" in _ITEXT_ESM
+        assert '<div class="eee-line">' in _ITEXT_ESM
+
+    def test_without_wrap_the_lines_stay_one_br_separated_run(self):
+        assert "lineHtml.join('<br>')" in _ITEXT_ESM
+
+    def test_wrap_change_redraws(self):
+        assert "model.on('change:wrap', draw)" in _ITEXT_ESM
+
+    def test_the_rules_are_also_kept_in_a_style_of_the_shadow_root(self):
+        # marimo can replace the adopted style sheets of the shadow root after the widget added its own
+        assert "shadow.appendChild(document.createElement('style'))" in _ITEXT_ESM
+        assert "model.on('change:_css', applyCss)" in _ITEXT_ESM
+        assert "style.remove()" not in _ITEXT_ESM  # marimo calls the cleanup of render() at once, and the DOM of the widget stays
+
+    def test_a_tap_on_a_note_selects_it_and_clears_the_greek_word(self):
+        note = _ITEXT_ESM.split("function activateNote", 1)[1].split("\n  }\n", 1)[0]
+        assert "model.set('selected_note', {" in note
+        assert "model.set('selected_word', '')" in note
+        assert "model.set('click_seq'" in note and "model.save_changes()" in note
+
+    def test_a_tap_on_a_greek_word_clears_the_selected_note(self):
+        word = _ITEXT_ESM.split("function activate(span)", 1)[1].split("\n  }\n", 1)[0]
+        assert "model.set('selected_note', {})" in word
+
+    def test_the_card_listens_for_clicks_and_keys_like_the_greek_words(self):
+        assert _ITEXT_ESM.count("trHost.addEventListener('click'") == 1
+        assert _ITEXT_ESM.count("trHost.addEventListener('keydown'") == 1
+        assert "closest('.gk-note')" in _ITEXT_ESM
+
+    def test_translation_redraws_on_change_and_marks_the_selected_note(self):
+        assert "model.on('change:translation_html', draw)" in _ITEXT_ESM
+        assert "model.on('change:notes', draw)" in _ITEXT_ESM
+        assert "classList.add('active')" in _ITEXT_ESM
+
+    def test_without_a_translation_the_greek_text_is_the_only_child(self):
+        # a container with inline-size containment has no intrinsic width: only a widget with a card gets one
+        assert "el.replaceChildren(container)" in _ITEXT_ESM
+        assert "el.replaceChildren(root)" in _ITEXT_ESM
+
     def test_delegates_single_click_listener(self):
-        assert _ITEXT_ESM.count("addEventListener('click'") == 1
+        assert _ITEXT_ESM.count("container.addEventListener('click'") == 1
         assert "closest('.gk-word')" in _ITEXT_ESM
 
     def test_keydown_handles_enter_and_space(self):
@@ -7505,6 +7695,149 @@ class TestStanzaMatchRound:
             assert translators <= {"Жуковский", "Вересаев"}
 
 
+class TestStanzaMatchCribLabel:
+    """The word-for-word crib shows as its label, not as its key (``interlinear_el``), in the options and in the quoted translation."""
+
+    @staticmethod
+    def _stanza(key):
+        return {"ref": "C.1", "lines": ["g"], "interlinear": "", "translations": {key: "crib text", "Т": "other text"}}
+
+    @pytest.mark.parametrize("lang", ["ru", "en", "el"])
+    def test_option_names_the_crib_by_its_label(self, gu_form, lang):
+        key = f"interlinear_{lang}"
+        _, correct = gu_form._stanza_match_prompt_and_correct(self._stanza(key), "grc_to_tr", valid_translators=[key])
+        assert correct == f"crib text — {gu_form.ui_label('interlinear_label', lang)}"
+        assert key not in correct
+
+    @pytest.mark.parametrize("lang", ["ru", "en", "el"])
+    def test_quoted_translation_cites_the_crib_by_its_label(self, gu_form, lang):
+        key = f"interlinear_{lang}"
+        prompt, _ = gu_form._stanza_match_prompt_and_correct(self._stanza(key), "tr_to_grc", valid_translators=[key])
+        assert prompt == f"> crib text\n> — {gu_form.ui_label('interlinear_label', lang)}"
+
+    def test_a_round_shows_no_crib_key_and_holds_the_graded_answer(self, gu_form):
+        import random
+        key = "interlinear_el"
+        stanzas = [{"ref": f"C.{n}", "lines": [f"g{n}"], "interlinear": "",
+                    "translations": {key: f"crib {n}", "Т": f"other {n}", "У": f"third {n}"}} for n in range(1, 6)]
+        label = gu_form.ui_label("interlinear_label", "el")
+        for _ in range(20):
+            round_ = gu_form._stanza_match_round(stanzas[0], stanzas, "grc_to_tr", random, valid_translators=[key, "Т", "У"])
+            assert round_["correct"] in round_["options"]
+            assert not any(key in o for o in round_["options"])
+            assert any(o.endswith(f" — {label}") for o in round_["options"])
+
+
+class TestStanzaMatchNoteStars:
+    """An exercise shows a translation without the ``*`` of its margin notes (Markdown read a pair as emphasis); the text of the file stays as it is."""
+
+    _STARRED = {"ref": "S.1", "lines": ["g"], "interlinear": "", "translations": {"Т": "aaa* bbb ccc* ddd", "У": "plain text"}}
+    _PLAIN = "aaa bbb ccc ddd"
+
+    def test_the_pick_and_the_pool_keep_the_text_of_the_file(self, gu_form):
+        # the length bucket and the dedupe of a round work on this text: only the display drops the stars
+        assert gu_form._stanza_match_pick_translation(self._STARRED, ["Т"]) == ("Т", "aaa* bbb ccc* ddd")
+        pool = gu_form._stanza_match_distractor_pool({"ref": "S.2", "lines": ["h"]}, [self._STARRED], "grc_to_tr")
+        assert {txt for _, tr, txt in pool if tr == "Т"} == {"aaa* bbb ccc* ddd"}
+
+    def test_the_right_answer_and_the_quoted_prompt_have_no_star(self, gu_form):
+        _, correct = gu_form._stanza_match_prompt_and_correct(self._STARRED, "grc_to_tr", valid_translators=["Т"])
+        prompt, _ = gu_form._stanza_match_prompt_and_correct(self._STARRED, "tr_to_grc", valid_translators=["Т"])
+        assert correct == f"{self._PLAIN} — Т"
+        assert prompt == f"> {self._PLAIN}\n> — Т"
+
+    def test_a_round_shows_no_star_in_any_option_and_holds_the_graded_answer(self, gu_form):
+        import random
+        stanzas = [{"ref": f"S.{n}", "lines": [f"g{n}"], "interlinear": "",
+                    "translations": {"Т": f"aaa{n}* bbb ccc{n}* ddd", "У": f"plain {n}"}} for n in range(1, 6)]
+        for _ in range(20):
+            round_ = gu_form._stanza_match_round(stanzas[0], stanzas, "grc_to_tr", random)
+            assert not any("*" in option for option in round_["options"])
+            assert round_["correct"] in round_["options"]
+
+
+class TestExercisesShowNoMarginNotes:
+    """A stanza's margin notes (``margin_glosses``) are shown in the text widget only: an exercise shows a translator's text without the stars, with no link, no style and no row."""
+
+    _S = [{"ref": f"S.{n}", "lines": [f"g{n}"], "interlinear": "",
+           "translations": {"К": f"aaa{n}* bbb", "У": f"plain {n}"},
+           "margin_glosses": {"К": {0: [(f"aaa{n}", f"meaning {n}")]}}} for n in range(1, 5)]
+
+    def _form(self, gu, radio, direction="grc_to_tr", lang="en"):
+        state = _form_state(cv=self._S[0], rem=self._S[1:])
+        cv_g, cv_s, _, rem_g, rem_s, _, sc_g, sc_s, _, rst_g, rst_s, hist_g, hist_s, _, fut_g, fut_s = state
+        return gu.stanza_match_form(
+            cv_g, cv_s, rem_g, rem_s, sc_g, sc_s, rst_g, rst_s, hist_g, hist_s, fut_g, fut_s,
+            radio, _FakeBtn(None), _FakeBtn(None), stanzas=self._S, direction=direction, lang=lang,
+        )
+
+    def test_the_quoted_translation_has_no_link_and_no_style(self, gu_form):
+        prompt, _ = gu_form._stanza_match_prompt_and_correct(self._S[0], "tr_to_grc", valid_translators=["К"])
+        assert prompt == "> aaa1 bbb\n> — К"
+
+    def test_the_right_answer_is_plain_text(self, gu_form):
+        _, correct = gu_form._stanza_match_prompt_and_correct(self._S[0], "grc_to_tr", valid_translators=["К"])
+        assert correct == "aaa1 bbb — К"
+
+    def test_no_row_stands_under_the_options_even_when_an_option_has_notes(self, gu_form):
+        radio = _FakeRadio(options=["aaa2 bbb — К", "plain 3 — У"])
+        result = self._form(gu_form, radio)
+        assert len(result) == 4 and result[1] is radio  # progress, radio, answer line, buttons
+
+    def test_a_note_in_the_data_does_not_change_grading(self, gu_form):
+        state = _form_state(cv=self._S[0], rem=self._S[1:])
+        cv_g, cv_s, _, rem_g, rem_s, _, sc_g, sc_s, sc_b, rst_g, rst_s, hist_g, hist_s, _, fut_g, fut_s = state
+        gu_form.stanza_match_form(
+            cv_g, cv_s, rem_g, rem_s, sc_g, sc_s, rst_g, rst_s, hist_g, hist_s, fut_g, fut_s,
+            _FakeRadio(value="aaa1 bbb — К"), _FakeBtn(1), _FakeBtn(None), stanzas=self._S, valid_translators=["К"],
+        )
+        assert sc_b[0] == {"correct": 1, "total": 1}
+
+
+class TestTranslatorChoice:
+    """A notebook that lets the learner pick the translators: the selector, and the stanza match asks for at least 2."""
+
+    _S = TestExercisesShowNoMarginNotes._S
+
+    @pytest.mark.parametrize("lang,word", [("en", "Translations"), ("ru", "Переводы"), ("el", "Μεταφράσεις")])
+    def test_the_selector_has_every_translator_all_selected_and_the_label_of_the_language(self, gu_form, lang, word):
+        sel = gu_form.translator_multiselect(["К", "У", f"interlinear_{lang}"], lang)
+        crib = gu_form.ui_label("interlinear_label", lang)
+        assert sel.options == {"К": "К", "У": "У", crib: f"interlinear_{lang}"}
+        assert sel.value == ["К", "У", f"interlinear_{lang}"]  # the keys, not the labels
+        assert sel.label == word
+
+    def _form(self, gu, state, **kw):
+        cv_g, cv_s, _, rem_g, rem_s, _, sc_g, sc_s, _, rst_g, rst_s, hist_g, hist_s, _, fut_g, fut_s = state
+        return gu.stanza_match_form(
+            cv_g, cv_s, rem_g, rem_s, sc_g, sc_s, rst_g, rst_s, hist_g, hist_s, fut_g, fut_s,
+            _FakeRadio(), _FakeBtn(None), _FakeBtn(None), stanzas=self._S, **kw,
+        )
+
+    @pytest.mark.parametrize("chosen", [[], ["К"]])
+    def test_fewer_than_two_translators_show_the_message_and_touch_no_state(self, gu_form, chosen):
+        state = _form_state(rem=None)
+        result = self._form(gu_form, state, translator_choice=True, valid_translators=chosen)
+        assert result == ("callout", "warn", gu_form.ui_label("stanza_match_min_translators", "ru"))  # the default language of the form
+        assert state[2][0] is None and state[5][0] is None  # cv and remaining stay unset: nothing started
+
+    @pytest.mark.parametrize("lang", ["en", "ru", "el"])
+    def test_the_message_is_in_the_language_of_the_notebook(self, gu_form, lang):
+        result = self._form(gu_form, _form_state(rem=None), translator_choice=True, valid_translators=["К"], lang=lang)
+        assert result[2] == gu_form.ui_label("stanza_match_min_translators", lang)
+
+    def test_two_translators_start_the_exercise(self, gu_form):
+        state = _form_state(rem=None)
+        assert self._form(gu_form, state, translator_choice=True, valid_translators=["К", "У"]) == "*...*"
+        assert state[2][0] is not None
+
+    def test_without_the_choice_one_translator_runs_as_before(self, gu_form):
+        assert self._form(gu_form, _form_state(rem=None), valid_translators=["К"]) == "*...*"
+
+    def test_the_choice_without_a_list_means_every_translator(self, gu_form):
+        assert self._form(gu_form, _form_state(rem=None), translator_choice=True) == "*...*"
+
+
 class TestStanzaMatchQuestion:
     def test_stanza_none_calls_stop(self, gu_form):
         import random
@@ -7977,6 +8310,12 @@ class TestBuildTranslationPresenceItems:
         )
         assert items == []
 
+    def test_an_item_carries_no_margin_notes_even_when_the_stanza_has_some(self, gu_form):
+        # the notes are shown in the text widget only
+        stanzas = [{**_SM_STANZAS[0], "margin_glosses": {"Жуковский": {0: [("Муза", "m")]}}}, *_SM_STANZAS[1:]]
+        items = gu_form.build_translation_presence_items(self._ROWS, _TP_VOCAB, stanzas)
+        assert items and all("notes" not in i for i in items)
+
 
 class TestSampleSessionItems:
     def test_caps_to_n(self, gu_form):
@@ -8078,6 +8417,58 @@ class TestBalancePresenceItems:
         assert all(it["reflected"] in ("yes", "no") for it in result)
         assert len(result) == 10
 
+    @staticmethod
+    def _tr_items(translator, n_yes, n_no):
+        return [{"lemma": f"{translator}{r}{i}", "translator": translator, "reflected": r}
+                for r, count in (("yes", n_yes), ("no", n_no)) for i in range(count)]
+
+    @staticmethod
+    def _per_translator(result):
+        return Counter(it["translator"] for it in result)
+
+    def test_by_translator_splits_session_evenly_by_class_and_translator(self, gu_form):
+        # One translator with few "no" rows, one with many: the plain session takes most of the "no" half from the second.
+        items = self._tr_items("A", 150, 5) + self._tr_items("B", 60, 90)
+        for _ in range(20):
+            result = gu_form.balance_presence_items(items, by_translator=True)
+            assert len(result) == 10
+            assert sum(1 for it in result if it["reflected"] == "no") == 5
+            assert self._per_translator(result) == {"A": 5, "B": 5}
+
+    def test_by_translator_balances_totals_when_one_translator_has_no_no_rows(self, gu_form):
+        items = self._tr_items("A", 50, 0) + self._tr_items("B", 50, 50)
+        for _ in range(20):
+            result = gu_form.balance_presence_items(items, by_translator=True)
+            assert sum(1 for it in result if it["reflected"] == "no") == 5
+            assert self._per_translator(result) == {"A": 5, "B": 5}
+
+    def test_by_translator_uses_what_exists_when_a_translator_runs_short(self, gu_form):
+        items = self._tr_items("A", 50, 50) + self._tr_items("B", 1, 1)
+        result = gu_form.balance_presence_items(items, by_translator=True)
+        assert len(result) == 10
+        assert sum(1 for it in result if it["reflected"] == "no") == 5
+        assert self._per_translator(result) == {"A": 8, "B": 2}
+
+    def test_by_translator_returns_every_row_when_the_pools_are_smaller_than_the_session(self, gu_form):
+        items = self._tr_items("A", 2, 2) + self._tr_items("B", 1, 1)
+        result = gu_form.balance_presence_items(items, by_translator=True)
+        assert sorted(it["lemma"] for it in result) == sorted(it["lemma"] for it in items)
+
+    def test_by_translator_three_translators_differ_by_at_most_one(self, gu_form):
+        items = self._tr_items("A", 50, 50) + self._tr_items("B", 50, 50) + self._tr_items("C", 50, 50)
+        result = gu_form.balance_presence_items(items, by_translator=True)
+        assert sorted(self._per_translator(result).values()) == [3, 3, 4]
+
+    def test_by_translator_needs_a_numeric_n(self, gu_form):
+        with pytest.raises(ValueError):
+            gu_form.balance_presence_items(self._tr_items("A", 5, 5), by_translator=True, n=None)
+
+    def test_by_translator_is_off_by_default(self, gu_form):
+        # B holds every "no" row, so the plain "no" half comes from B alone.
+        items = self._tr_items("A", 50, 0) + self._tr_items("B", 50, 50)
+        result = gu_form.balance_presence_items(items)
+        assert {it["translator"] for it in result if it["reflected"] == "no"} == {"B"}
+
 
 class TestTranslationPresenceQuestion:
     _ITEM = {"lemma": "ἀνήρ", "form": "Ἄνδρα", "meaning": "мужа", "translator": "Жуковский",
@@ -8136,6 +8527,21 @@ class TestPresencePassageMd:
     def test_lang_en_source_label(self, gu_form):
         md = gu_form._presence_passage_md(self._ITEM, True, "en")
         assert "original" in md
+
+    def test_a_crib_is_cited_by_its_label_not_its_key(self, gu_form):
+        md = gu_form._presence_passage_md({**self._ITEM, "translator": "interlinear_ru"}, False, "ru")
+        assert "подстрочник" in md
+        assert "interlinear_ru" not in md
+
+    def test_a_margin_note_star_is_not_shown(self, gu_form):
+        md = gu_form._presence_passage_md({**self._ITEM, "passage": "Муза* скажи мне о* муже"}, False, "ru")
+        assert "Муза скажи мне о муже" in md
+
+    def test_a_passage_shows_no_link_and_no_style_even_when_an_item_holds_notes(self, gu_form):
+        item = {**self._ITEM, "passage": "Муза* скажи", "notes": {0: [("Муза", "m")]}}
+        md = gu_form._presence_passage_md(item, False, "ru")
+        assert "<span" not in md and "<style>" not in md
+        assert "Муза скажи" in md and "**Ἄνδρα**" in md
 
 
 class TestTranslationPresenceWidgets:
@@ -8298,7 +8704,131 @@ class TestTranslationPresenceForm:
         result = self._call(gu_form, state, items=[], lang="en")
         assert "No reviewed word" in str(result)
 
+    def test_an_empty_choice_shows_the_message_and_touches_no_state(self, gu_form):
+        state = self._state(rem=None)
+        cv_g, cv_s, _, rem_g, rem_s, _, sc_g, sc_s, _, rst_g, rst_s, hist_g, hist_s, _, fut_g, fut_s = state
+        result = gu_form.translation_presence_form(
+            cv_g, cv_s, rem_g, rem_s, sc_g, sc_s, rst_g, rst_s, hist_g, hist_s, fut_g, fut_s,
+            _FakeRadio(), _FakeBtn(None), _FakeBtn(None), _FakeBtn(False),
+            items=[], lang="en", valid_translators=[],
+        )
+        assert result == ("callout", "warn", gu_form.ui_label("presence_min_translators", "en"))
+        assert state[2][0] is None and state[5][0] is None
+
+    def test_one_translator_is_enough(self, gu_form):
+        state = self._state(rem=None)
+        cv_g, cv_s, _, rem_g, rem_s, _, sc_g, sc_s, _, rst_g, rst_s, hist_g, hist_s, _, fut_g, fut_s = state
+        result = gu_form.translation_presence_form(
+            cv_g, cv_s, rem_g, rem_s, sc_g, sc_s, rst_g, rst_s, hist_g, hist_s, fut_g, fut_s,
+            _FakeRadio(), _FakeBtn(None), _FakeBtn(None), _FakeBtn(False),
+            items=self._ITEMS, valid_translators=["Жуковский"],
+        )
+        assert result == "*...*" and state[2][0] is not None
+
+    def test_a_choice_with_no_reviewed_item_keeps_the_maintainer_message(self, gu_form):
+        state = self._state(rem=None)
+        cv_g, cv_s, _, rem_g, rem_s, _, sc_g, sc_s, _, rst_g, rst_s, hist_g, hist_s, _, fut_g, fut_s = state
+        result = gu_form.translation_presence_form(
+            cv_g, cv_s, rem_g, rem_s, sc_g, sc_s, rst_g, rst_s, hist_g, hist_s, fut_g, fut_s,
+            _FakeRadio(), _FakeBtn(None), _FakeBtn(None), _FakeBtn(False),
+            items=[], valid_translators=["Жуковский"],
+        )
+        assert "Пока нет проверенных пар" in str(result)
+
     def test_lang_en_uses_yes_no_progress(self, gu_form):
         state = self._state(cv=self._ITEMS[0], rem=self._ITEMS[1:])
         result = self._call(gu_form, state, radio=_FakeRadio(value=None), lang="en")
         assert "correct" in str(result)
+
+
+# ──────────────────────────────── render_gloss_sheet (panel + table in one) ──
+
+class TestRenderGlossSheet:
+    _TABLES = [("homer", "<table>HOMER</table>"), ("lsj", "<table>LSJ</table>")]
+
+    def _parts(self, gu):
+        words = [{"form": "λόγος", "lemma": "λόγος", "context": "word", "meaning": "word/reason"}]
+        return gu.render_gloss_selector(words, "λόγος", lambda w: self._TABLES, lang="en")
+
+    def _sheet(self, gu, **kw):
+        tables, selector, panel = self._parts(gu)
+        kw.setdefault("selected_word", "λόγος")
+        return str(gu.render_gloss_sheet(panel, tables, selector, **kw))
+
+    def test_panel_and_table_are_in_one_block(self, gu_form):
+        out = self._sheet(gu_form)
+        assert out.count('class="eee-sheet on"') == 1
+        assert out.count('class="eee-sheet-table"') == 1
+        assert "λόγος" in out and "HOMER" in out and "LSJ" not in out
+        assert out.index("λόγος") < out.index("HOMER")
+
+    def test_table_follows_the_dropdown(self, gu_form):
+        tables, selector, panel = self._parts(gu_form)
+        selector.value = "lsj"
+        out = str(gu_form.render_gloss_sheet(panel, tables, selector, selected_word="λόγος"))
+        assert "LSJ" in out and "HOMER" not in out
+
+    def test_it_is_a_sheet_only_once_a_word_is_chosen(self, gu_form):
+        assert 'class="eee-sheet on"' in self._sheet(gu_form, selected_word="λόγος")
+        out = str(gu_form.render_gloss_sheet("hint", None, None, selected_word=""))
+        assert 'class="eee-sheet"' in out and 'class="eee-sheet on"' not in out
+
+    def test_a_markdown_panel_is_embedded_as_markup_not_as_its_source(self, gu_form):
+        # an f-string formats mo.md(...) as its markdown source: the hint of an empty panel showed its asterisks
+        class MdLike(str):
+            text = property(lambda self: f"<em>{self}</em>")
+
+        out = str(gu_form.render_gloss_sheet(MdLike("*hint*"), None, None, selected_word=""))
+        assert "<em>*hint*</em>" in out
+
+    def test_no_table_block_without_tables(self, gu_form):
+        out = str(gu_form.render_gloss_sheet("hint", None, None, selected_word=""))
+        assert 'class="eee-sheet-table"' not in out.split("</style>", 1)[1]
+        assert "hint" in out
+
+    def test_root_tag_alternates_with_every_click(self, gu_form):
+        # the browser keeps a checkbox's state across a rerun; a new tag is a new element, so open again
+        even = self._sheet(gu_form, click_seq=2)
+        odd = self._sheet(gu_form, click_seq=3)
+        assert even.rstrip().endswith("</div>") and '<div class="eee-sheet' in even
+        assert odd.rstrip().endswith("</section>") and '<section class="eee-sheet' in odd
+
+    def test_close_control_is_labelled_in_the_language(self, gu_form):
+        assert 'aria-label="Close"' in self._sheet(gu_form, lang="en")
+        assert 'aria-label="Закрыть"' in self._sheet(gu_form, lang="ru")
+        assert 'aria-label="Κλείσιμο"' in self._sheet(gu_form, lang="el")
+
+    def test_bottom_sheet_applies_below_the_given_viewport_width(self, gu_form):
+        assert "@media (max-width: 749px)" in self._sheet(gu_form)
+        assert "@media (max-width: 599px)" in self._sheet(gu_form, sheet_below_px=600)
+
+    def test_the_sheet_label_exists_in_every_ui_language(self, gu_form):
+        for lang in ("en", "ru", "el"):
+            assert gu_form.ui_label("gloss_sheet_close", lang) != "gloss_sheet_close"
+            assert gu_form.ui_label("margin_note_label", lang) != "margin_note_label"
+
+    def test_a_margin_note_replaces_the_gloss_panel_and_the_table(self, gu_form):
+        tables, selector, panel = self._parts(gu_form)
+        out = str(gu_form.render_gloss_sheet(
+            panel, tables, selector, selected_word="", click_seq=1, lang="en",
+            note={"line": 0, "k": 0, "word": "πολλοπάητον", "meaning": "παμπόνηρος"},
+        ))
+        assert "<b>πολλοπάητον</b> — παμπόνηρος" in out
+        assert "Margin note" in out
+        assert "HOMER" not in out and "λόγος" not in out
+        assert 'class="eee-sheet on"' in out  # a sheet although no Greek word is chosen
+
+    def test_a_margin_note_is_html_escaped(self, gu_form):
+        out = str(gu_form.render_gloss_sheet("p", None, None, selected_word="",
+                                             note={"word": "<w>", "meaning": "a & b"}))
+        assert "<b>&lt;w&gt;</b> — a &amp; b" in out
+
+    def test_an_empty_note_shows_the_gloss_panel_as_before(self, gu_form):
+        for empty in (None, {}):
+            out = self._sheet(gu_form, note=empty)
+            assert "HOMER" in out and "eee-note-word\"" not in out.split("</style>", 1)[1]
+
+    def test_a_note_label_follows_the_language(self, gu_form):
+        note = {"word": "w", "meaning": "m"}
+        assert "Примечание на полях" in str(gu_form.render_gloss_sheet("p", None, None, selected_word="", note=note, lang="ru"))
+        assert "Σημείωση στο περιθώριο" in str(gu_form.render_gloss_sheet("p", None, None, selected_word="", note=note, lang="el"))

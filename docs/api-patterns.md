@@ -1488,6 +1488,50 @@ Changing one never implies changing the other:
   are left out on purpose: "is this function word reflected in the
   translation" is not a meaningful question for a literary translation.
 
+`gu.balance_presence_items(items, *, no_ratio=0.5, n=10, by_translator=False)`
+picks the session of the translation-presence exercise from the judged rows
+(`items` come from `gu.build_translation_presence_items`): half "no" items and
+half "yes" items, `n` in all. By answer alone, a translator whose rendering
+omits many words supplies most of the "no" half, so most of the session (one
+translator can supply 7 of 10 items). With `by_translator=True` (new in 1.26.0)
+each pick, "no" items first, goes to the translator with the fewest items so far,
+so the totals differ by at most one when every translator has enough rows. It
+needs a numeric `n`. It is off by default, so a notebook that does not pass it is
+unchanged:
+
+```python
+TP_ITEMS = gu.balance_presence_items(items, n=SESSION_SIZE, by_translator=True)
+```
+
+#### Translator choice in the two translation exercises
+
+The stanza match (`stanza_match_widgets` / `stanza_match_form`) and the exercise "the word in the translation"
+(`build_translation_presence_items` / `translation_presence_form`) take `valid_translators=`, the translators they may
+use. New in 1.26.0: a notebook can let the learner choose them.
+
+- `gu.translator_multiselect(translators, lang)` is a `mo.ui.multiselect` of the translators, every one selected at the
+  start. Its `.value` is the list of the chosen translator keys; a crib key (`interlinear_<lang>`) shows as its label; the
+  label of the selector is the UI label `translators_selector_label`. Pass `.value` as `valid_translators=` to every call
+  of the exercise, and read it in the cell that resets the exercise, so that a new choice starts a new session.
+- `stanza_match_form(..., valid_translators=choice.value, translator_choice=True)`: the exercise needs at least 2
+  translators (each option of the strophe → translation direction comes from another translator). With fewer, the form
+  shows the warning `stanza_match_min_translators` in place of the exercise and starts or changes nothing. Without
+  `translator_choice=True` the form is as before. `stanza_match_widgets` needs no flag.
+- `translation_presence_form(..., valid_translators=choice.value)`: with an empty choice the form shows the warning
+  `presence_min_translators`. Build `items` from the same choice. A choice that leaves no reviewed row still shows the
+  message `presence_empty_label`, as without a choice.
+- A stanza dict may hold `margin_glosses`, `{translator: {line_index: [(word, meaning), ...]}}` (what
+  `interactive_text(notes=)` takes for one translator). The exercises do not show these notes: they belong to the text
+  widget. An exercise quotes a translator's text without the stars that mark the notes.
+
+```python
+choice = gu.translator_multiselect(TRANSLATORS, lang)   # a cell of its own; every translator is selected at the start
+gu.stanza_match_widgets(cv=..., remaining=..., stanzas=STANZAS, lang=lang, valid_translators=choice.value)
+gu.stanza_match_form(..., stanzas=STANZAS, lang=lang, valid_translators=choice.value, translator_choice=True)
+items = gu.build_translation_presence_items(rows, vocab, STANZAS, valid_translators=choice.value)
+gu.translation_presence_form(..., items=items, lang=lang, valid_translators=choice.value)
+```
+
 #### A real dropdown instead of `build_grc_lexicon_tabs`'s CSS picker
 
 `build_grc_lexicon_tabs`'s multi-lexicon picker is CSS-only (no JS runs in
@@ -1542,6 +1586,44 @@ caption + dropdown, ready to display.
 `gu.render_gloss_table(period_tables, period_selector)` — the chosen
 period's header + description + table (or nothing, if the word has no
 tables at all).
+
+`gu.render_gloss_sheet(gloss_panel, period_tables, period_selector, *, selected_word, click_seq=0, lang="ru", sheet_below_px=750, note=None)`
+(new in 1.26.0) — shows the panel and the table as ONE sheet, in place of the bare
+expressions of the two cells above. On a phone, the table of a form sits far
+below the poem, so the reader has to scroll down after every tap; the sheet
+fixes this. On a wide page (viewport of `sheet_below_px` pixels or more) it
+is a block under the text, as before. On a narrower one, once a word is
+chosen it is a sheet fixed to the bottom of the screen (at most 55% of its
+height, scrolling inside), with a close button that works with CSS only;
+choosing a word again, also the same word, shows it again. Cell 1 then shows
+nothing (it ends with `return gloss_panel, period_selector, period_tables`),
+and the cell that shows the sheet takes `period_selector` as a parameter, for
+the same reason as `render_gloss_table`:
+
+```python
+# Cell 1 -- builds, shows nothing:
+period_tables, period_selector, gloss_panel = gu.render_gloss_selector(
+    QUIZ_WORDS_RAW, text_widget.widget.selected_word, build_period_tables, lang=lang_sel.value,
+)
+return gloss_panel, period_selector, period_tables
+
+# Cell 2 -- shows panel and table as one sheet; reruns on a word click and on a dropdown pick:
+gu.render_gloss_sheet(
+    gloss_panel, period_tables, period_selector, lang=lang_sel.value,
+    selected_word=text_widget.widget.selected_word, click_seq=text_widget.widget.click_seq,
+    note=text_widget.widget.selected_note,
+)
+```
+
+`note` is the margin note a reader tapped in the translation (see
+`interactive_text(..., translation=, notes=)` above): when it is not empty the
+sheet shows the note, the word, its meaning and the label "Margin note", in
+place of the panel and the table; the sheet is open for a note as for a word.
+
+A browser keeps the state of a checkbox while marimo reruns the cell, so
+the sheet changes its root tag (`div` / `section`) with every click: a
+different tag is a new element, and a sheet that the reader closed is open
+again for the next word.
 
 Lower-level, if a notebook genuinely needs to build the tables/dropdown/table
 itself instead of using the two methods above:
@@ -1621,7 +1703,7 @@ text_widget = eee.interactive_text(
 translation = eee.find_stanza_translation(stanza["ref"], translations[trans_selector.value])
 ```
 
-- `interactive_text(mo, *, lines, clickable, homer_words=None, word_classes=None, css=None, ictus_html=None, show_ictus=True)`
+- `interactive_text(mo, *, lines, clickable, homer_words=None, word_classes=None, css=None, ictus_html=None, show_ictus=True, wrap=False, translation=None, notes=None, two_columns_from_px=600)`
   — returns a real `mo.ui.anywidget` rendering `lines` with vocabulary words
   as permanent clickable spans. A panel cell that reacts to word clicks must
   take the *widget*, not this call's return value, as a parameter and read
@@ -1644,15 +1726,79 @@ translation = eee.find_stanza_translation(stanza["ref"], translations[trans_sele
   eee.interactive_text(
       mo, lines=stanza["lines"], clickable=CLICKABLE_FORMS,
       word_classes={"homer": HOMER_WORDS, "lxx": LXX_WORDS},
-      css=".eee-itext .gk-word.lxx{background:#e3f0e3}",
+      css=".eee-itext .gk-word.lxx{background:#e3f0e3;color:#1d1d1b}",
   )
   ```
 
   Class names must be plain CSS identifiers; anything else, or the reserved
   `gk-word`/`active`, raises `ValueError` — also for a set that is empty.
 
+  **Dark theme.** The widget's own highlights (`.homer`, the selected word and
+  the selected note) are pale, so each carries dark text of its own; the page's
+  text is light in marimo's dark theme and would disappear on them. A `css=`
+  rule that sets a pale `background:` needs a `color:` for the same reason, as
+  in the example above. Where the browser knows `light-dark()`, the hover, focus
+  and star colours switch to lighter blues on a dark page (and stay as they were
+  on a light one).
+
+  `wrap=True` (new in 1.26.0) is for a narrow screen. By default each line stays on one row
+  (`white-space: nowrap`), so the widget cannot be narrower than its longest
+  line: put it in a row next to a translation on a phone and the translation
+  is pushed off the screen. With `wrap=True` every line is its own block that
+  wraps inside the box it is given, and its continuation rows are indented (a
+  hanging indent), so the reader can tell a wrapped row from the next line of
+  the poem. Line height in wrap mode is 1.5 (2 in the default mode, which has
+  no wrapped rows to keep apart); a `css=` rule such as
+  `.eee-itext.wrap{line-height:1.7}` changes it. Everything else, the
+  clickable words, `homer` and the other highlight sets, the ictus markup and
+  `selected_word`, works as before.
+
+  `translation=` and `notes=` (new in 1.26.0) draw the translation in the same widget, so the
+  poem and its translation fit any screen width and share one selection.
+  `translation` is the translator's text for the whole stanza, a list of
+  lines; their number need not equal the number of Greek lines (a free verse
+  translation, a prose translation), which is why the translation is one card
+  and not a line beside each Greek line. The card stands beside the Greek when
+  the box that holds the widget is at least `two_columns_from_px` wide (a
+  container query: what counts is the width the notebook gives the widget, not
+  the width of the window) and under it when narrower; `None` (the default)
+  draws the Greek text alone. Use it with `wrap=True`. All translation text is
+  HTML-escaped.
+
+  `notes` is the translator's margin notes, `{line_index: [(word, meaning), ...]}`.
+  The star (`*`) of a translation line is not drawn; when the line has a note for
+  it, the word before the star is a link (in a link's colour, with a dotted
+  underline) that is clickable like a Greek word (the k-th star of
+  a line belongs to the k-th note of that line). A tap on it sets
+  `.widget.selected_note` to `{"line": i, "k": k, "word": ..., "meaning": ...}`,
+  clears `selected_word`, and bumps `click_seq`; a tap on a Greek word clears
+  `selected_note`. The note is not printed under its line: the panel of the word
+  shows it (`GreekUtils.render_gloss_sheet(..., note=text_widget.widget.selected_note)`),
+  so a tap on a linked word explains it where a tap on a Greek word does. The stanza match and the exercise "the word in the translation" also show a translator's text without the stars (the options, the revealed answer and the quoted text alike); they do not show the notes: those belong to the text widget. A
+  lesson that lets the reader hide the translation gives the translator dropdown
+  a blank entry (`mo.ui.dropdown(..., allow_select_none=True)`) and passes
+  `translation=None` when its value is `None`:
+
+  ```python
+  choice = trans_selector.value  # None: the blank entry
+  text_widget = eee.interactive_text(
+      mo, lines=stanza["lines"], clickable=CLICKABLE_FORMS, wrap=True,
+      translation=None if choice is None else stanza["translations"][choice].split("\n"),
+      notes=stanza.get("margin_glosses", {}).get(choice, {}),
+  )
+  mo.vstack([
+      mo.hstack([stanza_selector, trans_selector], justify="start", wrap=True, gap=1.5),
+      text_widget,
+  ])
+  ```
+
   Runnable demo (clickable words, overlapping sets, `css=` on/off, a
-  click-reactive panel): `examples/interactive_text_notebook.py`, or
+  click-reactive panel, and `wrap=True` with `translation=`/`notes=` and
+  `render_gloss_sheet` set up as a lesson sets them up: a stanza dropdown and
+  a translation dropdown with a blank entry in one wrapping row, an interface
+  language that changes the labels and the meanings of the sheet, and two
+  stanzas, the second with a translation of 2 lines for 3 Greek lines and its
+  own notes): `examples/interactive_text_notebook.py`, or
   `make -C examples notebook-itext`.
 - `resolve_clicked_word(words_raw, selected_form) -> dict | None` — map the
   token that `interactive_text` reports in `.widget.selected_word` (tags and
@@ -1696,7 +1842,10 @@ translation = eee.find_stanza_translation(stanza["ref"], translations[trans_sele
   `## interlinear_{lang}` section naming. Use this instead of hardcoding the
   string when building a language-aware translator picker — a mismatch here
   (a notebook assuming a different name than the KB actually uses) silently
-  makes that option show no text instead of erroring.
+  makes that option show no text instead of erroring. The stanza match and
+  the exercise "the word in the translation" show such a key by the
+  `interlinear_label` of its language, not by the key; a picker built from
+  the keys does the same with `ui_label('interlinear_label', lang)`.
 - `strip_comment_lines(text)` — drop any `<!-- ... -->` line from a
   translator's stanza text (e.g. an interlinear translator's echoed Greek
   source line); a no-op for text with no such lines.

@@ -775,6 +775,19 @@ def _ui_label(key: str, lang: "str | None" = None) -> str:
     return entry.get(lang) or entry.get("en") or key
 
 
+def _translator_display_name(translator: "str | None") -> "str | None":
+    """A crib key (``interlinear_ru``) shows as its label in the language of the key; a name stays as it is."""
+    for lang in _UI_LANGS:
+        if translator == interlinear_translator_key(lang):
+            return _ui_label("interlinear_label", lang)
+    return translator
+
+
+def _without_note_stars(text: str) -> str:
+    """A translation as an exercise shows it: without the ``*`` that marks a word with a margin note."""
+    return text.replace("*", "")
+
+
 def _lang_map(keys, tsv_key) -> dict:
     """Build a ``{lang: {key: label}}`` dict for a *compound* concept (a
     tense code, a verb-tense column, a voice) that has no single matching

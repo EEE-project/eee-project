@@ -41,9 +41,12 @@ from eee_project.content import (
     _fetch_url_bytes,
     _fetch_url_bytes_async,
     _fetch_json_url,
+    _UI_LABELS,
     _UI_LANGS,
     _load_ui_labels,
     _ui_label,
+    _translator_display_name,
+    _without_note_stars,
     _GRC_TCOL,
     _EL_VERB_COL_LBL,
     _EL_VOICE_CAP,
@@ -930,6 +933,52 @@ class TestUiLabel:
         for name, d in (("_GRC_TCOL", _GRC_TCOL), ("_EL_VERB_COL_LBL", _EL_VERB_COL_LBL),
                         ("_EL_VOICE_CAP", _EL_VOICE_CAP)):
             assert set(d.keys()) == set(_UI_LANGS), f"{name} has a fixed language set, not derived from _UI_LANGS"
+
+
+class TestTranslatorDisplayName:
+    """The key of a word-for-word crib is technical (``interlinear_el``): a learner reads the label of the crib in the language of the key."""
+
+    def test_a_crib_key_becomes_the_label_of_its_own_language(self):
+        for lang in _UI_LANGS:
+            assert _translator_display_name(interlinear_translator_key(lang)) == _ui_label("interlinear_label", lang)
+
+    def test_the_russian_and_english_labels(self):
+        assert _translator_display_name("interlinear_ru") == "подстрочник"
+        assert _translator_display_name("interlinear_en") == "interlinear"
+
+    def test_a_translator_name_and_none_stay_as_they_are(self):
+        assert _translator_display_name("Жуковский") == "Жуковский"
+        assert _translator_display_name(None) is None
+
+    def test_a_crib_key_of_a_language_without_a_ui_file_stays_as_it_is(self):
+        assert _translator_display_name("interlinear_xx") == "interlinear_xx"
+
+
+class TestWithoutNoteStars:
+    """A translation as the exercises show it: without the ``*`` that marks a word with a margin note."""
+
+    def test_the_stars_are_dropped_and_the_words_stay(self):
+        assert _without_note_stars("aaa* bbb ccc* ddd") == "aaa bbb ccc ddd"
+
+    def test_a_text_without_a_star_is_unchanged(self):
+        text = "Муза, скажи мне о том многоопытном муже"
+        assert _without_note_stars(text) == text
+
+    def test_a_line_break_and_a_bullet_stay(self):
+        assert _without_note_stars("a*\nb• c") == "a\nb• c"
+
+
+class TestTranslatorChoiceLabels:
+    """The label of a translator choice and its two "too few translators" messages: one key each, with a text in every UI language."""
+
+    @pytest.mark.parametrize("key", ["translators_selector_label", "stanza_match_min_translators", "presence_min_translators"])
+    def test_the_key_has_its_own_text_in_every_ui_language(self, key):
+        entry = _UI_LABELS[key]
+        assert set(entry) == set(_UI_LANGS)
+        assert all(text.strip() and text != key for text in entry.values())
+
+    def test_the_stanza_match_message_names_the_number_of_translators_it_needs(self):
+        assert all("2" in text for text in _UI_LABELS["stanza_match_min_translators"].values())
 
 
 class TestSaveLanguageSelection:

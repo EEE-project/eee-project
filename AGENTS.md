@@ -73,6 +73,10 @@ introduced shortly after `30fa087`) is where per-version detail lives now —
   dropdowns are known to do this — the page itself is fine, only
   `Page.captureScreenshot` hangs), switch to JS-only interaction
   (`javascript_exec` for DOM queries/events) rather than retrying screenshots.
+  `tests/integration/test_interactive_text_browser.py` automates this live check for `interactive_text` and
+  `render_gloss_sheet`: it runs `examples/interactive_text_notebook.py` with `marimo run` and drives Chromium
+  through Playwright at a phone width and a wide width (`-m integration`; skipped without Playwright or a Chromium,
+  see its docstring). Run it after a change to `_ITEXT_ESM`, `_ITEXT_CSS`, `_ITEXT_CSS_TR` or the sheet.
 - `tests/test_examples_run.py` runs every `examples/*.py` (the notebooks and the plain
   scripts) from its first line to its last (`python -I`, 4 at a time, about 25 s in all), so a
   library change that breaks an example fails the suite. It does not render a page, so the
