@@ -119,12 +119,12 @@
       margin: 0 auto;
     }
 
-    .hero {
+    .eee-index-header {
       text-align: center;
       margin-bottom: 40px;
     }
 
-    .hero-title {
+    .eee-title {
       font-size: 30px;
       font-weight: 800;
       letter-spacing: -0.02em;
@@ -134,7 +134,7 @@
       margin-bottom: 10px;
     }
 
-    .hero-subtitle {
+    .eee-subtitle {
       font-size: 15px;
       color: var(--muted);
       line-height: 1.6;
@@ -148,7 +148,7 @@
       gap: 16px;
     }
 
-    .card {
+    .eee-card {
       display: block;
       text-decoration: none;
       color: var(--text);
@@ -159,23 +159,23 @@
       transition: transform 0.15s, border-color 0.2s, box-shadow 0.2s;
     }
 
-    .card:active {
+    .eee-card:active {
       transform: scale(0.98);
     }
 
-    .card:hover {
+    .eee-card:hover {
       border-color: rgba(0,61,130,0.35);
       box-shadow: 0 0 20px rgba(0,61,130,0.06);
     }
 
-    .card-header {
+    .eee-card-header {
       display: flex;
       align-items: center;
       gap: 12px;
       margin-bottom: 10px;
     }
 
-    .card-icon {
+    .eee-card-icon {
       font-size: 26px;
       width: 46px;
       height: 46px;
@@ -187,26 +187,26 @@
       flex-shrink: 0;
     }
 
-    .card-title {
+    .eee-card-title {
       font-size: 19px;
       font-weight: 700;
       letter-spacing: 0.01em;
     }
 
-    .card-greek {
+    .eee-card-greek {
       font-family: 'DM Mono', monospace;
       font-size: 13px;
       color: var(--accent);
       margin-top: 2px;
     }
 
-    .card-desc {
+    .eee-card-desc {
       font-size: 14px;
       color: var(--muted);
       line-height: 1.5;
     }
 
-    .card-arrow {
+    .eee-card-arrow {
       display: flex;
       align-items: center;
       justify-content: flex-end;
@@ -266,94 +266,94 @@
   </div>
 
   <div class="content">
-    <div class="hero">
-      <div class="hero-title">Ελληνικά Εκπαιδευτικά Εργαλεία</div>
-      <div class="hero-subtitle" data-i18n="hero_subtitle">Interactive Ancient &amp; Modern Greek morphology tools, running entirely in your browser via WebAssembly — no install needed.</div>
+    <div class="eee-index-header">
+      <div class="eee-title">Ελληνικά Εκπαιδευτικά Εργαλεία</div>
+      <div class="eee-subtitle" data-i18n="subtitle">Interactive Ancient &amp; Modern Greek morphology tools, running entirely in your browser via WebAssembly — no install needed.</div>
     </div>
 
     <div class="cards">
-      <a class="card" href="drill/">
-        <div class="card-header">
-          <div class="card-icon">&#x1F3AF;</div>
+      <a class="eee-card" href="drill/">
+        <div class="eee-card-header">
+          <div class="eee-card-icon">&#x1F3AF;</div>
           <div>
-            <div class="card-title">Paradigm Drill</div>
-            <div class="card-greek">Άσκηση Κλίσης</div>
+            <div class="eee-card-title">Paradigm Drill</div>
+            <div class="eee-card-greek">Άσκηση Κλίσης</div>
           </div>
         </div>
-        <div class="card-desc" data-i18n="desc_drill">Practice verb, noun, and adjective forms with the built-in vocabulary or your own uploaded word list.</div>
-        <div class="card-arrow">OPEN &rarr;</div>
+        <div class="eee-card-desc" data-i18n="desc_drill">Practice verb, noun, and adjective forms with the built-in vocabulary or your own uploaded word list.</div>
+        <div class="eee-card-arrow">OPEN &rarr;</div>
       </a>
 
-      <a class="card" href="greek/">
-        <div class="card-header">
-          <div class="card-icon">&#x1F50D;</div>
+      <a class="eee-card" href="greek/">
+        <div class="eee-card-header">
+          <div class="eee-card-icon">&#x1F50D;</div>
           <div>
-            <div class="card-title">Greek Morphology Explorer</div>
-            <div class="card-greek">Μορφολογία — Νέα &amp; Αρχαία</div>
+            <div class="eee-card-title">Greek Morphology Explorer</div>
+            <div class="eee-card-greek">Μορφολογία — Νέα &amp; Αρχαία</div>
           </div>
         </div>
-        <div class="card-desc" data-i18n="desc_greek">Look up any word's full inflection paradigm, switching freely between Modern and Ancient Greek backends.</div>
-        <div class="card-arrow">OPEN &rarr;</div>
+        <div class="eee-card-desc" data-i18n="desc_greek">Look up any word's full inflection paradigm, switching freely between Modern and Ancient Greek backends.</div>
+        <div class="eee-card-arrow">OPEN &rarr;</div>
       </a>
 
-      <a class="card" href="ancient-greek/">
-        <div class="card-header">
-          <div class="card-icon">&#x1F4DC;</div>
+      <a class="eee-card" href="ancient-greek/">
+        <div class="eee-card-header">
+          <div class="eee-card-icon">&#x1F4DC;</div>
           <div>
-            <div class="card-title">Ancient Greek Morphology</div>
-            <div class="card-greek">Ἀρχαία Ἑλληνικά</div>
+            <div class="eee-card-title">Ancient Greek Morphology</div>
+            <div class="eee-card-greek">Ἀρχαία Ἑλληνικά</div>
           </div>
         </div>
-        <div class="card-desc" data-i18n="desc_ancient_greek">Browse 5 period/corpus backends — Homer, LSJ, LXX, MorphGNT, and Byzantine — plus UniMorph.</div>
-        <div class="card-arrow">OPEN &rarr;</div>
+        <div class="eee-card-desc" data-i18n="desc_ancient_greek">Browse 5 period/corpus backends — Homer, LSJ, LXX, MorphGNT, and Byzantine — plus UniMorph.</div>
+        <div class="eee-card-arrow">OPEN &rarr;</div>
       </a>
 
-      <a class="card" href="modern-greek/">
-        <div class="card-header">
-          <div class="card-icon">&#x1F1EC;&#x1F1F7;</div>
+      <a class="eee-card" href="modern-greek/">
+        <div class="eee-card-header">
+          <div class="eee-card-icon">&#x1F1EC;&#x1F1F7;</div>
           <div>
-            <div class="card-title">Modern Greek Morphology</div>
-            <div class="card-greek">Νέα Ελληνικά</div>
+            <div class="eee-card-title">Modern Greek Morphology</div>
+            <div class="eee-card-greek">Νέα Ελληνικά</div>
           </div>
         </div>
-        <div class="card-desc" data-i18n="desc_modern_greek">Compare the dedicated Modern Greek backend against UniMorph for the same lemma.</div>
-        <div class="card-arrow">OPEN &rarr;</div>
+        <div class="eee-card-desc" data-i18n="desc_modern_greek">Compare the dedicated Modern Greek backend against UniMorph for the same lemma.</div>
+        <div class="eee-card-arrow">OPEN &rarr;</div>
       </a>
 
-      <a class="card" href="unimorph/">
-        <div class="card-header">
-          <div class="card-icon">&#x1F310;</div>
+      <a class="eee-card" href="unimorph/">
+        <div class="eee-card-header">
+          <div class="eee-card-icon">&#x1F310;</div>
           <div>
-            <div class="card-title">UniMorph Browser</div>
-            <div class="card-greek">187 γλώσσες</div>
+            <div class="eee-card-title">UniMorph Browser</div>
+            <div class="eee-card-greek">187 γλώσσες</div>
           </div>
         </div>
-        <div class="card-desc" data-i18n="desc_unimorph">Explore inflection data for all 187 languages in the UniMorph corpus — 6 bundled offline, the rest fetched on demand.</div>
-        <div class="card-arrow">OPEN &rarr;</div>
+        <div class="eee-card-desc" data-i18n="desc_unimorph">Explore inflection data for all 187 languages in the UniMorph corpus — 6 bundled offline, the rest fetched on demand.</div>
+        <div class="eee-card-arrow">OPEN &rarr;</div>
       </a>
 
-      <a class="card" href="exercise/">
-        <div class="card-header">
-          <div class="card-icon">&#x1F9E9;</div>
+      <a class="eee-card" href="exercise/">
+        <div class="eee-card-header">
+          <div class="eee-card-icon">&#x1F9E9;</div>
           <div>
-            <div class="card-title">Exercise &amp; Quiz Demo</div>
-            <div class="card-greek">Ασκήσεις &amp; Κουίζ</div>
+            <div class="eee-card-title">Exercise &amp; Quiz Demo</div>
+            <div class="eee-card-greek">Ασκήσεις &amp; Κουίζ</div>
           </div>
         </div>
-        <div class="card-desc" data-i18n="desc_exercise">Live comparison, custom drills, multiple choice, write-the-word with polytonic diacritics, and full paradigm drills.</div>
-        <div class="card-arrow">OPEN &rarr;</div>
+        <div class="eee-card-desc" data-i18n="desc_exercise">Live comparison, custom drills, multiple choice, write-the-word with polytonic diacritics, and full paradigm drills.</div>
+        <div class="eee-card-arrow">OPEN &rarr;</div>
       </a>
 
-      <a class="card" href="interactive-text/">
-        <div class="card-header">
-          <div class="card-icon">&#x1F4D6;</div>
+      <a class="eee-card" href="interactive-text/">
+        <div class="eee-card-header">
+          <div class="eee-card-icon">&#x1F4D6;</div>
           <div>
-            <div class="card-title">Interactive Text</div>
-            <div class="card-greek">Διαδραστικό Κείμενο</div>
+            <div class="eee-card-title">Interactive Text</div>
+            <div class="eee-card-greek">Διαδραστικό Κείμενο</div>
           </div>
         </div>
-        <div class="card-desc" data-i18n="desc_interactive_text">Click words in a poem, highlight word sets, and read it beside or under a translation that fits a phone, with margin notes in the word panel and comment cards that light up the words they discuss.</div>
-        <div class="card-arrow">OPEN &rarr;</div>
+        <div class="eee-card-desc" data-i18n="desc_interactive_text">Click words in a poem, highlight word sets, and read it beside or under a translation that fits a phone, with margin notes in the word panel and comment cards that light up the words they discuss.</div>
+        <div class="eee-card-arrow">OPEN &rarr;</div>
       </a>
     </div>
 
@@ -367,13 +367,13 @@
     // Shares the "eee_lang" localStorage key with every demo's own
     // language_bridge()/language_selector() (see notebook_utils.py) --
     // picking a language here carries into whichever demo you open next,
-    // and vice versa. Card titles and the hero's Greek headline are brand
+    // and vice versa. Card titles and the Greek headline at the top are brand
     // names, not translated content, so they stay fixed across languages
     // (matching the demo pages' own topbar/tab titles, which don't
     // translate either); only the descriptive prose switches.
     const TRANSLATIONS = {
       en: {
-        hero_subtitle: "Interactive Ancient &amp; Modern Greek morphology tools, running entirely in your browser via WebAssembly — no install needed.",
+        subtitle: "Interactive Ancient &amp; Modern Greek morphology tools, running entirely in your browser via WebAssembly — no install needed.",
         desc_drill: "Practice verb, noun, and adjective forms with the built-in vocabulary or your own uploaded word list.",
         desc_greek: "Look up any word's full inflection paradigm, switching freely between Modern and Ancient Greek backends.",
         desc_ancient_greek: "Browse 5 period/corpus backends — Homer, LSJ, LXX, MorphGNT, and Byzantine — plus UniMorph.",
@@ -384,7 +384,7 @@
         footer_text: "EEE — Greek Language Educational Tools",
       },
       ru: {
-        hero_subtitle: "Интерактивные инструменты морфологии древнегреческого и новогреческого языков — работают полностью в браузере через WebAssembly, установка не требуется.",
+        subtitle: "Интерактивные инструменты морфологии древнегреческого и новогреческого языков — работают полностью в браузере через WebAssembly, установка не требуется.",
         desc_drill: "Тренируйте формы глаголов, существительных и прилагательных — со встроенным словарём или своим списком слов.",
         desc_greek: "Ищите полную парадигму словоформ любого слова, свободно переключаясь между новогреческим и древнегреческим движками.",
         desc_ancient_greek: "5 периодов/корпусов — Гомер, LSJ, LXX, MorphGNT и византийский — плюс UniMorph.",
@@ -395,7 +395,7 @@
         footer_text: "EEE — образовательные инструменты греческого языка",
       },
       el: {
-        hero_subtitle: "Διαδραστικά εργαλεία μορφολογίας αρχαίων και νέων ελληνικών, που εκτελούνται εξ ολοκλήρου στον browser σας μέσω WebAssembly — χωρίς εγκατάσταση.",
+        subtitle: "Διαδραστικά εργαλεία μορφολογίας αρχαίων και νέων ελληνικών, που εκτελούνται εξ ολοκλήρου στον browser σας μέσω WebAssembly — χωρίς εγκατάσταση.",
         desc_drill: "Εξασκηθείτε σε τύπους ρημάτων, ουσιαστικών και επιθέτων με το ενσωματωμένο λεξιλόγιο ή τη δική σας λίστα λέξεων.",
         desc_greek: "Αναζητήστε την πλήρη κλίση οποιασδήποτε λέξης, εναλλάσσοντας ελεύθερα ανάμεσα σε νέα και αρχαία ελληνικά.",
         desc_ancient_greek: "5 περίοδοι/σώματα κειμένων — Όμηρος, LSJ, LXX, MorphGNT και βυζαντινή — συν UniMorph.",
