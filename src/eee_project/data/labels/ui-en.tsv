@@ -88,6 +88,7 @@ gloss_panel_era_caption	*Word forms by era — only the simplest morphological c
 period_selector_label	Period
 word_missing_in_paradigm	{word} — missing in the paradigm of {lemma}
 card_list_soon	coming soon
+card_list_open	OPEN
 card_list_load_error	Couldn't load file: {url}<br><br>Check that it's accessible at that link.
 word_list_empty_for	The word list for {title} is empty.
 check_entered_must_be	entered **"{value}"**, must be **{expected}**

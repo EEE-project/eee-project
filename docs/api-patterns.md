@@ -267,7 +267,7 @@ Helper functions for Marimo notebooks, exported from `eee_project`:
 
 ```python
 from eee_project import eee_topbar, eee_footer, load_ga_config
-from eee_project.notebook_utils import eee_hero, eee_card_list
+from eee_project.notebook_utils import eee_index_header, eee_card_list
 
 # load GA config from ga.json next to this notebook (returns None if missing)
 _ga = load_ga_config(__file__)
@@ -277,8 +277,8 @@ eee_topbar(mo, back_url="https://...", lang=lang_sel.value,
            titles={"ru": "Каподистриас", "en": "Kapodistrias"},
            ga_config=_ga)
 
-# index-page hero title block
-eee_hero(mo, lang_sel.value, {
+# index-page title and subtitle
+eee_index_header(mo, lang_sel.value, {
     "ru": ("Каподистриас", "Серия уроков"),
     "el": ("Καποδίστριας", "Σειρά μαθημάτων"),
     "en": ("Kapodistrias", "Lesson series"),
@@ -293,9 +293,10 @@ eee_footer(mo, lang=lang_sel.value)
 
 All four return `mo.Html()` (or `mo.md()` for `eee_card_list`'s load-error
 case) and **must be the last expression in a marimo cell** (no trailing
-`return`). `eee_hero` and `eee_card_list` both take `lang_fallback=` (default
-`"el"`) — the language to fall back to when `lang` has no translation; pass
-`lang_fallback="en"` for English-first notebooks.
+`return`). `eee_index_header` and `eee_card_list` both take `lang_fallback=`
+(default `"el"`) — the language to fall back to when `lang` has no
+translation; pass `lang_fallback="en"` for English-first notebooks.
+`eee_hero` is the old name of `eee_index_header` and still works.
 
 `eee_topbar` supports two styles via `style=`:
 
@@ -583,9 +584,10 @@ eee_card_list(mo, _cfg, lang_sel.value)
 
 Each row needs `url`, `icon`, `greek`, and `label_<lang>`/`title_<lang>`/
 `desc_<lang>` columns. `url` is used verbatim, whatever it points to — an
-empty `url` renders a disabled "coming soon" card instead. Renders a
-translated "couldn't load" message via `mo.md()` instead when
-`_cfg.lessons()` is empty.
+empty `url` renders a disabled "coming soon" card instead. A linked card
+ends with "OPEN →" in the page language (`card_list_open` in
+`data/labels/ui-*.tsv`). Renders a translated "couldn't load" message via
+`mo.md()` instead when `_cfg.lessons()` is empty.
 
 ---
 
@@ -2090,6 +2092,18 @@ return noun_fb, noun_ok
   advance focus, don't hand-roll it on top of this recipe — use the
   "Paradigm drill (3-cell API)" recipe above, which already implements the
   reply side of this protocol correctly.
+- A reply may carry `"note": [line, ...]` (new in 1.27.0): plain-text lines that the
+  form draws right under the field the Enter came from. The "Paradigm drill (3-cell
+  API)" recipe does this for a wrong answer, so on a phone the message is under the
+  field being typed in, not under all the rows. A hand-rolled reply can do the same:
+
+  ```python
+  form.widget.focus_request = {"request_id": req_id, "advance_to": None,
+                               "note": ["❌ [Nom. Sg.]: noun \"λάθος\", must be μήνυμα"]}
+  ```
+
+  The form scrolls the lines into view when they are off the screen and removes them
+  when the field is edited or when a reply without a `note` comes for it.
 
 ---
 

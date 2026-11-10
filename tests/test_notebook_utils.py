@@ -5,6 +5,7 @@ import dataclasses
 import json
 import re
 from collections import Counter
+from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 import marimo as mo
@@ -17,7 +18,7 @@ from eee_project.notebook_utils import (
     GreekUtils,
     eee_topbar,
     eee_ga_tracker,
-    eee_hero,
+    eee_index_header,
     eee_card_list,
     eee_footer,
     _source_host_base,
@@ -32,6 +33,8 @@ from eee_project.notebook_utils import (
     _PARA_ESM,
     _ITEXT_ESM,
     _ITEXT_CSS,
+    _INDEX_HEADER_CSS,
+    _CARD_LIST_CSS,
     _UI_LABELS,
 )
 from conftest import (
@@ -690,24 +693,34 @@ class TestEeeGaTracker:
         assert eee_ga_tracker(_FormMo(), {"other": "value"}) is None
 
 
-class TestEeeHero:
+class TestEeeIndexHeader:
     _TITLES = {"ru": ("Заголовок", "Подзаголовок"), "el": ("Τίτλος", "Υπότιτλος"), "en": ("Title", "Subtitle")}
 
     def test_returns_html_with_title_and_subtitle(self):
-        result = eee_hero(_StubHtmlMo(), "en", self._TITLES)
+        result = eee_index_header(_StubHtmlMo(), "en", self._TITLES)
         assert isinstance(result, _StubHtmlMo.Html)
         assert "Title" in result.s
         assert "Subtitle" in result.s
-        assert "eee-hero" in result.s
+        assert "eee-index-header" in result.s
+        assert '<div class="eee-subtitle">Subtitle</div>' in result.s
 
     def test_lang_fallback_used_when_translation_missing(self):
-        result = eee_hero(_StubHtmlMo(), "fr", self._TITLES, lang_fallback="el")
+        result = eee_index_header(_StubHtmlMo(), "fr", self._TITLES, lang_fallback="el")
         assert "Τίτλος" in result.s
         assert "Υπότιτλος" in result.s
 
     def test_lang_fallback_en(self):
-        result = eee_hero(_StubHtmlMo(), "fr", self._TITLES, lang_fallback="en")
+        result = eee_index_header(_StubHtmlMo(), "fr", self._TITLES, lang_fallback="en")
         assert "Title" in result.s
+
+    def test_every_class_of_the_markup_has_a_css_rule(self):
+        html = eee_index_header(_StubHtmlMo(), "en", self._TITLES).s
+        for name in re.findall(r'class="([^"]+)"', html):
+            assert re.search(rf"\.{re.escape(name)}(?![\w-])", html), f"no CSS rule for {name}"
+
+    def test_old_name_eee_hero_is_the_same_function(self):
+        from eee_project.notebook_utils import eee_hero
+        assert eee_hero is eee_index_header
 
 
 class TestEeeCardList:
@@ -751,6 +764,18 @@ class TestEeeCardList:
         assert "coming soon" in result.s
         assert "<a " not in result.s
 
+    def test_linked_card_ends_with_the_open_label_of_the_page_language(self):
+        for lang, word in (("en", "OPEN"), ("ru", "ОТКРЫТЬ"), ("el", "ΑΝΟΙΓΜΑ")):
+            result = eee_card_list(_StubHtmlMo(), self._cfg([self._ROW]), lang=lang)
+            assert f'<div class="eee-card-arrow">{word} →</div>' in result.s
+            assert "◀" not in result.s
+
+    def test_open_label_falls_back_and_a_disabled_card_has_none(self):
+        result = eee_card_list(_StubHtmlMo(), self._cfg([self._ROW]), lang="fr", lang_fallback="en")
+        assert "OPEN →" in result.s
+        result = eee_card_list(_StubHtmlMo(), self._cfg([{**self._ROW, "url": ""}]), lang="en")
+        assert "→" not in result.s
+
     def test_lang_fallback_used_when_translation_missing(self):
         result = eee_card_list(_StubHtmlMo(), self._cfg([self._ROW]), lang="fr", lang_fallback="el")
         assert "Μάθημα 1" in result.s
@@ -772,6 +797,31 @@ class TestEeeCardList:
     def test_empty_lessons_load_error_falls_back(self):
         result = eee_card_list(_StubHtmlMo(), self._cfg([]), lang="fr", lang_fallback="en")
         assert "Couldn't load file" in result
+
+
+class TestHubLookMatchesTheEeeProjectHub:
+    """eee_index_header and eee_card_list use the class names and the sizes of examples/deploy/hub_index.html, the eee-project landing hub."""
+
+    @staticmethod
+    def _value(css, selector, prop):
+        m = re.search(rf"{re.escape(selector)}\s*\{{[^}}]*?\b{prop}:\s*([^;}}]+)", css)
+        assert m, f"{selector} has no {prop}"
+        return m.group(1).strip()
+
+    @pytest.mark.parametrize("selector, lib_css, prop", [
+        pytest.param(".eee-title", _INDEX_HEADER_CSS, "font-size", id="title-size"),
+        pytest.param(".eee-title", _INDEX_HEADER_CSS, "margin-bottom", id="title-margin"),
+        pytest.param(".eee-subtitle", _INDEX_HEADER_CSS, "font-size", id="subtitle-size"),
+        pytest.param(".eee-card-title", _CARD_LIST_CSS, "font-size", id="card-title-size"),
+        pytest.param(".eee-card-greek", _CARD_LIST_CSS, "font-size", id="card-greek-size"),
+        pytest.param(".eee-card-desc", _CARD_LIST_CSS, "font-size", id="card-desc-size"),
+        pytest.param(".eee-card-arrow", _CARD_LIST_CSS, "letter-spacing", id="arrow-spacing"),
+    ])
+    def test_same_value_as_the_hub(self, selector, lib_css, prop):
+        hub = (Path(__file__).resolve().parents[1] / "examples" / "deploy" / "hub_index.html").read_text(encoding="utf-8")
+        # the browser applies the last rule of a selector and _value() reads the first
+        assert len(re.findall(rf"{re.escape(selector)}\s*\{{", lib_css)) == 1, f"{selector} is defined more than once"
+        assert self._value(lib_css, selector, prop) == self._value(hub, selector, prop)
 
 
 # ──────────────────────────────────────────────────── fmt_ud_feats ──
@@ -2857,12 +2907,27 @@ class TestMakeParadigmForm:
     def test_esm_focus_request_is_a_named_dict_not_a_positional_pair(self):
         # focus_request always carries an ack (request_id, to release the
         # lock) and *optionally* a real navigation instruction (advance_to,
-        # null on a wrong answer or the last field). A plain [index, seq]
+        # null on a wrong answer or the last field) and a `note` (the lines
+        # that explain a wrong answer). A plain [index, seq]
         # pair made that "sometimes it's just an ack" dual purpose invisible
         # in the shape itself -- a null advance_to says it directly.
         import eee_project.notebook_utils as _nu
-        assert "const{request_id,advance_to}=model.get('focus_request')||{};" in _nu._PARA_ESM
+        assert "const{request_id,advance_to,note}=model.get('focus_request')||{};" in _nu._PARA_ESM
         assert "advance_to!=null&&advance_to<inputs.length" in _nu._PARA_ESM
+
+    def test_esm_draws_the_replys_note_under_the_origin_field(self):
+        # The message block of a drill sits under ALL the rows and the buttons: on a phone it is
+        # below the screen when the learner presses Enter in a field further up. The reply's
+        # note (plain-text lines for that field alone) is drawn right under the field the Enter
+        # came from, as text and never as markup; a reply without a note clears it.
+        import eee_project.notebook_utils as _nu
+        assert "showNote(originIdx,note);" in _nu._PARA_ESM
+        assert "d.textContent=t" in _nu._PARA_ESM
+        assert ".eee-para-note{" in _nu._PARA_CSS
+
+    def test_esm_clears_a_fields_note_when_it_is_edited(self):
+        import eee_project.notebook_utils as _nu
+        assert "showNote(i,null);" in _nu._PARA_ESM
 
     def test_esm_submit_locks_release_on_timeout_backstop(self):
         # If Python's reply for this exact request never arrives (e.g.
@@ -3684,6 +3749,15 @@ class _ParadigmDrillFormBase:
         """
         assert sorted(actual, key=lambda d: d["form"]) == sorted(expected, key=lambda d: d["form"])
 
+    def _wrong_enter_reply(self, gu, slot_name, test_name, call, values):
+        """The reply to Enter in field 0 when its answer is wrong. The full check is
+        stubbed to echo the values it was given, so the reply shows which fields it judged."""
+        form = _pdform(values, submit_count=1, enter_field_index=0)
+        with patch.object(gu, slot_name, return_value=False), \
+             patch.object(gu, test_name, side_effect=lambda base, cap, *args, **kwargs: (False, f"❌ {cap.value}")):
+            call(form)
+        return form.widget.focus_request
+
 
 class TestVerbParadigmDrillForm(_ParadigmDrillFormBase):
     _VOCAB = [{"form": "λύω", "meaning": "I loose"}, {"form": "ἄγω", "meaning": "I lead"}]
@@ -3843,6 +3917,15 @@ class TestVerbParadigmDrillForm(_ParadigmDrillFormBase):
         # the origin field on every Enter and needs a reply to release that
         # lock, even when the answer was wrong.
         assert form.widget.focus_request == {"request_id": 1, "advance_to": None}
+
+    def test_enter_on_wrong_slot_sends_that_fields_message_as_a_note(self, gu):
+        # The note holds the lines of the checked field alone: the full check runs on a copy
+        # of the form with every other field blank (the four siblings share this engine).
+        reply = self._wrong_enter_reply(
+            gu, "check_verb_slot", "check_verb_test",
+            lambda form: self._call(gu, self._state(), self._VOCAB[0], form, self._meta()),
+            ["asd", "λύεις"])
+        assert reply == {"request_id": 1, "advance_to": None, "note": ["❌ ['asd', '']"]}
 
     def test_next_button_persists_and_advances_regardless_of_correctness(self, gu):
         cv = self._VOCAB[0]
@@ -4389,6 +4472,34 @@ class TestNounParadigmDrillForm(_ParadigmDrillFormBase):
         mock_slot.assert_called_once_with(
             "ὁ ἀγρός", 0, "ἀγρός", article=True, active_cases=gu._cfg.noun_cells, indefinite=False,
         )
+
+    def test_enter_on_wrong_slot_sends_that_fields_message_as_a_note(self, gu):
+        # On a phone the message block sits far below the field being typed in, so the reply
+        # carries the lines of the checked field alone (the full check of a copy of the form
+        # with every other field blank), as plain text, for the form to draw under that field.
+        seen = []
+
+        def full(noun, cap, **kwargs):
+            seen.append(list(cap.value))
+            return False, '❌ [Nom. Sg.]: article missing, must be **ὁ**<br>❌ [Nom. Sg.]: noun "**λάθος**", must be **ἀγρός**'
+
+        form = _pdform(["λάθος", "ἀγροῦ"], submit_count=1, enter_field_index=0)
+        with patch.object(gu, "check_noun_slot", return_value=False), \
+             patch.object(gu, "check_noun_test", side_effect=full):
+            self._call(gu, self._state(), self._VOCAB[0], form, self._meta())
+        assert form.widget.focus_request == {
+            "request_id": 1, "advance_to": None,
+            "note": ["❌ [Nom. Sg.]: article missing, must be ὁ", '❌ [Nom. Sg.]: noun "λάθος", must be ἀγρός'],
+        }
+        assert ["λάθος", ""] in seen
+
+    def test_enter_on_an_empty_field_sends_no_note(self, gu):
+        # A blank answer has nothing to explain, whatever the rest of the form says.
+        form = _pdform(["", "ἀγροῦ"], submit_count=1, enter_field_index=0)
+        with patch.object(gu, "check_noun_slot", return_value=False), \
+             patch.object(gu, "check_noun_test", return_value=(False, "❌ [Gen. Sg.]: x")):
+            self._call(gu, self._state(), self._VOCAB[0], form, self._meta())
+        assert form.widget.focus_request == {"request_id": 1, "advance_to": None}
 
     def test_article_false_passed_to_check_noun_slot(self, gu):
         # article=False (e.g. a Modern Greek "simple" bare-noun mode toggle)
@@ -6576,6 +6687,13 @@ class TestAdjectiveParadigmDrillForm(_ParadigmDrillFormBase):
         assert form.widget.focus_request == {"request_id": 1, "advance_to": 1}
         mock_slot.assert_called_with(cv["form"], "simple", 0, "καλός", active_slots=gu._adj_slot_list("simple"))
 
+    def test_enter_on_wrong_slot_sends_that_fields_message_as_a_note(self, gu):
+        reply = self._wrong_enter_reply(
+            gu, "check_adjective_slot", "check_adjective_test",
+            lambda form: self._call(gu, self._state(), self._VOCAB[0], form),
+            ["asd", "καλή"] + [""] * 4)
+        assert reply == {"request_id": 1, "advance_to": None, "note": [f"❌ {['asd'] + [''] * 5}"]}
+
     def test_next_button_persists_and_advances_regardless_of_correctness(self, gu):
         cv = self._VOCAB[0]
         state = self._state()
@@ -6619,6 +6737,13 @@ class TestPronounParadigmDrillForm(_ParadigmDrillFormBase):
             self._call_form(gu.pronoun_paradigm_drill_form, state, cv, form)
         assert form.widget.focus_request == {"request_id": 1, "advance_to": 1}
         mock_slot.assert_called_with(cv["form"], "simple", 0, "κανένας", active_slots=gu._pronoun_slot_list("simple"))
+
+    def test_enter_on_wrong_slot_sends_that_fields_message_as_a_note(self, gu):
+        reply = self._wrong_enter_reply(
+            gu, "check_pronoun_slot", "check_pronoun_test",
+            lambda form: self._call_form(gu.pronoun_paradigm_drill_form, self._state(), self._VOCAB[0], form),
+            ["asd", "κανένα"] + [""] * 4)
+        assert reply == {"request_id": 1, "advance_to": None, "note": [f"❌ {['asd'] + [''] * 5}"]}
 
     def test_error_tracking_wiring_reaches_pronoun(self, gu):
         # Confirms get_errors/set_errors/get_retry_cnt/set_retry_cnt reach

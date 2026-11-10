@@ -88,6 +88,7 @@ gloss_panel_era_caption	*Τύποι λέξεων ανά περίοδο — μό�
 period_selector_label	Περίοδος
 word_missing_in_paradigm	{word} — απουσιάζει από την κλίση του {lemma}
 card_list_soon	σύντομα
+card_list_open	ΑΝΟΙΓΜΑ
 card_list_load_error	Δεν ήταν δυνατή η φόρτωση του αρχείου: {url}<br><br>Ελέγξτε αν είναι προσβάσιμο σε αυτόν τον σύνδεσμο.
 word_list_empty_for	Η λίστα λέξεων για {title} είναι κενή.
 check_entered_must_be	καταχωρήθηκε **"{value}"**, πρέπει να είναι **{expected}**

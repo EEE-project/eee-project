@@ -88,6 +88,7 @@ gloss_panel_era_caption	*Формы слова по эпохам — тольк�
 period_selector_label	Период
 word_missing_in_paradigm	{word} — отсутствует в парадигме {lemma}
 card_list_soon	скоро
+card_list_open	ОТКРЫТЬ
 card_list_load_error	Не удалось загрузить файл: {url}<br><br>Проверьте, что он доступен по этой ссылке.
 word_list_empty_for	Список слов для «{title}» пуст.
 check_entered_must_be	введено **"{value}"**, должно быть **{expected}**

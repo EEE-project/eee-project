@@ -27,8 +27,8 @@ def _demos():
 def _hub_cards():
     """{dir: (card title, i18n key of its description)} for each card on the hub page."""
     cards = {}
-    for href, inner in re.findall(r'<a class="card" href="([^"]+)/">(.*?)</a>', HUB, re.S):
-        title = re.search(r'<div class="card-title">(.*?)</div>', inner).group(1)
+    for href, inner in re.findall(r'<a class="eee-card" href="([^"]+)/">(.*?)</a>', HUB, re.S):
+        title = re.search(r'<div class="eee-card-title">(.*?)</div>', inner).group(1)
         cards[href] = (html.unescape(title), re.search(r'data-i18n="([^"]+)"', inner).group(1))
     return cards
 
@@ -66,6 +66,17 @@ class TestLiveDemoSet:
             keys = _translation_keys(lang)
             for name, (_, key) in _hub_cards().items():
                 assert key in keys, f"{name}: no {key} in the {lang} block"
+
+    def test_every_text_key_of_the_page_exists_in_every_language(self):
+        used = set(re.findall(r'data-i18n="([^"]+)"', HUB))
+        for lang in ("en", "ru", "el"):
+            assert used <= set(_translation_keys(lang)), f"{lang}: no {used - set(_translation_keys(lang))}"
+
+    def test_every_class_of_the_markup_has_a_css_rule(self):
+        css, markup = HUB[: HUB.index("</style>")], HUB[HUB.index("<body"):]
+        for group in re.findall(r'class="([^"]+)"', markup):
+            for name in group.split():
+                assert re.search(rf"\.{re.escape(name)}(?![\w-])", css), f"no CSS rule for {name}"
 
     def test_readme_lists_the_same_demos(self):
         expected = {name: (title, notebook) for name, (notebook, _, _, title) in _demos().items()}

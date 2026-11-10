@@ -526,27 +526,23 @@ def eee_ga_tracker(mo, ga_config: "dict | None"):
     return mo.vstack([widget], gap=0) if widget is not None else None
 
 
-_HERO_CSS = """
+_INDEX_HEADER_CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;700;800&display=swap');
-.eee-hero { text-align: center; padding: 32px 16px 24px; font-family: Syne, sans-serif; }
-.eee-series {
-  font-family: "DM Mono", monospace; font-size: 11px; color: #003d82;
-  letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 10px;
-}
+.eee-index-header { text-align: center; padding: 32px 16px 24px; font-family: Syne, sans-serif; }
+.eee-subtitle { font-size: 15px; color: #666; line-height: 1.6; max-width: 480px; margin: 0 auto; }
 .eee-title {
-  font-size: 26px; font-weight: 800; letter-spacing: -0.02em;
+  font-size: 30px; font-weight: 800; letter-spacing: -0.02em;
   background: linear-gradient(90deg, #003d82, #5f27cd);
   -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-  margin-bottom: 6px;
+  margin-bottom: 10px;
 }
-.eee-subtitle { font-size: 14px; color: #666; }
 </style>
 """
 
 
-def eee_hero(mo, lang: str, titles: "dict[str, tuple[str, str]]", *, lang_fallback: str = "el"):
-    """Render the EEE index-page hero title block.
+def eee_index_header(mo, lang: str, titles: "dict[str, tuple[str, str]]", *, lang_fallback: str = "el"):
+    """Render the title and the subtitle at the top of an EEE index page.
 
     Must be the **last expression** in a marimo cell — no trailing ``return``.
 
@@ -559,19 +555,22 @@ def eee_hero(mo, lang: str, titles: "dict[str, tuple[str, str]]", *, lang_fallba
 
     Example cell::
 
-        from eee_project.notebook_utils import eee_hero
-        eee_hero(mo, lang_sel.value, {
+        from eee_project.notebook_utils import eee_index_header
+        eee_index_header(mo, lang_sel.value, {
             "ru": ("Каподистриас", "Серия уроков"),
             "el": ("Καποδίστριας", "Σειρά μαθημάτων"),
             "en": ("Kapodistrias", "Lesson series"),
         })
     """
     title, subtitle = titles.get(lang, titles[lang_fallback])
-    return mo.Html(f"""{_HERO_CSS}
-<div class="eee-hero">
+    return mo.Html(f"""{_INDEX_HEADER_CSS}
+<div class="eee-index-header">
   <div class="eee-title">{title}</div>
-  <div class="eee-series">{subtitle}</div>
+  <div class="eee-subtitle">{subtitle}</div>
 </div>""")
+
+
+eee_hero = eee_index_header  # old name, kept so that notebooks that still call it keep working
 
 
 _CARD_LIST_CSS = """
@@ -579,7 +578,7 @@ _CARD_LIST_CSS = """
 .eee-card, .eee-card-disabled {
   display: block; text-decoration: none; color: #1a1a1a;
   background: #f8f9fa; border: 1px solid #e0e0e0;
-  border-radius: 12px; padding: 20px; margin-bottom: 14px;
+  border-radius: 12px; padding: 20px; margin-bottom: 16px;
   font-family: Syne, sans-serif;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
@@ -595,12 +594,12 @@ _CARD_LIST_CSS = """
   font-family: "DM Mono", monospace; font-size: 10px; color: #003d82;
   letter-spacing: .12em; text-transform: uppercase; margin-bottom: 2px;
 }
-.eee-card-title { font-size: 16px; font-weight: 700; }
-.eee-card-greek { font-family: "DM Mono", monospace; font-size: 12px; color: #5f27cd; margin-top: 1px; }
-.eee-card-desc { font-size: 13px; color: #666; line-height: 1.5; }
+.eee-card-title { font-size: 19px; font-weight: 700; letter-spacing: 0.01em; }
+.eee-card-greek { font-family: "DM Mono", monospace; font-size: 13px; color: #003d82; margin-top: 2px; }
+.eee-card-desc { font-size: 14px; color: #666; line-height: 1.5; }
 .eee-card-arrow {
   text-align: right; margin-top: 10px;
-  font-family: "DM Mono", monospace; font-size: 11px; color: #5f27cd;
+  font-family: "DM Mono", monospace; font-size: 11px; color: #5f27cd; letter-spacing: 0.1em;
 }
 </style>
 """
@@ -616,6 +615,7 @@ def eee_card_list(mo, cfg: "ConfigStore", lang: str, *, lang_fallback: str = "el
     — text falls back to ``lang_fallback`` when the current ``lang`` has no
     translation. ``url`` is used verbatim (no molab-specific construction —
     the TSV owns the full URL, so notebooks stay portable to other hosting).
+    A linked card ends with a localized "OPEN →" (label ``card_list_open``).
     A falsy ``url`` renders a disabled "coming soon" card. Card links open in
     a new tab (``target="_blank" rel="noopener"``) unless ``same_window`` is
     set — see that parameter below. Renders a translated "couldn't load"
@@ -647,6 +647,8 @@ def eee_card_list(mo, cfg: "ConfigStore", lang: str, *, lang_fallback: str = "el
 
     _soon_entry = _UI_LABELS.get('card_list_soon', {})
     soon = _soon_entry.get(lang, _soon_entry.get(lang_fallback, 'card_list_soon'))
+    _open_entry = _UI_LABELS.get('card_list_open', {})
+    open_label = _open_entry.get(lang, _open_entry.get(lang_fallback, 'card_list_open'))
     label_key, label_fb = f'label_{lang}', f'label_{lang_fallback}'
     title_key, title_fb = f'title_{lang}', f'title_{lang_fallback}'
     desc_key, desc_fb = f'desc_{lang}', f'desc_{lang_fallback}'
@@ -664,7 +666,7 @@ def eee_card_list(mo, cfg: "ConfigStore", lang: str, *, lang_fallback: str = "el
             </div>
             <div class="eee-card-desc">{row.get(desc_key, row[desc_fb])}</div>"""
         if url:
-            cards.append(f'<a class="eee-card" href="{url}"{_target_attr}>{inner}<div class="eee-card-arrow">◀</div></a>')
+            cards.append(f'<a class="eee-card" href="{url}"{_target_attr}>{inner}<div class="eee-card-arrow">{open_label} →</div></a>')
         else:
             cards.append(f'<div class="eee-card eee-card-disabled">{inner}<div class="eee-card-arrow">{soon}</div></div>')
 
@@ -1244,6 +1246,8 @@ _PARA_CSS = _bar_css(".eee-para-bar", "margin:6px 0 8px") + """\
 .eee-para-inp{flex:1;padding:5px 8px;font-size:15px;border:1px solid #ccc;border-radius:4px;
   font-family:'GFS Didot','New Athena Unicode','Noto Serif',serif}
 .eee-para-inp:focus{outline:none;border-color:#003d82;box-shadow:0 0 0 2px rgba(0,61,130,0.15)}
+.eee-para-note{margin:0 0 4px;font-size:13px;line-height:1.4;color:#b3261e;font-family:sans-serif}
+@supports (color:light-dark(#000,#fff)){.eee-para-note{color:light-dark(#b3261e,#ff8a80)}}
 """
 
 _PARA_ESM = _DIACRITIC_CORE_JS + r"""
@@ -1308,7 +1312,7 @@ function render({model,el}){
     const inp=focusedInp;
     const pos=inp.selectionStart??inp.value.length;
     const newPos=stripLastDiacritic(inp,pos);
-    if(newPos!==null){updateValues();inp.setSelectionRange(newPos,newPos);}
+    if(newPos!==null){showNote(inputs.indexOf(inp),null);updateValues();inp.setSelectionRange(newPos,newPos);}
     inp.focus();
   });
   bar.appendChild(clrBtn);
@@ -1317,6 +1321,24 @@ function render({model,el}){
   const inputs=[];
   const labels=model.get('labels')||[];
   const initVals=model.get('values')||[];
+
+  // A wrong answer's lines go under their own field: the message block below the rows is off a phone's screen. No lines hides it.
+  const rows=[];
+  const notes=[];
+  function showNote(i,lines){
+    let n=notes[i];
+    if(!lines||!lines.length){if(n)n.hidden=true;return;}
+    if(!n){
+      n=document.createElement('div');
+      n.className='eee-para-note';
+      n.setAttribute('role','status');
+      rows[i].after(n);
+      notes[i]=n;
+    }
+    n.replaceChildren(...lines.map(t=>{const d=document.createElement('div');d.textContent=t;return d;}));
+    n.hidden=false;
+    n.scrollIntoView({block:'nearest'});
+  }
 
   // shared by keydown-Enter and mobile "Go" (form submit) below — idx is
   // -1 (submit_request.field_index's own documented "unset" default) when
@@ -1408,6 +1430,7 @@ function render({model,el}){
       updateValues();
     });
     inp.addEventListener('input',()=>{
+      showNote(i,null);
       if(biSnap&&biSnap.inp===inp){
         inp.value=biSnap.value;inp.setSelectionRange(biSnap.pos,biSnap.pos);biSnap=null;
         updateValues();return;
@@ -1417,6 +1440,7 @@ function render({model,el}){
     row.appendChild(lblEl);row.appendChild(inp);
     form.appendChild(row);
     inputs.push(inp);
+    rows.push(row);
   });
   el.appendChild(form);
 
@@ -1445,7 +1469,7 @@ function render({model,el}){
   });
 
   model.on('change:focus_request',()=>{
-    const{request_id,advance_to}=model.get('focus_request')||{};
+    const{request_id,advance_to,note}=model.get('focus_request')||{};
     const originIdx=pendingOrigin.get(request_id);
     // No locked field matches this reply (nothing was focused when Enter
     // fired, so fireSubmit never locked or recorded an origin for it) --
@@ -1453,6 +1477,7 @@ function render({model,el}){
     if(originIdx===undefined)return;
     pendingOrigin.delete(request_id);
     releaseLock(originIdx);
+    showNote(originIdx,note);
     // A newer Enter has been sent since this reply was computed -- it's
     // for a request that's no longer the latest, so don't act on it.
     if(request_id!==(model.get('submit_request').request_id||0))return;
@@ -1525,6 +1550,13 @@ def make_paradigm_form(mo, labels, values=None, polytonic=True):
     field (``advance_to=None``) — the field stays locked until its exact
     ``request_id`` gets a reply, so a reply that only unlocks and moves
     nowhere is still required.
+
+    A reply may also carry ``"note": [line, ...]`` (plain-text lines): the form
+    draws them right under the field the Enter came from, scrolls them into
+    view when they are off the screen, and removes them when that field is
+    edited or when a reply without a ``note`` comes for it. Use it to say why a
+    wrong answer is wrong; the ``*_paradigm_drill_form`` helpers do, because a
+    phone shows only a few rows and their message block sits under all of them.
     """
     if not _ANYWIDGET_OK:
         raise ImportError("anywidget is required for make_paradigm_form")
@@ -4154,6 +4186,16 @@ class GreekUtils:
             state["errors"] = (get_errors, set_errors, get_retry_cnt, set_retry_cnt)
         return state
 
+    @staticmethod
+    def _field_note(make_cap, full_check, live, i) -> list:
+        """The wrong-answer lines of field *i* alone, as plain text: the full check of a copy
+        of the form with every other field blank (a blank field adds no line)."""
+        snap = make_cap([v if j == i else "" for j, v in enumerate(live)])
+        if snap is None:
+            return []
+        _, fb = full_check(snap)
+        return [line.replace("**", "") for line in fb.split("<br>") if line]
+
     def _paradigm_drill_form(
         self,
         state: dict,
@@ -4319,7 +4361,13 @@ class GreekUtils:
                 # the JS side locks the origin field the instant Enter
                 # fires and only releases it once this exact request_id
                 # comes back, so a dropped reply would leave it stuck.
-                _w.focus_request = {"request_id": _req_id, "advance_to": advance_to}
+                reply = {"request_id": _req_id, "advance_to": advance_to}
+                # The message block below sits under all the rows: on a phone it is off the screen.
+                if in_range and not field_ok and self._has_input([_live[i]]):
+                    note = self._field_note(make_cap, full_check, _live, i)
+                    if note:
+                        reply["note"] = note
+                _w.focus_request = reply
 
         cap = get_cap()
         ok = False
