@@ -4,6 +4,15 @@ from unittest.mock import MagicMock
 
 import eee_project._registry as _reg
 from eee_project._tag_registry import _clear_tag_registry
+from eee_project.content import _source_host_base
+
+
+@pytest.fixture(autouse=True)
+def fresh_source_host_base():
+    # _source_host_base() is cached for the life of a page; a test that fakes the host must not leave its answer for the next test.
+    _source_host_base.cache_clear()
+    yield
+    _source_host_base.cache_clear()
 
 
 @pytest.fixture(autouse=True)

@@ -268,6 +268,11 @@ class TestTenseDropdownOptions:
             'conditional_simple', 'conditional_continuous',
         ]
 
+    def test_dropdown_options_need_no_english_entry_when_the_language_is_there(self):
+        cfg = dataclasses.replace(MODERN_GREEK, tense_labels={"present": {"greek": "gr-label", "label": {"ru": "ru-label"}}})
+        opts = GreekUtils(_StubBackend(), _StubMo(), _pd, config=cfg).tense_dropdown_options('ru')
+        assert opts == {"ru-label (gr-label)": "present"}
+
     def test_dropdown_options_unknown_lang_falls_back_to_english(self, gu_mg):
         opts = gu_mg.tense_dropdown_options('fr')
         assert 'Continuous Future (Συνεχής Μέλλοντας)' in opts
@@ -713,6 +718,11 @@ class TestEeeIndexHeader:
         result = eee_index_header(_StubHtmlMo(), "fr", self._TITLES, lang_fallback="en")
         assert "Title" in result.s
 
+    def test_titles_with_only_the_page_language_need_no_fallback_entry(self):
+        result = eee_index_header(_StubHtmlMo(), "en", {"en": ("Title", "Subtitle")})
+        assert '<div class="eee-title">Title</div>' in result.s
+        assert '<div class="eee-subtitle">Subtitle</div>' in result.s
+
     def test_every_class_of_the_markup_has_a_css_rule(self):
         html = eee_index_header(_StubHtmlMo(), "en", self._TITLES).s
         for name in re.findall(r'class="([^"]+)"', html):
@@ -784,6 +794,18 @@ class TestEeeCardList:
     def test_lang_fallback_en(self):
         result = eee_card_list(_StubHtmlMo(), self._cfg([self._ROW]), lang="fr", lang_fallback="en")
         assert "Lesson 1" in result.s
+
+    def test_rows_with_only_the_page_language_need_no_fallback_columns(self):
+        row = {"url": "https://example.com/x", "icon": "📖", "greek": "λόγος",
+               "label_en": "Lesson 1", "title_en": "Title", "desc_en": "Description"}
+        result = eee_card_list(_StubHtmlMo(), self._cfg([row]), lang="en")
+        assert '<div class="eee-card-label">Lesson 1</div>' in result.s
+        assert '<div class="eee-card-title">Title</div>' in result.s
+        assert '<div class="eee-card-desc">Description</div>' in result.s
+
+    def test_an_empty_cell_of_the_page_language_stays_empty(self):
+        result = eee_card_list(_StubHtmlMo(), self._cfg([{**self._ROW, "label_en": ""}]), lang="en", lang_fallback="el")
+        assert '<div class="eee-card-label"></div>' in result.s
 
     def test_empty_lessons_returns_load_error(self):
         result = eee_card_list(_StubHtmlMo(), self._cfg([]), lang="en")
@@ -4094,6 +4116,21 @@ class TestVerbParadigmDrillForm(_ParadigmDrillFormBase):
                       get_errors=get_errors, set_errors=set_errors,
                       get_retry_cnt=get_retry_cnt, set_retry_cnt=set_retry_cnt)
         assert errors_box[0] == {}
+
+    def test_enter_with_no_focused_field_counts_no_error_and_sends_no_note(self, gu):
+        # submit_request.field_index is -1 when no field was focused: no field was answered,
+        # so the text in the last field must be neither counted as a mistake nor explained.
+        cv = self._VOCAB[0]
+        get_errors, set_errors, errors_box = _pair({})
+        get_retry_cnt, set_retry_cnt, _ = _pair(0)  # error tracking is on only when all four callbacks are given
+        form = _pdform(["", "asd"], submit_count=1, enter_field_index=-1)
+        with patch.object(gu, "check_verb_slot", return_value=False), \
+             patch.object(gu, "check_verb_test", return_value=(False, "❌ x")):
+            self._call(gu, self._state(), cv, form, self._meta(),
+                      get_errors=get_errors, set_errors=set_errors,
+                      get_retry_cnt=get_retry_cnt, set_retry_cnt=set_retry_cnt)
+        assert errors_box[0] == {}
+        assert form.widget.focus_request == {"request_id": 1, "advance_to": None}
 
     def test_without_error_tracking_wrong_check_is_unaffected(self, gu):
         # REGRESSION: get_errors/set_errors/get_retry_cnt/set_retry_cnt/

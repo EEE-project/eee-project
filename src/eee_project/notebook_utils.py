@@ -562,7 +562,7 @@ def eee_index_header(mo, lang: str, titles: "dict[str, tuple[str, str]]", *, lan
             "en": ("Kapodistrias", "Lesson series"),
         })
     """
-    title, subtitle = titles.get(lang, titles[lang_fallback])
+    title, subtitle = titles[lang] if lang in titles else titles[lang_fallback]
     return mo.Html(f"""{_INDEX_HEADER_CSS}
 <div class="eee-index-header">
   <div class="eee-title">{title}</div>
@@ -638,17 +638,16 @@ def eee_card_list(mo, cfg: "ConfigStore", lang: str, *, lang_fallback: str = "el
         from eee_project.notebook_utils import eee_card_list
         eee_card_list(mo, cfg, lang_sel.value)
     """
+    def _label(key):  # the label of the current language, else of lang_fallback, else the key
+        entry = _UI_LABELS.get(key, {})
+        return entry.get(lang, entry.get(lang_fallback, key))
+
     rows = cfg.lessons()
     if not rows:
         _tsv_url = f"{cfg.raw_base}/{ConfigStore._FILENAME}"
-        _err_entry = _UI_LABELS.get('card_list_load_error', {})
-        _template = _err_entry.get(lang, _err_entry.get(lang_fallback, 'card_list_load_error'))
-        return mo.md(_template.format(url=_tsv_url))
+        return mo.md(_label('card_list_load_error').format(url=_tsv_url))
 
-    _soon_entry = _UI_LABELS.get('card_list_soon', {})
-    soon = _soon_entry.get(lang, _soon_entry.get(lang_fallback, 'card_list_soon'))
-    _open_entry = _UI_LABELS.get('card_list_open', {})
-    open_label = _open_entry.get(lang, _open_entry.get(lang_fallback, 'card_list_open'))
+    soon, open_label = _label('card_list_soon'), _label('card_list_open')
     label_key, label_fb = f'label_{lang}', f'label_{lang_fallback}'
     title_key, title_fb = f'title_{lang}', f'title_{lang_fallback}'
     desc_key, desc_fb = f'desc_{lang}', f'desc_{lang_fallback}'
@@ -659,12 +658,12 @@ def eee_card_list(mo, cfg: "ConfigStore", lang: str, *, lang_fallback: str = "el
         inner = f"""<div class="eee-card-header">
               <div class="eee-card-icon">{row['icon']}</div>
               <div>
-                <div class="eee-card-label">{row.get(label_key, row[label_fb])}</div>
-                <div class="eee-card-title">{row.get(title_key, row[title_fb])}</div>
+                <div class="eee-card-label">{row[label_key] if label_key in row else row[label_fb]}</div>
+                <div class="eee-card-title">{row[title_key] if title_key in row else row[title_fb]}</div>
                 <div class="eee-card-greek">{row['greek']}</div>
               </div>
             </div>
-            <div class="eee-card-desc">{row.get(desc_key, row[desc_fb])}</div>"""
+            <div class="eee-card-desc">{row[desc_key] if desc_key in row else row[desc_fb]}</div>"""
         if url:
             cards.append(f'<a class="eee-card" href="{url}"{_target_attr}>{inner}<div class="eee-card-arrow">{open_label} →</div></a>')
         else:
@@ -1323,7 +1322,6 @@ function render({model,el}){
   const initVals=model.get('values')||[];
 
   // A wrong answer's lines go under their own field: the message block below the rows is off a phone's screen. No lines hides it.
-  const rows=[];
   const notes=[];
   function showNote(i,lines){
     let n=notes[i];
@@ -1332,7 +1330,7 @@ function render({model,el}){
       n=document.createElement('div');
       n.className='eee-para-note';
       n.setAttribute('role','status');
-      rows[i].after(n);
+      inputs[i].parentElement.after(n);
       notes[i]=n;
     }
     n.replaceChildren(...lines.map(t=>{const d=document.createElement('div');d.textContent=t;return d;}));
@@ -1440,7 +1438,6 @@ function render({model,el}){
     row.appendChild(lblEl);row.appendChild(inp);
     form.appendChild(row);
     inputs.push(inp);
-    rows.push(row);
   });
   el.appendChild(form);
 
@@ -2189,7 +2186,8 @@ class GreekUtils:
         """
         out = {}
         for key, info in self._cfg.tense_labels.items():
-            label = info['label'].get(lang, info['label']['en'])
+            labels = info['label']
+            label = labels[lang] if lang in labels else labels['en']
             display = label if label == info['greek'] else f"{label} ({info['greek']})"
             out[display] = key
         return out
@@ -4352,10 +4350,10 @@ class GreekUtils:
                 advance_to = None
                 in_range = 0 <= i < len(_live)
                 field_ok = in_range and slot_ok(i, _live[i])
+                wrong_answer = in_range and not field_ok and self._has_input([_live[i]])
                 if field_ok and i + 1 < len(_live):
                     advance_to = i + 1
-                if (not field_ok and in_range and get_errors is not None
-                        and cv and self._has_input([_live[i]])):
+                if wrong_answer and get_errors is not None and cv:
                     self._record_mistake(get_errors, set_errors, cv[word_key])
                 # Always reply, even on a wrong answer or the last field --
                 # the JS side locks the origin field the instant Enter
@@ -4363,7 +4361,7 @@ class GreekUtils:
                 # comes back, so a dropped reply would leave it stuck.
                 reply = {"request_id": _req_id, "advance_to": advance_to}
                 # The message block below sits under all the rows: on a phone it is off the screen.
-                if in_range and not field_ok and self._has_input([_live[i]]):
+                if wrong_answer:
                     note = self._field_note(make_cap, full_check, _live, i)
                     if note:
                         reply["note"] = note

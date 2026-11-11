@@ -295,7 +295,11 @@ All four return `mo.Html()` (or `mo.md()` for `eee_card_list`'s load-error
 case) and **must be the last expression in a marimo cell** (no trailing
 `return`). `eee_index_header` and `eee_card_list` both take `lang_fallback=`
 (default `"el"`) — the language to fall back to when `lang` has no
-translation; pass `lang_fallback="en"` for English-first notebooks.
+translation; pass `lang_fallback="en"` for English-first notebooks. The entry
+of `lang` is looked up first, and the fallback is read only when `lang` has
+no entry, so a hub in one language needs only that language: a `titles` dict
+with only `"en"`, or a lessons TSV with only the `label_en`, `title_en` and
+`desc_en` columns, works with `lang="en"`.
 `eee_hero` is the old name of `eee_index_header` and still works.
 
 `eee_topbar` supports two styles via `style=`:
