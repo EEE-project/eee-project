@@ -217,6 +217,28 @@ def test_a_closed_sheet_opens_again_for_the_next_word(browser, base_url):
         assert sheet["display"] != "none" and "τρόποι" in sheet["text"]
 
 
+def test_on_a_phone_the_badge_of_marimo_is_hidden_while_the_sheet_is_open(browser, base_url):
+    # marimo draws its "made with marimo" badge on a static or WASM page only, above every cell output: the test puts
+    # an element with the attributes of that badge where marimo puts it (`marimo run` draws none)
+    with _page(browser, base_url, PHONE) as page:
+        page.evaluate(
+            """() => {
+                const badge = document.createElement('div');
+                badge.className = 'fixed bottom-0 right-0 z-50 print:hidden';
+                badge.dataset.testid = 'watermark';
+                badge.textContent = 'made with marimo';
+                document.querySelector('#App').parentElement.appendChild(badge);
+            }"""
+        )
+        badge = page.locator("[data-testid=watermark]")
+        assert badge.is_visible()
+        page.locator(f"{STANZA} .gk-note").first.click()
+        _settle(page)
+        assert _sheet(page)["position"] == "fixed" and not badge.is_visible()  # it covered the last line and the close button
+        page.locator(".eee-sheet-close").click()
+        assert badge.is_visible()
+
+
 def test_a_pick_in_the_period_dropdown_keeps_the_sheet(browser, base_url):
     with _page(browser, base_url, WIDE) as page:
         page.locator(f"{STANZA} .gk-word", has_text="ἔπερσεν").first.click()

@@ -1927,6 +1927,7 @@ def interactive_text(mo, *, lines, clickable, homer_words=None, word_classes=Non
     return mo.ui.anywidget(w)
 
 
+# The last rule: on a static or WASM page marimo draws its "made with marimo" badge above every cell output, so the open sheet hides it.
 _GLOSS_SHEET_CSS = """\
 <style>
 .eee-sheet{margin-top:1em}
@@ -1940,6 +1941,7 @@ _GLOSS_SHEET_CSS = """\
 .eee-sheet.on .eee-sheet-close{display:flex;position:absolute;top:2px;right:4px;width:44px;height:44px;align-items:center;justify-content:center;font-size:26px;line-height:1;cursor:pointer}
 .eee-sheet.on .eee-sheet-x:focus-visible + .eee-sheet-close{outline:2px solid #003d82}
 .eee-sheet.on:has(.eee-sheet-x:checked){display:none}
+body:has(.eee-sheet.on .eee-sheet-x:not(:checked)) [data-testid="watermark"]{display:none}
 }
 </style>"""
 

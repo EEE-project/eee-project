@@ -1601,7 +1601,11 @@ fixes this. On a wide page (viewport of `sheet_below_px` pixels or more) it
 is a block under the text, as before. On a narrower one, once a word is
 chosen it is a sheet fixed to the bottom of the screen (at most 55% of its
 height, scrolling inside), with a close button that works with CSS only;
-choosing a word again, also the same word, shows it again. Cell 1 then shows
+choosing a word again, also the same word, shows it again. While the sheet
+is open it hides the "made with marimo" badge (since 1.27.2): on a static or
+WASM page marimo draws that badge at the bottom right, above every cell
+output, and it covered the end of the last line of the sheet and its close
+button. Cell 1 then shows
 nothing (it ends with `return gloss_panel, period_selector, period_tables`),
 and the cell that shows the sheet takes `period_selector` as a parameter, for
 the same reason as `render_gloss_table`:

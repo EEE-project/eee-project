@@ -8964,6 +8964,15 @@ class TestRenderGlossSheet:
         assert "@media (max-width: 749px)" in self._sheet(gu_form)
         assert "@media (max-width: 599px)" in self._sheet(gu_form, sheet_below_px=600)
 
+    def test_the_phone_sheet_hides_the_badge_of_marimo_while_it_is_open(self, gu_form):
+        # on a static or WASM page marimo draws its badge above every cell output: it covered the last line and the close button
+        phone = self._sheet(gu_form).split("@media (max-width: 749px){", 1)[1].split("\n}\n", 1)[0]
+        rules = [rule for rule in phone.split("\n") if '[data-testid="watermark"]' in rule]
+        assert len(rules) == 1 and rules[0].endswith("{display:none}")
+        selector = rules[0].split("{", 1)[0]
+        assert ".eee-sheet.on" in selector and ":not(:checked)" in selector  # only while the sheet is open
+        assert selector.count(":has(") == 1  # a browser drops a rule that has a :has() inside a :has()
+
     def test_the_sheet_label_exists_in_every_ui_language(self, gu_form):
         for lang in ("en", "ru", "el"):
             assert gu_form.ui_label("gloss_sheet_close", lang) != "gloss_sheet_close"
