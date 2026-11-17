@@ -472,6 +472,15 @@ before the async browser read has had a chance to apply it (the write is
 synchronous, the read isn't, so an unconditional write would win that race
 every time).
 
+A page runs its cells once more while it loads only when the stored language
+differs from the one on show (since 1.27.3). `language_selector` writes the
+language it starts with into the bridge (`shown`); the browser reports another
+stored language as a value change (marimo then runs every cell that reads the
+language again, in the stored language), and reports nothing stored, or the
+same language, through a custom message that sets `bridge.stored` with no new
+run. Before 1.27.3 every load ran those cells twice, and a choice made in the
+first seconds (a translator of a translation exercise, say) was reset.
+
 ### Lesson languages (`split_lesson`, `join_lesson`)
 
 A lesson notebook that serves all three UI languages holds the text of every language: dicts keyed by language code (`{"ru": ..., "el": ..., "en": ...}`),

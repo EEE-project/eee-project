@@ -7,6 +7,8 @@ import html
 import re
 from pathlib import Path
 
+from eee_project.content import _UI_LABELS
+
 EXAMPLES = Path(__file__).parent.parent / "examples"
 MAKEFILE = (EXAMPLES / "Makefile").read_text(encoding="utf-8")
 HUB = (EXAMPLES / "deploy" / "hub_index.html").read_text(encoding="utf-8")
@@ -33,9 +35,12 @@ def _hub_cards():
     return cards
 
 
+def _translation_block(lang):
+    return re.search(rf"\n      {lang}: \{{\n(.*?)\n      \}},", HUB, re.S).group(1)
+
+
 def _translation_keys(lang):
-    block = re.search(rf"\n      {lang}: \{{\n(.*?)\n      \}},", HUB, re.S).group(1)
-    return re.findall(r'^\s+(\w+): "', block, re.M)
+    return re.findall(r'^\s+(\w+): "', _translation_block(lang), re.M)
 
 
 def _readme_demos():
@@ -71,6 +76,14 @@ class TestLiveDemoSet:
         used = set(re.findall(r'data-i18n="([^"]+)"', HUB))
         for lang in ("en", "ru", "el"):
             assert used <= set(_translation_keys(lang)), f"{lang}: no {used - set(_translation_keys(lang))}"
+
+    def test_the_open_label_of_every_card_is_a_text_key_with_the_words_of_the_library(self):
+        # it was fixed English text in every card, while eee_card_list shows the label card_list_open of the page language
+        arrows = re.findall(r'<div class="eee-card-arrow"([^>]*)>', HUB[HUB.index("<body"):])
+        assert len(arrows) == len(_hub_cards()) and all(attrs.strip() == 'data-i18n="open"' for attrs in arrows)
+        for lang in ("en", "ru", "el"):
+            text = re.search(r'^\s+open: "(.*)",$', _translation_block(lang), re.M).group(1)
+            assert text == f"{_UI_LABELS['card_list_open'][lang]} &rarr;"
 
     def test_every_class_of_the_markup_has_a_css_rule(self):
         css, markup = HUB[: HUB.index("</style>")], HUB[HUB.index("<body"):]

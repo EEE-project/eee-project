@@ -447,6 +447,26 @@ class TestLanguageBridge:
         assert bridge is not None
         assert bridge.stored is None
 
+    def test_a_browser_message_sets_the_stored_language(self):
+        # a stored language that changes nothing on show comes as a custom message, so no cell runs again
+        import eee_project.notebook_utils as _nu
+        if not _nu._ANYWIDGET_OK:
+            pytest.skip("anywidget not installed")
+        bridge = language_bridge(_LangMo())
+        bridge._handle_custom_msg({"stored": ""}, [])
+        assert bridge.stored == ""
+        bridge._handle_custom_msg({"stored": "ru"}, [])
+        assert bridge.stored == "ru"
+
+    def test_a_browser_message_of_another_shape_changes_nothing(self):
+        import eee_project.notebook_utils as _nu
+        if not _nu._ANYWIDGET_OK:
+            pytest.skip("anywidget not installed")
+        bridge = language_bridge(_LangMo())
+        for content in ({"stored": 5}, {"other": "ru"}, "ru", None):
+            bridge._handle_custom_msg(content, [])
+        assert bridge.stored is None
+
 
 class TestLanguageSelector:
     def test_bridge_none_uses_default(self):
@@ -494,6 +514,31 @@ class TestLanguageSelector:
     def test_custom_options(self):
         selector = language_selector(_LangMo(), None, options={"Foo": "fo", "Bar": "ba"}, default="ba")
         assert selector.value == "ba"
+
+    def test_tells_the_bridge_which_language_it_shows(self):
+        # the browser compares the stored language with it: only another language makes the cells run again
+        import eee_project.notebook_utils as _nu
+        if not _nu._ANYWIDGET_OK:
+            pytest.skip("anywidget not installed")
+        mo_stub = _LangMo()
+        bridge = language_bridge(mo_stub)
+        language_selector(mo_stub, bridge)
+        assert bridge.shown == "en"
+        bridge.stored = "ru"
+        language_selector(mo_stub, bridge)
+        assert bridge.shown == "ru"
+        bridge.stored = "xx"
+        language_selector(mo_stub, bridge)
+        assert bridge.shown == "en"
+
+    def test_tells_the_bridge_the_first_option_when_the_default_is_not_one(self):
+        import eee_project.notebook_utils as _nu
+        if not _nu._ANYWIDGET_OK:
+            pytest.skip("anywidget not installed")
+        mo_stub = _LangMo()
+        bridge = language_bridge(mo_stub)
+        language_selector(mo_stub, bridge, options={"Foo": "fo"}, default="en")
+        assert bridge.shown == "fo"
 
 
 # ──────────────────────────────────────── eee_topbar / eee_footer ──

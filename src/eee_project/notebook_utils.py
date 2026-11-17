@@ -862,8 +862,21 @@ function render({ model, el }) {
   el.style.display = "none";
   const KEY = "eee_lang";
   const existing = localStorage.getItem(KEY) || "";
-  model.set("stored", existing);
-  model.save_changes();
+  // Another stored language is a value change (the cells run again); nothing stored or the same one goes as a custom message.
+  let told = false;
+  const tell = () => {
+    const onShow = model.get("save") || model.get("shown") || "";  // after a change the saved language is the one on show
+    if (told || (existing && !onShow)) return;
+    told = true;
+    if (existing && existing !== onShow) {
+      model.set("stored", existing);
+      model.save_changes();
+    } else {
+      model.send({ stored: existing });
+    }
+  };
+  model.on("change:shown", tell);
+  tell();
   model.on("change:save", () => {
     const v = model.get("save");
     if (v) localStorage.setItem(KEY, v);
@@ -879,6 +892,17 @@ if _ANYWIDGET_OK:
         # yet" -- distinct from "" (a real, confirmed localStorage miss).
         stored = _traitlets.Unicode(allow_none=True, default_value=None).tag(sync=True)
         save = _traitlets.Unicode("").tag(sync=True)
+        # the language the page shows (set by language_selector): the browser compares the stored one with it
+        shown = _traitlets.Unicode("").tag(sync=True)
+
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            self.on_msg(self._on_browser_message)
+
+        def _on_browser_message(self, _widget, content, _buffers):
+            # what the browser has stored when that changes nothing on show: set here, so no cell runs again
+            if isinstance(content, dict) and isinstance(content.get("stored"), str):
+                self.stored = content["stored"]
 
 
 def language_bridge(mo):
@@ -894,6 +918,9 @@ def language_bridge(mo):
     cell-scoped, so :func:`language_selector` needs to take this bridge
     as an explicit cell parameter to be rerun once the browser's
     (asynchronous) stored-value read completes.
+
+    That rerun happens only when the stored language differs from the one
+    on show (since 1.27.3; see "Language persistence" in docs/api-patterns.md).
     """
     if not _ANYWIDGET_OK:
         return None
@@ -910,7 +937,9 @@ def language_selector(mo, bridge, options: dict | None = None, default: str = "e
     Call from a cell that takes *bridge* as a parameter — marimo then
     reruns this cell (rebuilding the dropdown with the real stored
     value) the moment the browser read lands, since it's watching
-    *bridge* for changes.
+    *bridge* for changes. The language the dropdown starts with goes into
+    the bridge (``shown``): the browser reports a stored language as a
+    change only when it differs from that one.
     """
     options = options or dict(_LANGUAGE_OPTIONS)
     initial_code = default
@@ -919,6 +948,8 @@ def language_selector(mo, bridge, options: dict | None = None, default: str = "e
         if stored is not None and stored in options.values():
             initial_code = stored
     initial_label = next((label for label, code in options.items() if code == initial_code), next(iter(options)))
+    if bridge is not None:
+        bridge.shown = options[initial_label]
     return mo.ui.dropdown(options=options, value=initial_label, label="🌐")
 
 
