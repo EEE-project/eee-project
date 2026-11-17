@@ -119,6 +119,19 @@
       margin: 0 auto;
     }
 
+    /* On a phone the fixed language box covered the end of the first title line: it stands in the page there, under the top bar. */
+    @media (max-width: 599px) {
+      #langWrap {
+        position: static;
+        width: fit-content;
+        margin: 58px 10px 0 auto;
+      }
+
+      .content {
+        padding-top: 14px;
+      }
+    }
+
     .eee-index-header {
       text-align: center;
       margin-bottom: 40px;
@@ -281,7 +294,7 @@
           </div>
         </div>
         <div class="eee-card-desc" data-i18n="desc_drill">Practice verb, noun, and adjective forms with the built-in vocabulary or your own uploaded word list.</div>
-        <div class="eee-card-arrow">OPEN &rarr;</div>
+        <div class="eee-card-arrow" data-i18n="open">OPEN &rarr;</div>
       </a>
 
       <a class="eee-card" href="greek/">
@@ -293,7 +306,7 @@
           </div>
         </div>
         <div class="eee-card-desc" data-i18n="desc_greek">Look up any word's full inflection paradigm, switching freely between Modern and Ancient Greek backends.</div>
-        <div class="eee-card-arrow">OPEN &rarr;</div>
+        <div class="eee-card-arrow" data-i18n="open">OPEN &rarr;</div>
       </a>
 
       <a class="eee-card" href="ancient-greek/">
@@ -305,7 +318,7 @@
           </div>
         </div>
         <div class="eee-card-desc" data-i18n="desc_ancient_greek">Browse 5 period/corpus backends — Homer, LSJ, LXX, MorphGNT, and Byzantine — plus UniMorph.</div>
-        <div class="eee-card-arrow">OPEN &rarr;</div>
+        <div class="eee-card-arrow" data-i18n="open">OPEN &rarr;</div>
       </a>
 
       <a class="eee-card" href="modern-greek/">
@@ -317,7 +330,7 @@
           </div>
         </div>
         <div class="eee-card-desc" data-i18n="desc_modern_greek">Compare the dedicated Modern Greek backend against UniMorph for the same lemma.</div>
-        <div class="eee-card-arrow">OPEN &rarr;</div>
+        <div class="eee-card-arrow" data-i18n="open">OPEN &rarr;</div>
       </a>
 
       <a class="eee-card" href="unimorph/">
@@ -329,7 +342,7 @@
           </div>
         </div>
         <div class="eee-card-desc" data-i18n="desc_unimorph">Explore inflection data for all 187 languages in the UniMorph corpus — 6 bundled offline, the rest fetched on demand.</div>
-        <div class="eee-card-arrow">OPEN &rarr;</div>
+        <div class="eee-card-arrow" data-i18n="open">OPEN &rarr;</div>
       </a>
 
       <a class="eee-card" href="exercise/">
@@ -341,7 +354,7 @@
           </div>
         </div>
         <div class="eee-card-desc" data-i18n="desc_exercise">Live comparison, custom drills, multiple choice, write-the-word with polytonic diacritics, and full paradigm drills.</div>
-        <div class="eee-card-arrow">OPEN &rarr;</div>
+        <div class="eee-card-arrow" data-i18n="open">OPEN &rarr;</div>
       </a>
 
       <a class="eee-card" href="interactive-text/">
@@ -353,7 +366,7 @@
           </div>
         </div>
         <div class="eee-card-desc" data-i18n="desc_interactive_text">Click words in a poem, highlight word sets, and read it beside or under a translation that fits a phone, with margin notes in the word panel and comment cards that light up the words they discuss.</div>
-        <div class="eee-card-arrow">OPEN &rarr;</div>
+        <div class="eee-card-arrow" data-i18n="open">OPEN &rarr;</div>
       </a>
     </div>
 
@@ -382,6 +395,7 @@
         desc_exercise: "Live comparison, custom drills, multiple choice, write-the-word with polytonic diacritics, and full paradigm drills.",
         desc_interactive_text: "Click words in a poem, highlight word sets, and read it beside or under a translation that fits a phone, with margin notes in the word panel and comment cards that light up the words they discuss.",
         footer_text: "EEE — Greek Language Educational Tools",
+        open: "OPEN &rarr;",
       },
       ru: {
         subtitle: "Интерактивные инструменты морфологии древнегреческого и новогреческого языков — работают полностью в браузере через WebAssembly, установка не требуется.",
@@ -393,6 +407,7 @@
         desc_exercise: "Живое сравнение, свои упражнения, тесты с выбором ответа, ввод слова с политоническими диакритиками и полные парадигмы.",
         desc_interactive_text: "Кликайте по словам стихотворения, подсвечивайте наборы слов и читайте его рядом с переводом или над ним (подходит для телефона): примечания на полях — в панели слова, карточки комментариев подсвечивают слова, о которых идёт речь.",
         footer_text: "EEE — образовательные инструменты греческого языка",
+        open: "ОТКРЫТЬ &rarr;",
       },
       el: {
         subtitle: "Διαδραστικά εργαλεία μορφολογίας αρχαίων και νέων ελληνικών, που εκτελούνται εξ ολοκλήρου στον browser σας μέσω WebAssembly — χωρίς εγκατάσταση.",
@@ -404,6 +419,7 @@
         desc_exercise: "Ζωντανή σύγκριση, προσαρμοσμένες ασκήσεις, πολλαπλή επιλογή, γραφή λέξης με πολυτονικά διακριτικά και πλήρεις κλίσεις.",
         desc_interactive_text: "Κάντε κλικ σε λέξεις ενός ποιήματος, επισημάνετε σύνολα λέξεων και διαβάστε το δίπλα ή κάτω από μετάφραση που χωράει σε τηλέφωνο — οι σημειώσεις στο περιθώριο εμφανίζονται στον πίνακα της λέξης και οι κάρτες σχολίων επισημαίνουν τις λέξεις στις οποίες αναφέρονται.",
         footer_text: "EEE — Εκπαιδευτικά εργαλεία ελληνικής γλώσσας",
+        open: "ΑΝΟΙΓΜΑ &rarr;",
       },
     };
 
