@@ -13,8 +13,9 @@ sets) and `css=` (the rules that style them), plus the click-reactive panel patt
 `wrap=True`, `translation=` and `notes=` with `GreekUtils.render_gloss_sheet`, set up as an Odyssey
 lesson sets them up (a stanza dropdown, a translation dropdown with a blank entry, an interface
 language): a stanza that fits a phone, its translation as one card, and margin notes shown in the
-word panel; then the two translation exercises on the same stanzas (`stanza_match_form` and
-`translation_presence_form`) with a choice of translators (`translator_multiselect`);
+word panel; then the two translation exercises, each with a choice of translators (`translator_multiselect`):
+`stanza_match_form` on the same stanzas, and `translation_presence_form` on Odyssey I.1–5 in Pope's and Murray's
+translations, its session balanced by translator (`balance_presence_items(..., by_translator=True)`);
 then `mixed_language_notes`: one card per comment, choosing a card
 highlights the words it is about.
 
@@ -194,19 +195,29 @@ def _(mo):
     mo.md(r"""
     # The two translation exercises — a choice of translators
 
-    `stanza_match_form` (match a stanza with its translation, or the reverse) and `translation_presence_form` (is a word of
-    the stanza reflected in a passage of a translation) take the stanzas of the lesson. An exercise quotes a translator's text
-    without the stars of the margin notes: the notes (`margin_glosses`, the data `notes=` takes above) belong to the text widget
-    of the section above and are not shown in the exercises.
+    `stanza_match_form` (match a stanza with its translation, or the reverse) takes the stanzas of the lesson above.
+    `translation_presence_form` (is a word of the stanza reflected in a passage of a translation) here takes Odyssey I.1–5
+    in Pope's (1725) and Murray's (1919) translations, with the answer key of a real lesson. Its session is drawn by
+    `balance_presence_items`: 10 items at most, half of them «no», split evenly between the chosen translators
+    (`by_translator=True`), so answering «yes» to everything does not win. Murray renders every word of these lines, so with
+    both translators all the «no» items come from Pope and the translator gives the answer away: choose Pope alone for a
+    mixed session. Murray alone has only «yes» items: there is nothing to balance, and the function returns all of them.
+    An exercise quotes a translator's text without the stars of the margin notes: the notes (`margin_glosses`,
+    the data `notes=` takes above) belong to the text widget of the section above and are not shown in the exercises.
 
     ```python
     translators = gu.translator_multiselect(["literal", "with margin notes"], lang)   # all chosen at the start; .value = the keys
     gu.stanza_match_form(..., stanzas=STANZAS, direction=direction.value, lang=lang,
                          valid_translators=translators.value, translator_choice=True)   # fewer than 2 translators: a warning
+    items = gu.balance_presence_items(
+        gu.build_translation_presence_items(rows, vocab, STANZAS, valid_translators=translators.value),
+        n=10, by_translator=True,   # half "no", the same number of items from each chosen translator
+    )
     gu.translation_presence_form(..., items=items, lang=lang, valid_translators=translators.value)   # no translator: a warning
     ```
 
-    Choose one translator, or none, and a message takes the place of the exercise. The 🌐 dropdown of the section above sets the language.
+    Fewer than two translators in the first choice, or none in the second, and a message takes the place of that exercise.
+    The 🌐 dropdown of the section above sets the language.
     """)
     return
 
@@ -335,12 +346,40 @@ def _(mo):
 
 
 @app.cell
-def _(GLOSS_WORDS, LESSON_STANZAS, PRESENCE_ROWS, ex_translators, gu, tp_set_cv, tp_set_remaining):
-    tp_items = gu.build_translation_presence_items(
-        PRESENCE_ROWS, GLOSS_WORDS["en"], LESSON_STANZAS, valid_translators=ex_translators.value,
+def _(PRESENCE_STANZAS, gu, lang_choice):
+    tp_translators = gu.translator_multiselect(list(PRESENCE_STANZAS[0]["translations"]), lang_choice.value)
+    tp_translators
+    return (tp_translators,)
+
+
+@app.cell
+def _(
+    PRESENCE_ROWS,
+    PRESENCE_STANZAS,
+    PRESENCE_VOCAB,
+    gu,
+    lang_choice,
+    tp_set_cv,
+    tp_set_future,
+    tp_set_history,
+    tp_set_remaining,
+    tp_set_restore_entry,
+    tp_set_score,
+    tp_translators,
+):
+    tp_items = gu.balance_presence_items(
+        gu.build_translation_presence_items(
+            PRESENCE_ROWS, PRESENCE_VOCAB[lang_choice.value], PRESENCE_STANZAS, valid_translators=tp_translators.value,
+        ),
+        n=10, by_translator=True,
     )
-    tp_set_cv(None)  # a new choice starts a new session
+    # a new choice or language starts a new session: every part of the quiz state goes back to the start
+    tp_set_cv(None)
     tp_set_remaining(None)
+    tp_set_score({"correct": 0, "total": 0})
+    tp_set_history([])
+    tp_set_future([])
+    tp_set_restore_entry(None)
     return (tp_items,)
 
 
@@ -360,7 +399,6 @@ def _(gu, lang_choice, tp_cv, tp_history, tp_items, tp_remaining, tp_restore_ent
 
 @app.cell
 def _(
-    ex_translators,
     gu,
     lang_choice,
     tp_choice_radio,
@@ -380,6 +418,7 @@ def _(
     tp_set_restore_entry,
     tp_set_score,
     tp_source_switch,
+    tp_translators,
 ):
     gu.translation_presence_form(
         tp_cv, tp_set_cv, tp_remaining, tp_set_remaining,
@@ -388,7 +427,7 @@ def _(
         tp_choice_radio, tp_next_btn, tp_prev_btn, tp_source_switch,
         items=tp_items,
         lang=lang_choice.value,
-        valid_translators=ex_translators.value,
+        valid_translators=tp_translators.value,
     )
     return
 
@@ -498,7 +537,7 @@ def _():
             "lines": [
                 "πολλῶν δ᾽ ἀνθρώπων ἴδεν ἄστεα καὶ νόον ἔγνω,",
                 "πολλὰ δ᾽ ὅ γ᾽ ἐν πόντῳ πάθεν ἄλγεα ὃν κατὰ θυμόν,",
-                "ἀρνύμενος ἣν τε ψυχὴν καὶ νόστον ἑταίρων.",
+                "ἀρνύμενος ἥν τε ψυχὴν καὶ νόστον ἑταίρων.",
             ],
             "translations": {
                 "literal": "He saw the cities of many men and came to know their minds,\n"
@@ -516,6 +555,119 @@ def _():
             },
         },
     ]
+
+    # The exercise "word in the translation" on Odyssey I.1-5: Pope (1725) and Murray (1919), public domain, as in
+    # greek-knowledge-eee (texts/odyssey/translations_en.md); the meanings and the answer key are those of the Odyssey lesson
+    # 2026_06_01 of created_with_eee (vocab_I_1-21_{en,ru,el}.tsv, translation_presence.tsv), by the same author.
+    PRESENCE_STANZAS = [
+        {
+            "ref": "I.1–5",
+            "lines": LINES + LESSON_STANZAS[1]["lines"],
+            "translations": {
+                "Pope": (
+                    "The man for wisdom's various arts renown'd,\n"
+                    "Long exercised in woes, O Muse! resound;\n"
+                    "Who, when his arms had wrought the destined fall\n"
+                    "Of sacred Troy, and razed her heaven-built wall,\n"
+                    "Wandering from clime to clime, observant stray'd,\n"
+                    "Their manners noted, and their states survey'd,\n"
+                    "On stormy seas unnumber'd toils he bore,\n"
+                    "Safe with his friends to gain his natal shore:"
+                ),
+                "Murray": (
+                    "Tell me, O Muse, of the man of many devices,\n"
+                    "who wandered full many ways after he had sacked\n"
+                    "the sacred citadel of Troy. Many were the men\n"
+                    "whose cities he saw and whose mind he learned, aye,\n"
+                    "and many the woes he suffered in his heart upon the sea,\n"
+                    "seeking to win his own life and the return of his comrades."
+                ),
+            },
+        },
+    ]
+    PRESENCE_VOCAB = {
+        "en": [
+            {"form": "Ἄνδρα", "lemma": "ἀνήρ", "meaning": "man (accusative singular of ἀνήρ)"},
+            {"form": "ἔγνω", "lemma": "γιγνώσκω", "meaning": "learned, came to know (active aorist of γιγνώσκω)"},
+            {"form": "ἀνθρώπων", "lemma": "ἄνθρωπος", "meaning": "of people (genitive plural of ἄνθρωπος)"},
+            {"form": "πόντῳ", "lemma": "πόντος", "meaning": "sea (dative of πόντος)"},
+            {"form": "ἄστεα", "lemma": "ἄστυ", "meaning": "cities (accusative plural of ἄστυ)"},
+            {"form": "ψυχήν", "lemma": "ψυχή", "meaning": "soul, life (accusative of ψυχή)"},
+            {"form": "πλάγχθη", "lemma": "πλάζω", "meaning": "wandered (aorist passive of πλάζω, \"to drive off course, lead astray\")"},
+            {"form": "ἴδεν", "lemma": "ὁράω", "meaning": "saw (active aorist; present tense uses ὁράω)"},
+            {"form": "πάθεν", "lemma": "πάσχω", "meaning": "suffered, endured (active aorist of πάσχω)"},
+            {"form": "ἔννεπε", "lemma": "ἐνέπω", "meaning": "tell, relate (imperative of ἐννέπω)"},
+            {"form": "πολύτροπον", "lemma": "πολύτροπος", "meaning": "πολύ \"much\" + τρόπος (\"way, manner,\" from τρέπω \"to turn\") → \"much-wandering\" / \"versatile, resourceful, cunning.\" Accusative singular."},
+            {"form": "ἱερόν", "lemma": "ἱερός", "meaning": "neuter of ἱερός, \"sacred, holy\""},
+            {"form": "πτολίεθρον", "lemma": "πτολίεθρον", "meaning": "epic form of πόλις, \"city\""},
+            {"form": "ἔπερσεν", "lemma": "πέρθω", "meaning": "destroyed, sacked (active aorist of πέρθω)"},
+            {"form": "νόον", "lemma": "νοῦς", "meaning": "mind (accusative singular of νόος)"},
+            {"form": "ἄλγεα", "lemma": "ἄλγος", "meaning": "pains, sufferings (plural of ἄλγος)"},
+            {"form": "θυμόν", "lemma": "θυμός", "meaning": "heart, spirit (accusative of θυμός)"},
+            {"form": "νόστον", "lemma": "νόστος", "meaning": "return, homecoming (accusative of νόστος)"},
+            {"form": "ἑταίρων", "lemma": "ἑταῖρος", "meaning": "comrades (genitive plural of ἑταῖρος)"},
+            {"form": "ἀρνύμενος", "lemma": "ἄρνυμαι", "meaning": "masculine nominative participle of ἄρνυμαι, \"to strive for, win, earn\""},
+            {"form": "μοῦσα", "lemma": "μοῦσα", "meaning": "muse"},
+            {"form": "μάλα", "lemma": "μάλα", "meaning": "very, greatly"},
+            {"form": "πολλὰ", "lemma": "πολύς", "meaning": "much, many things (neuter plural of πολύς, πολλή, πολύ, \"much, many\")"},
+            {"form": "Τροίης", "lemma": "Τροία", "meaning": "genitive singular [of Τροία, \"Troy\"]"},
+            {"form": "πολλῶν", "lemma": "πολύς", "meaning": "genitive plural of πολύς"},
+        ],
+        "ru": [
+            {"form": "Ἄνδρα", "lemma": "ἀνήρ", "meaning": "мужа (винительный падеж единственного числа от ἀνήρ)"},
+            {"form": "ἔγνω", "lemma": "γιγνώσκω", "meaning": "узнал (активный аорист от γιγνώσκω)"},
+            {"form": "ἀνθρώπων", "lemma": "ἄνθρωπος", "meaning": "людей (родит. п. множ. ч. от ἄνθρωπος)"},
+            {"form": "πόντῳ", "lemma": "πόντος", "meaning": "море (дат. п. от πόντος)"},
+            {"form": "ἄστεα", "lemma": "ἄστυ", "meaning": "города (винит. п. множ. ч. от ἄστυ)"},
+            {"form": "ψυχήν", "lemma": "ψυχή", "meaning": "душу (вин. п. от ψυχή)"},
+            {"form": "πλάγχθη", "lemma": "πλάζω", "meaning": "скитался (прошедшее законченное время, аорист, пассивного залога от πλάζω, сбивать с пути)"},
+            {"form": "ἴδεν", "lemma": "ὁράω", "meaning": "видел (активный аорист, в наст. вр. употребляется ὁράω)"},
+            {"form": "πάθεν", "lemma": "πάσχω", "meaning": "претерпел, испытал (активный аорист от πάσχω)"},
+            {"form": "ἔννεπε", "lemma": "ἐνέπω", "meaning": "расскажи (повелительное наклонение от ἐννέπω)"},
+            {"form": "πολύτροπον", "lemma": "πολύτροπος", "meaning": "πολύ много + τροπος (τρέπω поворачивать) направление, образ, способ → много странствовавший / многообразный, изворотливый. вин. п. ед. ч."},
+            {"form": "ἱερόν", "lemma": "ἱερός", "meaning": "ср. род от ἱερός, священный"},
+            {"form": "πτολίεθρον", "lemma": "πτολίεθρον", "meaning": "эпич. форма слова πόλις, город"},
+            {"form": "ἔπερσεν", "lemma": "πέρθω", "meaning": "разрушил (прошедшее законченное время, аорист, активного залога от πέρθω)"},
+            {"form": "νόον", "lemma": "νοῦς", "meaning": "ум (винит. п. ед. ч от νόος)"},
+            {"form": "ἄλγεα", "lemma": "ἄλγος", "meaning": "боли, страдания (множ. ч. от ἄλγος)"},
+            {"form": "θυμόν", "lemma": "θυμός", "meaning": "духе (вин. п. от θυμός)"},
+            {"form": "νόστον", "lemma": "νόστος", "meaning": "возвращение (вин. п. от νόστος)"},
+            {"form": "ἑταίρων", "lemma": "ἑταῖρος", "meaning": "товарищей (род. п. множ. ч. от ἑταίρος)"},
+            {"form": "ἀρνύμενος", "lemma": "ἄρνυμαι", "meaning": "причастие муж. р. в именит. падеже от ἄρνυμαι, бороться за что-то, добывать, снискивать"},
+            {"form": "μοῦσα", "lemma": "μοῦσα", "meaning": "муза"},
+            {"form": "μάλα", "lemma": "μάλα", "meaning": "очень"},
+            {"form": "πολλὰ", "lemma": "πολύς", "meaning": "много (множ. число среднего рода от πολύς, πολλή, πολύ многий)"},
+            {"form": "Τροίης", "lemma": "Τροία", "meaning": "родит. п. ед. ч."},
+            {"form": "πολλῶν", "lemma": "πολύς", "meaning": "родит. п. множ. ч. от πολύς"},
+        ],
+        "el": [
+            {"form": "Ἄνδρα", "lemma": "ἀνήρ", "meaning": "άντρας (αιτιατική ενικού του ἀνήρ)"},
+            {"form": "ἔγνω", "lemma": "γιγνώσκω", "meaning": "έμαθε, γνώρισε (ενεργητικός αόριστος του γιγνώσκω)"},
+            {"form": "ἀνθρώπων", "lemma": "ἄνθρωπος", "meaning": "ανθρώπων (γενική πληθυντικού του ἄνθρωπος)"},
+            {"form": "πόντῳ", "lemma": "πόντος", "meaning": "θάλασσα (δοτική του πόντος)"},
+            {"form": "ἄστεα", "lemma": "ἄστυ", "meaning": "πόλεις (αιτιατική πληθυντικού του ἄστυ)"},
+            {"form": "ψυχήν", "lemma": "ψυχή", "meaning": "ψυχή (αιτιατική του ψυχή)"},
+            {"form": "πλάγχθη", "lemma": "πλάζω", "meaning": "περιπλανήθηκε (παθητικός αόριστος του πλάζω, «παρασύρω, βγάζω από τον δρόμο»)"},
+            {"form": "ἴδεν", "lemma": "ὁράω", "meaning": "είδε (ενεργητικός αόριστος· στον ενεστώτα χρησιμοποιείται το ὁράω)"},
+            {"form": "πάθεν", "lemma": "πάσχω", "meaning": "υπέφερε, δοκίμασε (ενεργητικός αόριστος του πάσχω)"},
+            {"form": "ἔννεπε", "lemma": "ἐνέπω", "meaning": "πες, αφηγήσου (προστακτική του ἐννέπω)"},
+            {"form": "πολύτροπον", "lemma": "πολύτροπος", "meaning": "πολύ «πολύ» + τρόπος (από το τρέπω «στρέφω») «κατεύθυνση, τρόπος» → «πολυπερίπλανος» / «πολυμήχανος, τετραπέρατος». Αιτιατική ενικού."},
+            {"form": "ἱερόν", "lemma": "ἱερός", "meaning": "ουδέτερο γένος του ἱερός, «ιερός»"},
+            {"form": "πτολίεθρον", "lemma": "πτολίεθρον", "meaning": "επικός τύπος της λέξης πόλις, «πόλη»"},
+            {"form": "ἔπερσεν", "lemma": "πέρθω", "meaning": "κατέστρεψε, λεηλάτησε (ενεργητικός αόριστος του πέρθω)"},
+            {"form": "νόον", "lemma": "νοῦς", "meaning": "νου (αιτιατική ενικού του νόος)"},
+            {"form": "ἄλγεα", "lemma": "ἄλγος", "meaning": "πόνοι, βάσανα (πληθυντικός του ἄλγος)"},
+            {"form": "θυμόν", "lemma": "θυμός", "meaning": "θυμός, ψυχή (αιτιατική του θυμός)"},
+            {"form": "νόστον", "lemma": "νόστος", "meaning": "επιστροφή, νόστος (αιτιατική του νόστος)"},
+            {"form": "ἑταίρων", "lemma": "ἑταῖρος", "meaning": "συντρόφων (γενική πληθυντικού του ἑταῖρος)"},
+            {"form": "ἀρνύμενος", "lemma": "ἄρνυμαι", "meaning": "μετοχή αρσενικού γένους, ονομαστικής, του ἄρνυμαι, «αγωνίζομαι για κάτι, κερδίζω, αποκτώ»"},
+            {"form": "μοῦσα", "lemma": "μοῦσα", "meaning": "μούσα"},
+            {"form": "μάλα", "lemma": "μάλα", "meaning": "πολύ, πάρα πολύ"},
+            {"form": "πολλὰ", "lemma": "πολύς", "meaning": "πολλά (ουδέτερο πληθυντικού του πολύς, πολλή, πολύ)"},
+            {"form": "Τροίης", "lemma": "Τροία", "meaning": "γενική ενικού [του Τροία, «Τροία»]"},
+            {"form": "πολλῶν", "lemma": "πολύς", "meaning": "γενική πληθυντικού του πολύς"},
+        ],
+    }
 
     # A lesson's vocabulary per interface language, and build_period_tables(word) -> [(period, html table), ...]: two periods make a dropdown.
     GLOSS_WORDS = {
@@ -546,10 +698,56 @@ def _():
     }
     # The answer key of "is the word reflected in the translation": one row per word, stanza it occurs in and translator (a lesson keeps it in translation_presence.tsv).
     PRESENCE_ROWS = [
-        {"lemma": "πέρθω", "form": "ἔπερσεν", "stanza_ref": "1.1-2", "translator": "literal", "reflected": "yes"},
-        {"lemma": "πλάζω", "form": "πλάγχθη", "stanza_ref": "1.1-2", "translator": "with margin notes", "reflected": "yes"},
-        {"lemma": "γιγνώσκω", "form": "ἔγνω", "stanza_ref": "1.3-5", "translator": "literal", "reflected": "yes"},
-        {"lemma": "ὁράω", "form": "ἴδεν", "stanza_ref": "1.3-5", "translator": "with margin notes", "reflected": "yes"},
+        {"lemma": "ἀνήρ", "form": "Ἄνδρα", "stanza_ref": "I.1–5", "translator": "Pope", "reflected": "yes"},
+        {"lemma": "ἀνήρ", "form": "Ἄνδρα", "stanza_ref": "I.1–5", "translator": "Murray", "reflected": "yes"},
+        {"lemma": "γιγνώσκω", "form": "ἔγνω", "stanza_ref": "I.1–5", "translator": "Pope", "reflected": "no"},
+        {"lemma": "γιγνώσκω", "form": "ἔγνω", "stanza_ref": "I.1–5", "translator": "Murray", "reflected": "yes"},
+        {"lemma": "ἄνθρωπος", "form": "ἀνθρώπων", "stanza_ref": "I.1–5", "translator": "Pope", "reflected": "no"},
+        {"lemma": "ἄνθρωπος", "form": "ἀνθρώπων", "stanza_ref": "I.1–5", "translator": "Murray", "reflected": "yes"},
+        {"lemma": "πόντος", "form": "πόντῳ", "stanza_ref": "I.1–5", "translator": "Pope", "reflected": "yes"},
+        {"lemma": "πόντος", "form": "πόντῳ", "stanza_ref": "I.1–5", "translator": "Murray", "reflected": "yes"},
+        {"lemma": "ἄστυ", "form": "ἄστεα", "stanza_ref": "I.1–5", "translator": "Pope", "reflected": "no"},
+        {"lemma": "ἄστυ", "form": "ἄστεα", "stanza_ref": "I.1–5", "translator": "Murray", "reflected": "yes"},
+        {"lemma": "ψυχή", "form": "ψυχήν", "stanza_ref": "I.1–5", "translator": "Pope", "reflected": "no"},
+        {"lemma": "ψυχή", "form": "ψυχήν", "stanza_ref": "I.1–5", "translator": "Murray", "reflected": "yes"},
+        {"lemma": "πλάζω", "form": "πλάγχθη", "stanza_ref": "I.1–5", "translator": "Pope", "reflected": "yes"},
+        {"lemma": "πλάζω", "form": "πλάγχθη", "stanza_ref": "I.1–5", "translator": "Murray", "reflected": "yes"},
+        {"lemma": "ὁράω", "form": "ἴδεν", "stanza_ref": "I.1–5", "translator": "Pope", "reflected": "yes"},
+        {"lemma": "ὁράω", "form": "ἴδεν", "stanza_ref": "I.1–5", "translator": "Murray", "reflected": "yes"},
+        {"lemma": "πάσχω", "form": "πάθεν", "stanza_ref": "I.1–5", "translator": "Pope", "reflected": "yes"},
+        {"lemma": "πάσχω", "form": "πάθεν", "stanza_ref": "I.1–5", "translator": "Murray", "reflected": "yes"},
+        {"lemma": "ἐνέπω", "form": "ἔννεπε", "stanza_ref": "I.1–5", "translator": "Pope", "reflected": "yes"},
+        {"lemma": "ἐνέπω", "form": "ἔννεπε", "stanza_ref": "I.1–5", "translator": "Murray", "reflected": "yes"},
+        {"lemma": "πολύτροπος", "form": "πολύτροπον", "stanza_ref": "I.1–5", "translator": "Pope", "reflected": "yes"},
+        {"lemma": "πολύτροπος", "form": "πολύτροπον", "stanza_ref": "I.1–5", "translator": "Murray", "reflected": "yes"},
+        {"lemma": "ἱερός", "form": "ἱερόν", "stanza_ref": "I.1–5", "translator": "Pope", "reflected": "yes"},
+        {"lemma": "ἱερός", "form": "ἱερόν", "stanza_ref": "I.1–5", "translator": "Murray", "reflected": "yes"},
+        {"lemma": "πτολίεθρον", "form": "πτολίεθρον", "stanza_ref": "I.1–5", "translator": "Pope", "reflected": "yes"},
+        {"lemma": "πτολίεθρον", "form": "πτολίεθρον", "stanza_ref": "I.1–5", "translator": "Murray", "reflected": "yes"},
+        {"lemma": "πέρθω", "form": "ἔπερσεν", "stanza_ref": "I.1–5", "translator": "Pope", "reflected": "yes"},
+        {"lemma": "πέρθω", "form": "ἔπερσεν", "stanza_ref": "I.1–5", "translator": "Murray", "reflected": "yes"},
+        {"lemma": "νοῦς", "form": "νόον", "stanza_ref": "I.1–5", "translator": "Pope", "reflected": "no"},
+        {"lemma": "νοῦς", "form": "νόον", "stanza_ref": "I.1–5", "translator": "Murray", "reflected": "yes"},
+        {"lemma": "ἄλγος", "form": "ἄλγεα", "stanza_ref": "I.1–5", "translator": "Pope", "reflected": "yes"},
+        {"lemma": "ἄλγος", "form": "ἄλγεα", "stanza_ref": "I.1–5", "translator": "Murray", "reflected": "yes"},
+        {"lemma": "θυμός", "form": "θυμόν", "stanza_ref": "I.1–5", "translator": "Pope", "reflected": "no"},
+        {"lemma": "θυμός", "form": "θυμόν", "stanza_ref": "I.1–5", "translator": "Murray", "reflected": "yes"},
+        {"lemma": "νόστος", "form": "νόστον", "stanza_ref": "I.1–5", "translator": "Pope", "reflected": "yes"},
+        {"lemma": "νόστος", "form": "νόστον", "stanza_ref": "I.1–5", "translator": "Murray", "reflected": "yes"},
+        {"lemma": "ἑταῖρος", "form": "ἑταίρων", "stanza_ref": "I.1–5", "translator": "Pope", "reflected": "yes"},
+        {"lemma": "ἑταῖρος", "form": "ἑταίρων", "stanza_ref": "I.1–5", "translator": "Murray", "reflected": "yes"},
+        {"lemma": "ἄρνυμαι", "form": "ἀρνύμενος", "stanza_ref": "I.1–5", "translator": "Pope", "reflected": "no"},
+        {"lemma": "ἄρνυμαι", "form": "ἀρνύμενος", "stanza_ref": "I.1–5", "translator": "Murray", "reflected": "yes"},
+        {"lemma": "μοῦσα", "form": "μοῦσα", "stanza_ref": "I.1–5", "translator": "Pope", "reflected": "yes"},
+        {"lemma": "μοῦσα", "form": "μοῦσα", "stanza_ref": "I.1–5", "translator": "Murray", "reflected": "yes"},
+        {"lemma": "μάλα", "form": "μάλα", "stanza_ref": "I.1–5", "translator": "Pope", "reflected": "no"},
+        {"lemma": "μάλα", "form": "μάλα", "stanza_ref": "I.1–5", "translator": "Murray", "reflected": "yes"},
+        {"lemma": "πολύς", "form": "πολλὰ", "stanza_ref": "I.1–5", "translator": "Pope", "reflected": "no"},
+        {"lemma": "πολύς", "form": "πολλὰ", "stanza_ref": "I.1–5", "translator": "Murray", "reflected": "yes"},
+        {"lemma": "Τροία", "form": "Τροίης", "stanza_ref": "I.1–5", "translator": "Pope", "reflected": "yes"},
+        {"lemma": "Τροία", "form": "Τροίης", "stanza_ref": "I.1–5", "translator": "Murray", "reflected": "yes"},
+        {"lemma": "πολύς", "form": "πολλῶν", "stanza_ref": "I.1–5", "translator": "Pope", "reflected": "no"},
+        {"lemma": "πολύς", "form": "πολλῶν", "stanza_ref": "I.1–5", "translator": "Murray", "reflected": "yes"},
     ]
     GLOSSED_FORMS = {norm(w["form"]) for w in GLOSS_WORDS["en"]}  # what a lesson passes as `clickable`: the words it can gloss
     assert all(GLOSSED_FORMS == {norm(w["form"]) for w in words} for words in GLOSS_WORDS.values()), "every language glosses the same words"
@@ -600,7 +798,7 @@ def _():
         },
     ]
     assert not eee.language_notes_problems(LINES, NOTES), "every fragment must occur in the text and none may overlap another"
-    return CSS, GLOSSED_FORMS, GLOSS_WORDS, LESSON_STANZAS, LINES, NOTES, PRESENCE_ROWS, SAMPLE, SETS, STANZAS, STYLES, TOKENS, build_period_tables, eee, gu, mo
+    return CSS, GLOSSED_FORMS, GLOSS_WORDS, LESSON_STANZAS, LINES, NOTES, PRESENCE_ROWS, PRESENCE_STANZAS, PRESENCE_VOCAB, SAMPLE, SETS, STANZAS, STYLES, TOKENS, build_period_tables, eee, gu, mo
 
 
 if __name__ == "__main__":

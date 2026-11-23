@@ -63,7 +63,7 @@ Feature keys follow [Universal Dependencies FEATS](https://universaldependencies
 
 When multiple backends cover the same language, register them by name and
 configure a chain (e.g. try `modern-greek` first, fall back to `unimorph`).
-See [`docs/chains.md`](docs/chains.md) for the full chain API, `stop="all"`
+See [`docs/chains.md`](https://github.com/EEE-project/eee-project/blob/main/docs/chains.md) for the full chain API, `stop="all"`
 union mode, and hook extension points.
 
 ## Greek diachronic coverage
@@ -109,8 +109,16 @@ See each backend's own README for exact lexicon-level coverage within each perio
 
 15 runnable scripts and notebooks in `examples/` — verbs/nouns/adjectives for
 el and grc, UniMorph, named backends, chains, hooks, and interactive Marimo
-viewers. See [examples/README.md](examples/README.md) for the full catalog and
+viewers. See [examples/README.md](https://github.com/EEE-project/eee-project/blob/main/examples/README.md) for the full catalog and
 how to run each one.
+
+The interactive notebooks also run as live demos in the browser, with no install: start at the hub on
+[Codeberg](https://eee-project.codeberg.page/eee-project/), [GitHub](https://eee-project.github.io/eee-project/) or
+[GitLab](https://eee-project.gitlab.io/eee-project/). The
+[Interactive Text demo](https://eee-project.codeberg.page/eee-project/interactive-text/) includes the two translation
+exercises of the Odyssey lessons, with a choice of translators: match a stanza with its translation
+(`stanza_match_form`), and say whether a word is reflected in a translation (`translation_presence_form`, its session
+balanced by translator with `balance_presence_items(..., by_translator=True)`).
 
 ## API
 
@@ -121,10 +129,10 @@ lookup), `register_backend()`, `set_chain()`, `set_fallback_backend()`,
 building structured inflection tables, and three exception types
 (`UnsupportedLanguageError`, `BackendLoadError`, `PosNotSupportedError`) with
 chain-aware failure handling. Full signatures, the slot-template API, writing
-a new backend, and exception semantics: [docs/api-reference.md](docs/api-reference.md).
+a new backend, and exception semantics: [docs/api-reference.md](https://github.com/EEE-project/eee-project/blob/main/docs/api-reference.md).
 
 Lesson tools: `python -m eee_project.split_lesson NOTEBOOK.py` splits a multilingual lesson notebook into one notebook per UI language and
-`python -m eee_project.join_lesson NOTEBOOK.py` joins them back; see "Lesson languages" in [docs/api-patterns.md](docs/api-patterns.md).
+`python -m eee_project.join_lesson NOTEBOOK.py` joins them back; see "Lesson languages" in [docs/api-patterns.md](https://github.com/EEE-project/eee-project/blob/main/docs/api-patterns.md).
 
 ## Backends
 

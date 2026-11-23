@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.27.4 - 2026-11-23
+- Changed: the Interactive Text demo (`examples/interactive_text_notebook.py`) runs "the word in the translation" on Odyssey I.1–5 in Pope's and Murray's translations, with the meanings and the answer key of a real lesson, and gives it its own choice of translators. Its session is drawn with `balance_presence_items(..., by_translator=True)`, so answering "yes" to everything does not win. The PyPI page links to the live demo; the README's relative links are absolute.
+- Fixed: line I.5 of the demo's Greek has the accent of the Odyssey text (`ἥν`, as in the KB and the lesson).
+- Checked: 26 example and hub tests (new: the demo's session is balanced); 20 browser tests of the demo and 7 of the hub page (Playwright's Chromium); `ruff check` and `marimo check` clean.
+
 ## 1.27.3 - 2026-11-17
 - Fixed: a page with `language_bridge` / `language_selector` ran every cell that reads the language a second time while it loaded, also when the language kept in the browser was the one on show (a first visit, or the same language as last time). That run built the translator selector of the two translation exercises anew, so a choice made in the first seconds of a page was reset. `language_selector` now writes the language it starts with into the bridge (`shown`), and the browser reports a stored language as a value change only when it differs; otherwise it sends a custom message that sets `bridge.stored` with no new run. A page whose stored language differs still runs once more, in that language. A first visit no longer stores the default language (the hub pages show English when nothing is stored, as before).
 - Fixed: the live demo hub (`examples/deploy/hub_index.html`): on a phone the language box covered the end of the title; below 600 px it now stands in the page, under the top bar. The label `OPEN` of the seven cards follows the page language (the words of `card_list_open`).

@@ -372,26 +372,30 @@ def _exercise_radios_shown(page, timeout):
 def test_a_choice_of_fewer_translators_than_an_exercise_needs_shows_its_message_in_place_of_the_exercise(browser, base_url):
     msg2, msg1 = _label("stanza_match_min_translators", "en"), _label("presence_min_translators", "en")
 
-    def toggle(page, *names):
-        page.locator("marimo-multiselect button").first.click()
+    def toggle(page, nth, *names):
+        page.locator("marimo-multiselect").nth(nth).locator("button").first.click()
         page.wait_for_timeout(700)
         for name in names:
             page.locator("[role=option]").filter(has_text=re.compile(rf"^\s*{re.escape(name)}\s*$")).first.click()
             page.wait_for_timeout(500)
         page.keyboard.press("Escape")
 
+    def options(page, nth):
+        return page.evaluate(f"() => JSON.parse(document.querySelectorAll('marimo-multiselect')[{nth}].getAttribute('data-options'))")
+
     with _page(browser, base_url, WIDE) as page:
-        page.wait_for_selector("marimo-multiselect", state="attached", timeout=90000)
+        page.wait_for_function("() => document.querySelectorAll('marimo-multiselect').length >= 2", timeout=90000)
         _exercise_radios_shown(page, 90000)
-        names = page.evaluate("() => JSON.parse(document.querySelector('marimo-multiselect').getAttribute('data-options'))")
-        assert len(names) == 2
-        toggle(page, names[1])  # one translator: enough for "the word in the translation", too few for the stanza match
+        match, presence = options(page, 0), options(page, 1)  # each exercise has its own choice of translators
+        assert len(match) == 2 and presence == ["Pope", "Murray"]
+        toggle(page, 0, match[1])  # one translator: too few for the stanza match; "the word in the translation" keeps its own
         page.get_by_text(msg2).wait_for(timeout=20000)
         assert page.get_by_text(msg1).count() == 0 and page.locator("marimo-radio").count() == 2  # the direction radio and the yes/no radio
-        toggle(page, names[0])  # none
+        toggle(page, 1, *presence)  # no translator for "the word in the translation"
         page.get_by_text(msg1).wait_for(timeout=20000)
         assert page.get_by_text(msg2).count() == 1
-        toggle(page, *names)  # both again: the exercises are back
+        toggle(page, 0, match[1])
+        toggle(page, 1, *presence)  # both choices full again: the exercises are back
         page.get_by_text(msg2).wait_for(state="detached", timeout=20000)
         page.get_by_text(msg1).wait_for(state="detached", timeout=20000)
         _exercise_radios_shown(page, 20000)

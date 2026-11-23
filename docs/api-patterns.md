@@ -1547,6 +1547,11 @@ items = gu.build_translation_presence_items(rows, vocab, STANZAS, valid_translat
 gu.translation_presence_form(..., items=items, lang=lang, valid_translators=choice.value)
 ```
 
+Live: the [Interactive Text demo](https://eee-project.codeberg.page/eee-project/interactive-text/) (source
+`examples/interactive_text_notebook.py`) runs both exercises with a choice of translators; its session of "the word in
+the translation" is drawn with `balance_presence_items(..., by_translator=True)` from Odyssey I.1–5 in Pope's and
+Murray's translations.
+
 #### A real dropdown instead of `build_grc_lexicon_tabs`'s CSS picker
 
 `build_grc_lexicon_tabs`'s multi-lexicon picker is CSS-only (no JS runs in
