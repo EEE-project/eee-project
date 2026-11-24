@@ -1155,7 +1155,8 @@ round's words, and "Again" still starts over with the full `vocab`. Without
 **New selection (1.24.0+).** A notebook starts a quiz again for a new selection
 by setting `remaining` to `None` (the `ellinika_b` chapters also clear `cv`).
 `word_quiz_form` and `word_drill_form` then also empty the score, the answers and
-the Prev history of the earlier round. Before 1.24.0 these stayed: the first
+the Prev history of the earlier round (`stanza_match_form` and
+`translation_presence_form` do the same since 1.27.5). Before 1.24.0 these stayed: the first
 question read "5 / 4 — correct: 1", Prev was on, and the Errors button could retry
 words of the old selection. A notebook does not need to clear these states itself.
 

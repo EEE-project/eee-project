@@ -8001,6 +8001,44 @@ class TestExercisesShowNoMarginNotes:
         assert sc_b[0] == {"correct": 1, "total": 1}
 
 
+class TestNewSelectionStartsFreshRound:
+    """A lesson that clears only cv and remaining (a new translator or direction) must get a round with no old score or history."""
+
+    _S = TestExercisesShowNoMarginNotes._S
+    _ITEMS = [{"lemma": "ἀνήρ", "form": "Ἄνδρα", "meaning": "мужа", "translator": "Жуковский", "passage": "p", "source": "s",
+               "reflected": "yes"}]
+
+    def _stale_state(self):
+        return _form_state(cv=None, rem=None, sc={"correct": 1, "total": 2}, rst={"answer": "x", "correct": False},
+                           hist=_answered(self._S[:2], [False, True]), fut=[{"word": None, "answer": None, "correct": None}])
+
+    def _call(self, gu, state):
+        cv_g, cv_s, _, rem_g, rem_s, _, sc_g, sc_s, _, rst_g, rst_s, hist_g, hist_s, _, fut_g, fut_s = state
+        if self._kind == "stanza":
+            return gu.stanza_match_form(cv_g, cv_s, rem_g, rem_s, sc_g, sc_s, rst_g, rst_s, hist_g, hist_s, fut_g, fut_s,
+                                        _FakeRadio(), _FakeBtn(None), _FakeBtn(None), stanzas=self._S)
+        return gu.translation_presence_form(cv_g, cv_s, rem_g, rem_s, sc_g, sc_s, rst_g, rst_s, hist_g, hist_s, fut_g, fut_s,
+                                            _FakeRadio(), _FakeBtn(None), _FakeBtn(None), _FakeBtn(False), items=self._ITEMS)
+
+    @pytest.fixture(params=["stanza", "presence"])
+    def kind(self, request):
+        self._kind = request.param
+
+    def test_a_new_selection_empties_score_history_and_answer(self, gu_form, kind):
+        state = self._stale_state()
+        assert self._call(gu_form, state) == "*...*"
+        assert (state[6](), state[11](), state[14](), state[9]()) == ({"correct": 0, "total": 0}, [], [], None)
+
+    def test_a_start_with_nothing_stale_calls_no_setter(self, gu_form, kind):
+        # each setter call re-runs the cells that read the state: a cell would run itself in a loop
+        calls = []
+        state = list(_form_state(rem=None))
+        for i in (7, 10, 12, 15):
+            state[i] = calls.append
+        assert self._call(gu_form, tuple(state)) == "*...*"
+        assert calls == []
+
+
 class TestTranslatorChoice:
     """A notebook that lets the learner pick the translators: the selector, and the stanza match asks for at least 2."""
 

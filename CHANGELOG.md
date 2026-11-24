@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.27.5 - 2026-11-24
+- Fixed: `stanza_match_form` and `translation_presence_form` start a fresh round after a new selection (a changed translator or direction) with score 0 and no history, like the word quiz and the word drill. Before, the new round kept the old score and the old Prev history.
+- Checked: 4 new tests (both forms, with and without stale state); 1951 tests pass.
+
 ## 1.27.4 - 2026-11-23
 - Changed: the Interactive Text demo (`examples/interactive_text_notebook.py`) runs "the word in the translation" on Odyssey I.1–5 in Pope's and Murray's translations, with the meanings and the answer key of a real lesson, and gives it its own choice of translators. Its session is drawn with `balance_presence_items(..., by_translator=True)`, so answering "yes" to everything does not win. The PyPI page links to the live demo; the README's relative links are absolute.
 - Fixed: line I.5 of the demo's Greek has the accent of the Odyssey text (`ἥν`, as in the KB and the lesson).

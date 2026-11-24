@@ -5069,16 +5069,23 @@ class GreekUtils:
         if remaining is None:
             if vocab:
                 self._shuffle_start(vocab, set_cv, set_remaining)
-            if get_score()["total"]:
-                set_score({"correct": 0, "total": 0})
-            if get_history():
-                set_history([])
-            if get_future():
-                set_future([])
-            if get_restore() is not None:
-                set_restore(None)
+            self._clear_round_state(get_score, get_history, get_future, get_restore,
+                                    set_score, set_history, set_future, set_restore)
             return None
         return get_cv(), remaining, get_score(), get_restore(), get_history(), get_future()
+
+    @staticmethod
+    def _clear_round_state(get_score, get_history, get_future, get_restore,
+                           set_score, set_history, set_future, set_restore) -> None:
+        """Empty what an earlier round left behind; a setter runs only for a state that holds something."""
+        if get_score()["total"]:
+            set_score({"correct": 0, "total": 0})
+        if get_history():
+            set_history([])
+        if get_future():
+            set_future([])
+        if get_restore() is not None:
+            set_restore(None)
 
     def _record_answer(self, cv: dict, answer: Any, is_correct: bool, history: list, score: dict,
                        set_history, set_score) -> None:
@@ -5972,6 +5979,8 @@ class GreekUtils:
         if remaining is None:
             if stanzas:
                 self._shuffle_start(stanzas, set_cv, set_remaining)
+            self._clear_round_state(get_score, get_history, get_future, get_restore,
+                                    set_score, set_history, set_future, set_restore)
             return mo.md("*...*")
 
         _done = cv is None and len(remaining) == 0
@@ -6368,6 +6377,8 @@ class GreekUtils:
             if not items:
                 return mo.md(self.ui_label('presence_empty_label', lang))
             self._shuffle_start(items, set_cv, set_remaining)
+            self._clear_round_state(get_score, get_history, get_future, get_restore,
+                                    set_score, set_history, set_future, set_restore)
             return mo.md("*...*")
 
         _done = cv is None and len(remaining) == 0
