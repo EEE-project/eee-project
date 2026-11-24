@@ -51,6 +51,7 @@ import csv
 import functools
 import html as _html
 import io
+import os
 import random as _random
 import re
 from dataclasses import dataclass
@@ -4802,14 +4803,11 @@ class GreekUtils:
     def _handle_quiz_next(self, all_items, cv, ans, correct, remaining, restore_entry,
                           history, future, score,
                           set_cv, set_remaining, set_history, set_future, set_score, set_restore,
-                          mo) -> "Any | None":
+                          mo) -> Any:
         """Shared Next-button handler for stanza-match and translation-presence forms.
 
         Handles restart-after-done, forward-through-history, and normal-advance.
-        Returns the "please wait" placeholder for any of those three; returns
-        ``None`` when there's no selection yet, so the caller falls through and
-        re-renders as-is (mirrors :meth:`_handle_prev`'s shape, but Next has a
-        third case Prev doesn't: nothing selected yet).
+        Always returns the "please wait" placeholder; with no selection yet nothing advances.
         """
         if cv is None:  # restart after done
             self._restart_quiz(all_items, set_cv, set_remaining,
@@ -4836,7 +4834,8 @@ class GreekUtils:
             set_remaining(remaining[1:] if remaining else [])
             set_restore(None)
             return mo.md("*...*")
-        return None  # no selection — caller falls through and re-renders as-is
+        set_cv(cv)  # no selection: only rebuilds the buttons, so the old Next click is not read again at the next answer
+        return mo.md("*...*")
 
     @staticmethod
     def word_drill_done(cv: "dict | None", remaining: "list | None") -> bool:
@@ -5989,13 +5988,10 @@ class GreekUtils:
                     if cv else None)
 
         if next_btn.value:
-            _result = self._handle_quiz_next(
+            return self._handle_quiz_next(
                 stanzas, cv, _ans, _correct, remaining, restore_entry, history, future, score,
                 set_cv, set_remaining, set_history, set_future, set_score, set_restore, mo,
             )
-            if _result is not None:
-                return _result
-            # else: no selection — fall through and re-render as-is
 
         if prev_btn.value:
             return self._handle_prev(cv, restore_entry, history, future, score,
@@ -6125,7 +6121,13 @@ class GreekUtils:
 
         text = "\t".join(["lemma", "form", "stanza_ref", "translator", "reflected"]) + "\n"
         text += "".join("\t".join(r) + "\n" for r in out)
-        Path(tsv_path).write_text(text, encoding="utf-8")
+        path = Path(tsv_path)
+        if path.exists() and path.read_text(encoding="utf-8") == text:
+            return
+        # write_text truncates first: a second page reading in that moment sees an empty file, takes it for a missing one and writes starter rows over the reviewed values
+        tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+        tmp.write_text(text, encoding="utf-8")
+        tmp.replace(path)
 
     def read_translation_presence_tsv(self, tsv_path: Any) -> "list[dict]":
         """Load translation_presence.tsv, dropping comment-prefixed (removed-word) rows.
@@ -6387,13 +6389,10 @@ class GreekUtils:
         _correct = (_yes if cv["reflected"] == "yes" else _no) if cv else None
 
         if next_btn.value:
-            _result = self._handle_quiz_next(
+            return self._handle_quiz_next(
                 items, cv, _ans, _correct, remaining, restore_entry, history, future, score,
                 set_cv, set_remaining, set_history, set_future, set_score, set_restore, mo,
             )
-            if _result is not None:
-                return _result
-            # else: no selection — fall through and re-render as-is
 
         if prev_btn.value:
             return self._handle_prev(cv, restore_entry, history, future, score,

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.27.6 - 2026-11-25
+- Fixed: in the stanza match and the presence quiz a click on Next with no answer stayed counted: the next answer then jumped to the next question at once, without showing its feedback. The click is now consumed (the shared Next handler sets the same word again, so the buttons are built new).
+- Changed: in the presence quiz such a click also puts the «show the original» switch back to the translation (the buttons and the switch are built together; checked in a browser).
+- Fixed: `GreekUtils.sync_translation_presence_tsv` no longer lets a second page empty the answer key. Every lesson load ran it and rewrote the file, also when nothing changed; the write started with an empty file, and a second page that read the file in that moment took it for a missing one and wrote starter rows over the reviewed `yes`/`no` values (two pages on one folder lost all 32 values; the quiz then showed «Пока нет проверенных пар»). The file is now written only when its text changes, and through a temporary file that replaces it in one step. Checked with a stress test of two processes: all reviewed values were lost before, none after.
+- Fixed: `uv.lock` names the version of the package again (it still said 1.27.4 in 1.27.5).
+- Checked: 2 new unit tests replace 2 that checked the old behavior (1951 tests pass), and the same two moved from a copied test class into the form classes; 2 new browser tests of the Interactive Text demo (an empty Next click, then an answer; both exercises) fail with 1.27.3 and pass with this fix, and all 22 browser tests of the demo pass (Playwright's Chromium). In a real browser (`marimo run`) the Kavafis lesson 1 presence quiz stayed at question 2 after the answer with this fix and jumped to 3 with 1.27.3; the Odyssey stanza match and presence exercises pass their full click test.
+
 ## 1.27.5 - 2026-11-24
 - Fixed: `stanza_match_form` and `translation_presence_form` start a fresh round after a new selection (a changed translator or direction) with score 0 and no history, like the word quiz and the word drill. Before, the new round kept the old score and the old Prev history.
 - Checked: 4 new tests (both forms, with and without stale state); 1951 tests pass.

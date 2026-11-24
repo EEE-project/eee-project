@@ -1536,6 +1536,9 @@ use. New in 1.26.0: a notebook can let the learner choose them.
 - `translation_presence_form(..., valid_translators=choice.value)`: with an empty choice the form shows the warning
   `presence_min_translators`. Build `items` from the same choice. A choice that leaves no reviewed row still shows the
   message `presence_empty_label`, as without a choice.
+- Next with no answer (both forms, since 1.27.6): nothing advances, and the click is not counted again at the next
+  answer (before 1.27.6 that answer jumped on at once, without its feedback). The form sets the same word again, so the
+  buttons are built new; in the presence quiz the "show the original" switch goes back to the translation.
 - A stanza dict may hold `margin_glosses`, `{translator: {line_index: [(word, meaning), ...]}}` (what
   `interactive_text(notes=)` takes for one translator). The exercises do not show these notes: they belong to the text
   widget. An exercise quotes a translator's text without the stars that mark the notes.

@@ -8001,44 +8001,6 @@ class TestExercisesShowNoMarginNotes:
         assert sc_b[0] == {"correct": 1, "total": 1}
 
 
-class TestNewSelectionStartsFreshRound:
-    """A lesson that clears only cv and remaining (a new translator or direction) must get a round with no old score or history."""
-
-    _S = TestExercisesShowNoMarginNotes._S
-    _ITEMS = [{"lemma": "ἀνήρ", "form": "Ἄνδρα", "meaning": "мужа", "translator": "Жуковский", "passage": "p", "source": "s",
-               "reflected": "yes"}]
-
-    def _stale_state(self):
-        return _form_state(cv=None, rem=None, sc={"correct": 1, "total": 2}, rst={"answer": "x", "correct": False},
-                           hist=_answered(self._S[:2], [False, True]), fut=[{"word": None, "answer": None, "correct": None}])
-
-    def _call(self, gu, state):
-        cv_g, cv_s, _, rem_g, rem_s, _, sc_g, sc_s, _, rst_g, rst_s, hist_g, hist_s, _, fut_g, fut_s = state
-        if self._kind == "stanza":
-            return gu.stanza_match_form(cv_g, cv_s, rem_g, rem_s, sc_g, sc_s, rst_g, rst_s, hist_g, hist_s, fut_g, fut_s,
-                                        _FakeRadio(), _FakeBtn(None), _FakeBtn(None), stanzas=self._S)
-        return gu.translation_presence_form(cv_g, cv_s, rem_g, rem_s, sc_g, sc_s, rst_g, rst_s, hist_g, hist_s, fut_g, fut_s,
-                                            _FakeRadio(), _FakeBtn(None), _FakeBtn(None), _FakeBtn(False), items=self._ITEMS)
-
-    @pytest.fixture(params=["stanza", "presence"])
-    def kind(self, request):
-        self._kind = request.param
-
-    def test_a_new_selection_empties_score_history_and_answer(self, gu_form, kind):
-        state = self._stale_state()
-        assert self._call(gu_form, state) == "*...*"
-        assert (state[6](), state[11](), state[14](), state[9]()) == ({"correct": 0, "total": 0}, [], [], None)
-
-    def test_a_start_with_nothing_stale_calls_no_setter(self, gu_form, kind):
-        # each setter call re-runs the cells that read the state: a cell would run itself in a loop
-        calls = []
-        state = list(_form_state(rem=None))
-        for i in (7, 10, 12, 15):
-            state[i] = calls.append
-        assert self._call(gu_form, tuple(state)) == "*...*"
-        assert calls == []
-
-
 class TestTranslatorChoice:
     """A notebook that lets the learner pick the translators: the selector, and the stanza match asks for at least 2."""
 
@@ -8180,13 +8142,13 @@ class TestStanzaMatchForm:
         s = _SM_STANZAS[0]
         state = self._state(cv=s, rem=_SM_STANZAS[1:])
         renew = _FakeBtn(label="renew")
-        result = self._call(gu_form, state, radio=_FakeRadio(value=None), next_v=1, renew_btn=renew)
+        result = self._call(gu_form, state, radio=_FakeRadio(value=None), renew_btn=renew)
         assert renew in result[-1]
 
     def test_no_renew_btn_omitted_from_nav_row(self, gu_form):
         s = _SM_STANZAS[0]
         state = self._state(cv=s, rem=_SM_STANZAS[1:])
-        result = self._call(gu_form, state, radio=_FakeRadio(value=None), next_v=1)
+        result = self._call(gu_form, state, radio=_FakeRadio(value=None))
         assert len(result[-1]) == 2
 
     def test_grc_to_tr_correct_answer_scores(self, gu_form):
@@ -8220,13 +8182,30 @@ class TestStanzaMatchForm:
         assert result == "*...*"
         assert sc_b[0]["correct"] == 1
 
-    def test_next_without_answer_rerenders(self, gu_form):
+    def test_next_without_answer_only_rebuilds_the_buttons(self, gu_form):
+        # a setter call re-runs the cells that read the state; the new Next button has a count of 0, so the next answer does not jump on
         s = _SM_STANZAS[0]
-        state = self._state(cv=s, rem=_SM_STANZAS[1:])
-        sc_b = state[8]
-        result = self._call(gu_form, state, radio=_FakeRadio(value=None), next_v=1)
-        assert result != "*...*"
-        assert sc_b[0]["total"] == 0
+        sets = []
+        state = list(self._state(cv=s, rem=_SM_STANZAS[1:]))
+        state[1] = sets.append
+        assert self._call(gu_form, tuple(state), radio=_FakeRadio(value=None), next_v=1) == "*...*"
+        assert sets == [s] and state[3]() == _SM_STANZAS[1:] and state[8][0]["total"] == 0
+
+    def test_a_new_selection_empties_score_history_and_answer(self, gu_form):
+        # a lesson that clears only cv and remaining (a new translator or direction) must get a round with no old score or history
+        state = _form_state(cv=None, rem=None, sc={"correct": 1, "total": 2}, rst={"answer": "x", "correct": False},
+                            hist=_answered(_SM_STANZAS[:2], [False, True]), fut=[{"word": None, "answer": None, "correct": None}])
+        assert self._call(gu_form, state) == "*...*"
+        assert (state[6](), state[11](), state[14](), state[9]()) == ({"correct": 0, "total": 0}, [], [], None)
+
+    def test_a_start_with_nothing_stale_calls_no_setter(self, gu_form):
+        # each setter call re-runs the cells that read the state: a cell would run itself in a loop
+        calls = []
+        state = list(self._state(rem=None))
+        for i in (7, 10, 12, 15):
+            state[i] = calls.append
+        assert self._call(gu_form, tuple(state)) == "*...*"
+        assert calls == []
 
     def test_done_shows_callout(self, gu_form):
         state = self._state(cv=None, rem=[], sc={"correct": 2, "total": 4})
@@ -8415,6 +8394,28 @@ class TestSyncTranslationPresenceTsv:
         assert all(r[4] == "" for r in rows)  # unreviewed starter default
         assert ("ἀνήρ", "Ἄνδρα", "I.1-2", "Жуковский") in {(r[0], r[1], r[2], r[3]) for r in rows}
         assert ("ἀνήρ", "Ἄνδρα", "I.1-2", "Вересаев") in {(r[0], r[1], r[2], r[3]) for r in rows}
+
+    def test_a_run_that_changes_nothing_does_not_write_the_file(self, gu_form, tmp_path, monkeypatch):
+        # a lesson runs this at every load: each write dirties a tracked file and opens a window for a reader that sees the file empty
+        p = tmp_path / "presence.tsv"
+        gu_form.sync_translation_presence_tsv(_TP_VOCAB, ["Жуковский"], _SM_STANZAS, p)
+        before = (p.stat().st_mtime_ns, p.read_bytes())
+        written, real = [], Path.write_text
+        monkeypatch.setattr(Path, "write_text", lambda self, *a, **k: written.append(self) or real(self, *a, **k))
+        gu_form.sync_translation_presence_tsv(_TP_VOCAB, ["Жуковский"], _SM_STANZAS, p)
+        assert written == [] and (p.stat().st_mtime_ns, p.read_bytes()) == before
+
+    def test_a_write_goes_through_a_temp_file_so_a_second_reader_never_sees_the_file_empty(self, gu_form, tmp_path, monkeypatch):
+        # a reader that finds the file empty takes it for a missing one and writes starter rows over the reviewed values
+        p = tmp_path / "presence.tsv"
+        gu_form.sync_translation_presence_tsv(_TP_VOCAB, ["Жуковский"], _SM_STANZAS, p)
+        old = p.read_text(encoding="utf-8")
+        written, real = [], Path.write_text
+        monkeypatch.setattr(Path, "write_text", lambda self, *a, **k: written.append(self) or real(self, *a, **k))
+        gu_form.sync_translation_presence_tsv(_TP_VOCAB, ["Жуковский", "Вересаев"], _SM_STANZAS, p)  # new rows: a write is needed
+        assert written and p not in written
+        assert p.read_text(encoding="utf-8").startswith(old) and len(gu_form._read_presence_rows(p)) == 6
+        assert [f.name for f in tmp_path.iterdir()] == ["presence.tsv"]  # no temp file left behind
 
     def test_word_occurring_in_two_stanzas_gets_a_row_per_stanza(self, gu_form, tmp_path):
         p = tmp_path / "presence.tsv"
@@ -8846,13 +8847,13 @@ class TestTranslationPresenceForm:
         item = self._ITEMS[0]
         state = self._state(cv=item, rem=self._ITEMS[1:])
         renew = _FakeBtn(label="renew")
-        result = self._call(gu_form, state, radio=_FakeRadio(value=None), next_v=1, renew_btn=renew)
+        result = self._call(gu_form, state, radio=_FakeRadio(value=None), renew_btn=renew)
         assert renew in result[-1]
 
     def test_no_renew_btn_omitted_from_nav_row(self, gu_form):
         item = self._ITEMS[0]
         state = self._state(cv=item, rem=self._ITEMS[1:])
-        result = self._call(gu_form, state, radio=_FakeRadio(value=None), next_v=1)
+        result = self._call(gu_form, state, radio=_FakeRadio(value=None))
         assert len(result[-1]) == 2
 
     def test_da_correct_for_reflected_yes(self, gu_form):
@@ -8915,14 +8916,6 @@ class TestTranslationPresenceForm:
         assert result == "*...*"
         assert sc_b[0] == {"correct": 1, "total": 1}
 
-    def test_next_without_answer_rerenders(self, gu_form):
-        item = self._ITEMS[0]
-        state = self._state(cv=item, rem=self._ITEMS[1:])
-        sc_b = state[8]
-        result = self._call(gu_form, state, radio=_FakeRadio(value=None), next_v=1)
-        assert result != "*...*"
-        assert sc_b[0]["total"] == 0
-
     def test_prev_goes_back(self, gu_form):
         past = {"word": self._ITEMS[1], "answer": "нет", "correct": True}
         state = self._state(cv=self._ITEMS[0], rem=[],
@@ -8932,6 +8925,31 @@ class TestTranslationPresenceForm:
         assert result == "*...*"
         assert cv_b[0] == self._ITEMS[1]
         assert sc_b[0]["total"] == 0
+
+    def test_next_without_answer_only_rebuilds_the_buttons(self, gu_form):
+        # a setter call re-runs the cells that read the state; the new Next button has a count of 0, so the next answer does not jump on
+        item = self._ITEMS[0]
+        sets = []
+        state = list(self._state(cv=item, rem=self._ITEMS[1:]))
+        state[1] = sets.append
+        assert self._call(gu_form, tuple(state), radio=_FakeRadio(value=None), next_v=1) == "*...*"
+        assert sets == [item] and state[3]() == self._ITEMS[1:] and state[8][0]["total"] == 0
+
+    def test_a_new_selection_empties_score_history_and_answer(self, gu_form):
+        # a lesson that clears only cv and remaining (a new translator) must get a round with no old score or history
+        state = _form_state(cv=None, rem=None, sc={"correct": 1, "total": 2}, rst={"answer": "x", "correct": False},
+                            hist=_answered(self._ITEMS, [False, True]), fut=[{"word": None, "answer": None, "correct": None}])
+        assert self._call(gu_form, state) == "*...*"
+        assert (state[6](), state[11](), state[14](), state[9]()) == ({"correct": 0, "total": 0}, [], [], None)
+
+    def test_a_start_with_nothing_stale_calls_no_setter(self, gu_form):
+        # each setter call re-runs the cells that read the state: a cell would run itself in a loop
+        calls = []
+        state = list(self._state(rem=None))
+        for i in (7, 10, 12, 15):
+            state[i] = calls.append
+        assert self._call(gu_form, tuple(state)) == "*...*"
+        assert calls == []
 
     def test_done_shows_callout(self, gu_form):
         state = self._state(cv=None, rem=[], sc={"correct": 1, "total": 2})

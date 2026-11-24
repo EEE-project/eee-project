@@ -399,3 +399,31 @@ def test_a_choice_of_fewer_translators_than_an_exercise_needs_shows_its_message_
         page.get_by_text(msg2).wait_for(state="detached", timeout=20000)
         page.get_by_text(msg1).wait_for(state="detached", timeout=20000)
         _exercise_radios_shown(page, 20000)
+
+
+def _counters(page):
+    """The progress lines of the two exercises, in page order: the stanza match, then "the word in the translation"."""
+    done = re.escape(_label("quiz_progress_correct", "en"))
+    return [t.replace("\n", " ") for t in page.get_by_text(re.compile(rf"\d+\s*/\s*\d+\s*—\s*{done}")).all_inner_texts()]
+
+
+def _answer(page, which):
+    """Pick an answer: a long option of the stanza match (which=0), or yes/no of the second exercise (which=1)."""
+    radios = page.get_by_role("radio")
+    values = radios.evaluate_all("els => els.map(e => e.getAttribute('value'))")
+    pool = [i for i, v in enumerate(values) if (v and len(v) > 25 if which == 0 else v in ("yes", "no"))]
+    radios.nth(pool[0]).click()
+
+
+@pytest.mark.parametrize("which", [0, 1], ids=["stanza match", "word in the translation"])
+def test_a_click_on_next_with_no_answer_is_not_read_again_at_the_next_answer(browser, base_url, which):
+    """The Next button keeps its click count until its cell runs again: before 1.27.6 the answer after an empty click jumped to the next question."""
+    with _page(browser, base_url, WIDE) as page:
+        _exercise_radios_shown(page, 90000)
+        before = _counters(page)[which]
+        page.get_by_role("button", name="Next", exact=True).nth(which).click()  # no answer: nothing advances
+        _settle(page)
+        assert _counters(page)[which] == before
+        _answer(page, which)
+        _settle(page)
+        assert _counters(page)[which] == before
