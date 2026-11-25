@@ -61,6 +61,30 @@ def test_the_presence_session_of_the_interactive_text_demo_is_balanced(tmp_path,
     assert Counter(it["reflected"] for it in items) == {"no": 5, "yes": 5}
 
 
+def test_every_language_of_the_interactive_text_demo_has_its_own_translations_of_the_same_stanzas(tmp_path, monkeypatch):
+    # The language selector changes the translation too: each language has the stanzas of English (same refs and Greek lines) with
+    # its own translators, at least two (the stanza match needs two), the crib of the KB first, and no English text left in them.
+    monkeypatch.setenv("HOME", str(tmp_path))
+    spec = importlib.util.spec_from_file_location("interactive_text_demo", EXAMPLES / "interactive_text_notebook.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    _, defs = module.app.run()
+    by_lang = defs["LESSON_STANZAS_BY_LANG"]
+    assert set(by_lang) == {"en", "ru", "el"}
+    english = by_lang["en"]
+    english_texts = {t for s in english for t in s["translations"].values()}
+    for lang in ("ru", "el"):
+        stanzas = by_lang[lang]
+        assert [(s["ref"], s["lines"]) for s in stanzas] == [(s["ref"], s["lines"]) for s in english]
+        for s, en in zip(stanzas, english):
+            keys = list(s["translations"])
+            assert len(keys) >= 2 and keys[0] == f"interlinear_{lang}" and "margin_glosses" not in s
+            assert all(len(t.split("\n")) == len(s["lines"]) for t in s["translations"].values())  # the KB texts are line for line
+            assert not english_texts & set(s["translations"].values())
+    assert list(by_lang["ru"][0]["translations"])[1:] == ["Жуковский", "Вересаев"]
+    assert list(by_lang["el"][0]["translations"])[1:] == ["Πολυλάς"]
+
+
 def test_a_new_session_of_the_interactive_text_demo_resets_all_six_quiz_states():
     # Structural check: the cell that draws the session resets every quiz state, so a stale score or history never shows.
     import ast

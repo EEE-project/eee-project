@@ -132,7 +132,9 @@ def _(mo):
     fixed to the bottom of the screen on a narrow one once you tap a word, with a close button. Tap an underlined
     word: `ἔπερσεν` and `ἴδεν` have two periods, so a dropdown, the others have one; or tap a linked word of the
     translation. The 🌐 dropdown sets the interface language of the sheet (`lang=`); the meanings come per language,
-    as the vocabulary files of a lesson do.
+    as the vocabulary files of a lesson do, and so do the translators: English has a literal rendering and the same
+    with margin notes, Russian a подстрочник, Zhukovsky and Veresaev, Greek a word-for-word rendering and Polylas
+    (the margin notes are English only).
     """)
     return
 
@@ -140,19 +142,27 @@ def _(mo):
 @app.cell
 def _(LESSON_STANZAS, eee, mo):
     stanza_choice = mo.ui.dropdown(options=[s["ref"] for s in LESSON_STANZAS], value=LESSON_STANZAS[0]["ref"], label="stanza")
-    trans_choice = mo.ui.dropdown(
-        options=list(LESSON_STANZAS[0]["translations"]),
-        value="with margin notes",
-        allow_select_none=True,  # the blank entry: value None, no translation
-        label="translation",
-    )
     lang_choice = eee.language_selector(mo, None)  # en, ru or el; a lesson passes its persisted language bridge here
-    return lang_choice, stanza_choice, trans_choice
+    return lang_choice, stanza_choice
 
 
 @app.cell
-def _(GLOSSED_FORMS, LESSON_STANZAS, eee, lang_choice, mo, stanza_choice, trans_choice):
-    _stanza = {s["ref"]: s for s in LESSON_STANZAS}[stanza_choice.value]
+def _(LESSON_STANZAS_BY_LANG, eee, gu, lang_choice, mo):
+    # built again when the language changes: each language has its own translators; a crib key shows as its label
+    _keys = list(LESSON_STANZAS_BY_LANG[lang_choice.value][0]["translations"])
+    _crib = eee.interlinear_translator_key(lang_choice.value)
+    trans_choice = mo.ui.dropdown(
+        options={(gu.ui_label("interlinear_label", lang_choice.value) if k == _crib else k): k for k in _keys},
+        value=_keys[1],  # the 2nd: with margin notes (en), Zhukovsky (ru), Polylas (el)
+        allow_select_none=True,  # the blank entry: value None, no translation
+        label="translation",
+    )
+    return (trans_choice,)
+
+
+@app.cell
+def _(GLOSSED_FORMS, LESSON_STANZAS_BY_LANG, eee, lang_choice, mo, stanza_choice, trans_choice):
+    _stanza = {s["ref"]: s for s in LESSON_STANZAS_BY_LANG[lang_choice.value]}[stanza_choice.value]
     _tr = trans_choice.value
     stanza_widget = eee.interactive_text(
         mo,
@@ -223,8 +233,8 @@ def _(mo):
 
 
 @app.cell
-def _(LESSON_STANZAS, gu, lang_choice, mo):
-    ex_translators = gu.translator_multiselect(list(LESSON_STANZAS[0]["translations"]), lang_choice.value)
+def _(LESSON_STANZAS_BY_LANG, gu, lang_choice, mo):
+    ex_translators = gu.translator_multiselect(list(LESSON_STANZAS_BY_LANG[lang_choice.value][0]["translations"]), lang_choice.value)
     _grc_to_tr = gu.ui_label("stanza_match_toggle_grc_to_tr", lang_choice.value)
     ex_direction = mo.ui.radio(
         options={_grc_to_tr: "grc_to_tr", gu.ui_label("stanza_match_toggle_tr_to_grc", lang_choice.value): "tr_to_grc"},
@@ -269,12 +279,12 @@ def _(ex_direction, ex_translators, sm_set_cv, sm_set_remaining):
 
 
 @app.cell
-def _(LESSON_STANZAS, ex_direction, ex_translators, gu, lang_choice, sm_cv, sm_history, sm_remaining, sm_restore_entry):
+def _(LESSON_STANZAS_BY_LANG, ex_direction, ex_translators, gu, lang_choice, sm_cv, sm_history, sm_remaining, sm_restore_entry):
     _ = sm_cv()
     sm_choice_radio, sm_next_btn, sm_prev_btn = gu.stanza_match_widgets(
         cv=sm_cv(),
         remaining=sm_remaining(),
-        stanzas=LESSON_STANZAS,
+        stanzas=LESSON_STANZAS_BY_LANG[lang_choice.value],
         direction=ex_direction.value,
         restore_entry=sm_restore_entry(),
         history_len=len(sm_history()),
@@ -286,7 +296,7 @@ def _(LESSON_STANZAS, ex_direction, ex_translators, gu, lang_choice, sm_cv, sm_h
 
 @app.cell
 def _(
-    LESSON_STANZAS,
+    LESSON_STANZAS_BY_LANG,
     ex_direction,
     ex_translators,
     gu,
@@ -312,7 +322,7 @@ def _(
         sm_score, sm_set_score, sm_restore_entry, sm_set_restore_entry,
         sm_history, sm_set_history, sm_future, sm_set_future,
         sm_choice_radio, sm_next_btn, sm_prev_btn,
-        stanzas=LESSON_STANZAS,
+        stanzas=LESSON_STANZAS_BY_LANG[lang_choice.value],
         direction=ex_direction.value,
         lang=lang_choice.value,
         valid_translators=ex_translators.value,
@@ -556,6 +566,37 @@ def _():
         },
     ]
 
+    # The same two stanzas in Russian and Greek, so the language selector changes the translation too: the line-for-line crib of the KB
+    # and its real translators (Zhukovsky 1849, Veresaev 1953, Polylas), cut at the lines of the stanzas above from greek-knowledge-eee
+    # texts/odyssey/translations_{ru,el}.md. The margin notes are English only. The crib keys are shown as their labels (interlinear_label).
+    _LESSON_TRANSLATIONS = {'ru': {'1.1-2': {'interlinear_ru': 'О муже мне расскажи, муза, о многостранном, который весьма много\n'
+                                        'скитался, когда Трои святую твердыню разрушил.',
+                      'Жуковский': 'Муза, скажи мне о том многоопытном муже, который,\nСтранствуя долго со дня, как святой Илион им разрушен,',
+                      'Вересаев': 'Муза, скажи мне о том многоопытном муже, который\nДолго скитался с тех пор, как разрушил священную Трою,'},
+            '1.3-5': {'interlinear_ru': 'Многих людей он видел города и ум узнал,\n'
+                                        'много также он и на море претерпел страданий в своем духе,\n'
+                                        'борясь и за свою душу, и за возвращение товарищей.',
+                      'Жуковский': 'Многих людей города посетил и обычаи видел,\n'
+                                   'Много и сердцем скорбел на морях, о спасенье заботясь\n'
+                                   'Жизни своей и возврате в отчизну сопутников; тщетны…',
+                      'Вересаев': 'Многих людей города посетил и обычаи видел,\n'
+                                  'Много духом страдал на морях, о спасеньи заботясь\n'
+                                  'Жизни своей и возврате в отчизну товарищей верных.'}},
+     'el': {'1.1-2': {'interlinear_el': 'Τον άντρα σε μένα πες, μούσα, τον πολύτροπο, που πάρα πολύ\n'
+                                        'περιπλανήθηκε, αφού της Τροίας το ιερό κάστρο κατέστρεψε·',
+                      'Πολυλάς': "Τον άνδρα, μούσα, λέγε μου, πολύτροπον, 'που εις μέρη\nπολλά επλανήθη, αφού έρριξε την ιερήν Τρωάδα•"},
+            '1.3-5': {'interlinear_el': 'πολλών και ανθρώπων είδε τις πόλεις και τον νου γνώρισε,\n'
+                                        'πολλά και αυτός στη θάλασσα υπέφερε πόνους στη δική του καρδιά,\n'
+                                        'αγωνιζόμενος για τη δική του ζωή και την επιστροφή των συντρόφων.',
+                      'Πολυλάς': 'και ανθρώπων είδε αυτός πολλών ταις χώραις και την γνώμην\n'
+                                 "έμαθε, και 'ς τα πέλαγα πολλά 'παθε ζητώντας\n"
+                                 "με τους συντρόφους άβλαπτος να φθάση 'ς την πατρίδα."}}}
+    LESSON_STANZAS_BY_LANG = {
+        "en": LESSON_STANZAS,
+        **{lang: [{"ref": s["ref"], "lines": s["lines"], "translations": by_ref[s["ref"]]} for s in LESSON_STANZAS]
+           for lang, by_ref in _LESSON_TRANSLATIONS.items()},
+    }
+
     # The exercise "word in the translation" on Odyssey I.1-5: Pope (1725) and Murray (1919), public domain, as in
     # greek-knowledge-eee (texts/odyssey/translations_en.md); the meanings and the answer key are those of the Odyssey lesson
     # 2026_06_01 of created_with_eee (vocab_I_1-21_{en,ru,el}.tsv, translation_presence.tsv), by the same author.
@@ -798,7 +839,7 @@ def _():
         },
     ]
     assert not eee.language_notes_problems(LINES, NOTES), "every fragment must occur in the text and none may overlap another"
-    return CSS, GLOSSED_FORMS, GLOSS_WORDS, LESSON_STANZAS, LINES, NOTES, PRESENCE_ROWS, PRESENCE_STANZAS, PRESENCE_VOCAB, SAMPLE, SETS, STANZAS, STYLES, TOKENS, build_period_tables, eee, gu, mo
+    return CSS, GLOSSED_FORMS, GLOSS_WORDS, LESSON_STANZAS, LESSON_STANZAS_BY_LANG, LINES, NOTES, PRESENCE_ROWS, PRESENCE_STANZAS, PRESENCE_VOCAB, SAMPLE, SETS, STANZAS, STYLES, TOKENS, build_period_tables, eee, gu, mo
 
 
 if __name__ == "__main__":

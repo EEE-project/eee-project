@@ -9088,6 +9088,16 @@ class TestRenderGlossSheet:
         assert "<b>πολλοπάητον</b> — παμπόνηρος" in out
         assert "Margin note" in out
         assert "HOMER" not in out and "λόγος" not in out
+
+    def test_a_margin_note_shows_its_label_in_the_language_of_the_page(self, gu_form):
+        # the demo's notes are English only, so no browser test taps a note in ru or el
+        tables, selector, panel = self._parts(gu_form)
+        for lang in ("ru", "el"):
+            out = str(gu_form.render_gloss_sheet(
+                panel, tables, selector, selected_word="", click_seq=1, lang=lang,
+                note={"line": 0, "k": 0, "word": "πολλοπάητον", "meaning": "παμπόνηρος"},
+            ))
+            assert gu_form.ui_label("margin_note_label", lang) in out and "Margin note" not in out
         assert 'class="eee-sheet on"' in out  # a sheet although no Greek word is chosen
 
     def test_a_margin_note_is_html_escaped(self, gu_form):

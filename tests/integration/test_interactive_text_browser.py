@@ -356,9 +356,25 @@ def test_the_interface_language_changes_the_labels_and_the_meanings_of_the_sheet
             _settle(page)
             text = _sheet(page)["text"]
             assert meaning in text and _label("gloss_panel_era_caption", lang).strip("*") in text
-            page.locator(f"{STANZA} .gk-note").first.click()
+            # the margin notes are English only, so no note to tap here: the note label per language is a unit test of render_gloss_sheet
+
+
+def test_the_translation_follows_the_interface_language(browser, base_url):
+    # the section offers the translators of the language: Russian and Greek have the KB's crib and real translators, not the English text
+    english, ru_text, el_text = "Tell me, Muse", "Муза, скажи мне о том многоопытном муже", "Τον άνδρα, μούσα, λέγε μου"
+    with _page(browser, base_url, WIDE) as page:
+        assert english in page.locator(f"{STANZA} .eee-tr").inner_text()
+        for name, option, shown, hidden in (("Русский", "Жуковский", ru_text, english), ("Ελληνικά", "Πολυλάς", el_text, ru_text)):
+            _dropdown_with(page, name).select_option(label=name)
             _settle(page)
-            assert _label("margin_note_label", lang) in _sheet(page)["text"]
+            card = page.locator(f"{STANZA} .eee-tr").inner_text()
+            assert shown in card and hidden not in card
+            assert _dropdown_with(page, option).evaluate("s => s.options[s.selectedIndex].text") == option  # the 2nd of the list is chosen
+        crib = _label("interlinear_label", "el")
+        assert _dropdown_with(page, option).evaluate("s => [...s.options].map(o => o.text)") == ["--", crib, "Πολυλάς"]
+        _dropdown_with(page, "English").select_option(label="English")
+        _settle(page)
+        assert english in page.locator(f"{STANZA} .eee-tr").inner_text()
 
 
 # ── the two translation exercises under the text: the choice of translators ──
