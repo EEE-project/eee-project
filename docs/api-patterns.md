@@ -1554,10 +1554,12 @@ gu.translation_presence_form(..., items=items, lang=lang, valid_translators=choi
 Live: the [Interactive Text demo](https://eee-project.codeberg.page/eee-project/interactive-text/) (source
 `examples/interactive_text_notebook.py`) runs both exercises with a choice of translators; its session of "the word in
 the translation" is drawn with `balance_presence_items(..., by_translator=True)` from Odyssey I.1–5 in Pope's and
-Murray's translations. The text section and the stanza match follow the interface language (since 1.27.7): English has
-a literal rendering and the same with margin notes, Russian a подстрочник, Zhukovsky and Veresaev, Greek a
-word-for-word rendering and Polylas, all from `greek-knowledge-eee` (`texts/odyssey/translations_{ru,el}.md`); the
-margin notes are English only.
+Murray's translations. Every part of the demo follows the interface language (since 1.27.8; the text section and the stanza
+match since 1.27.7): the dropdown labels come from the label files, and so do the translators. English has a literal
+rendering and the same with margin notes, Russian a подстрочник, Zhukovsky and Veresaev, Greek a word-for-word rendering
+and Polylas, all from `greek-knowledge-eee` (`texts/odyssey/translations_{ru,el}.md`); the margin notes are English only.
+The word-in-the-translation exercise and the `mixed_language_notes` section use the same translators. The lesson's answer
+key has few «no» rows for them (2 for Russian, 4 for Greek), so a balanced session is short: 4 items in Russian, 8 in Greek.
 
 #### A real dropdown instead of `build_grc_lexicon_tabs`'s CSS picker
 

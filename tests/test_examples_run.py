@@ -85,6 +85,33 @@ def test_every_language_of_the_interactive_text_demo_has_its_own_translations_of
     assert list(by_lang["el"][0]["translations"])[1:] == ["Πολυλάς"]
 
 
+def test_the_presence_exercise_and_the_mixed_notes_of_the_interactive_text_demo_follow_the_language_too(tmp_path, monkeypatch):
+    # The same rule as for the text section: Russian and Greek have the translators of the KB, not Pope and Murray, and a session of the
+    # exercise can be drawn from the lesson's reviewed answer key for them (few "no" rows there: a short session is the right result).
+    monkeypatch.setenv("HOME", str(tmp_path))
+    spec = importlib.util.spec_from_file_location("interactive_text_demo", EXAMPLES / "interactive_text_notebook.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    _, defs = module.app.run()
+    gu, rows, vocab = defs["gu"], defs["PRESENCE_ROWS"], defs["PRESENCE_VOCAB"]
+    presence, mixed, text = defs["PRESENCE_STANZAS_BY_LANG"], defs["MIXED_STANZAS_BY_LANG"], defs["LESSON_STANZAS_BY_LANG"]
+    assert set(presence) == set(mixed) == {"en", "ru", "el"}
+    assert {lang: list(presence[lang][0]["translations"]) for lang in presence} == {
+        "en": ["Pope", "Murray"], "ru": ["Жуковский", "Вересаев"], "el": ["Πολυλάς"]}
+    assert all(r["reflected"] in ("yes", "no") for r in rows)  # a row the lesson has not reviewed is not in the demo
+    for lang in ("en", "ru", "el"):
+        translators = list(presence[lang][0]["translations"])
+        assert {r["translator"] for r in rows} >= set(translators)
+        assert all(len(t.split("\n")) >= 5 for t in presence[lang][0]["translations"].values())
+        built = gu.build_translation_presence_items(rows, vocab[lang], presence[lang], valid_translators=translators)
+        items = gu.balance_presence_items(built, n=10, by_translator=True)
+        assert items and {it["translator"] for it in items} == set(translators)
+        assert 2 * sum(it["reflected"] == "no" for it in items) == len(items)  # half "no": the key has few "no" rows in ru and el
+        assert mixed[lang][0]["lines"] == text["en"][0]["lines"]  # the mixed section shows stanza I.1-2
+    assert mixed["en"][0]["translations"].keys() == {"literal", "freer"}  # the demo's own renderings
+    assert list(mixed["ru"][0]["translations"])[1:] == ["Жуковский", "Вересаев"] and list(mixed["el"][0]["translations"])[1:] == ["Πολυλάς"]
+
+
 def test_a_new_session_of_the_interactive_text_demo_resets_all_six_quiz_states():
     # Structural check: the cell that draws the session resets every quiz state, so a stale score or history never shows.
     import ast

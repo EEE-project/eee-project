@@ -140,24 +140,18 @@ def _(mo):
 
 
 @app.cell
-def _(LESSON_STANZAS, eee, mo):
-    stanza_choice = mo.ui.dropdown(options=[s["ref"] for s in LESSON_STANZAS], value=LESSON_STANZAS[0]["ref"], label="stanza")
+def _(eee, mo):
     lang_choice = eee.language_selector(mo, None)  # en, ru or el; a lesson passes its persisted language bridge here
-    return lang_choice, stanza_choice
+    return (lang_choice,)
 
 
 @app.cell
-def _(LESSON_STANZAS_BY_LANG, eee, gu, lang_choice, mo):
-    # built again when the language changes: each language has its own translators; a crib key shows as its label
-    _keys = list(LESSON_STANZAS_BY_LANG[lang_choice.value][0]["translations"])
-    _crib = eee.interlinear_translator_key(lang_choice.value)
-    trans_choice = mo.ui.dropdown(
-        options={(gu.ui_label("interlinear_label", lang_choice.value) if k == _crib else k): k for k in _keys},
-        value=_keys[1],  # the 2nd: with margin notes (en), Zhukovsky (ru), Polylas (el)
-        allow_select_none=True,  # the blank entry: value None, no translation
-        label="translation",
-    )
-    return (trans_choice,)
+def _(LESSON_STANZAS_BY_LANG, gu, lang_choice, mo, translator_dropdown):
+    # built again when the language changes: the labels and the translators (a crib key shows as its label) are the language's own
+    _stanzas = LESSON_STANZAS_BY_LANG[lang_choice.value]
+    stanza_choice = mo.ui.dropdown(options=[s["ref"] for s in _stanzas], value=_stanzas[0]["ref"], label=gu.ui_label("stanza_label", lang_choice.value))
+    trans_choice = translator_dropdown(_stanzas, lang_choice.value, 1, True)  # the 2nd: with margin notes (en), Zhukovsky (ru), Polylas (el); a blank entry: no translation
+    return stanza_choice, trans_choice
 
 
 @app.cell
@@ -212,6 +206,9 @@ def _(mo):
     (`by_translator=True`), so answering «yes» to everything does not win. Murray renders every word of these lines, so with
     both translators all the «no» items come from Pope and the translator gives the answer away: choose Pope alone for a
     mixed session. Murray alone has only «yes» items: there is nothing to balance, and the function returns all of them.
+    The language selector changes the translators here too: Russian has Zhukovsky and Veresaev, Greek has Polylas, with the
+    lesson's reviewed answer key for them. That key has few «no» rows (2 for Russian, 4 for Greek), so half of a session
+    being «no» makes these sessions short: 4 items in Russian, 8 in Greek.
     An exercise quotes a translator's text without the stars of the margin notes: the notes (`margin_glosses`,
     the data `notes=` takes above) belong to the text widget of the section above and are not shown in the exercises.
 
@@ -356,8 +353,8 @@ def _(mo):
 
 
 @app.cell
-def _(PRESENCE_STANZAS, gu, lang_choice):
-    tp_translators = gu.translator_multiselect(list(PRESENCE_STANZAS[0]["translations"]), lang_choice.value)
+def _(PRESENCE_STANZAS_BY_LANG, gu, lang_choice):
+    tp_translators = gu.translator_multiselect(list(PRESENCE_STANZAS_BY_LANG[lang_choice.value][0]["translations"]), lang_choice.value)
     tp_translators
     return (tp_translators,)
 
@@ -365,7 +362,7 @@ def _(PRESENCE_STANZAS, gu, lang_choice):
 @app.cell
 def _(
     PRESENCE_ROWS,
-    PRESENCE_STANZAS,
+    PRESENCE_STANZAS_BY_LANG,
     PRESENCE_VOCAB,
     gu,
     lang_choice,
@@ -379,7 +376,7 @@ def _(
 ):
     tp_items = gu.balance_presence_items(
         gu.build_translation_presence_items(
-            PRESENCE_ROWS, PRESENCE_VOCAB[lang_choice.value], PRESENCE_STANZAS, valid_translators=tp_translators.value,
+            PRESENCE_ROWS, PRESENCE_VOCAB[lang_choice.value], PRESENCE_STANZAS_BY_LANG[lang_choice.value], valid_translators=tp_translators.value,
         ),
         n=10, by_translator=True,
     )
@@ -461,7 +458,8 @@ def _(mo):
     ```
 
     `STANZAS` is the list a lesson already holds: `[{"lines": [...], "translations": {translator: "line\nline"}}]`.
-    The notes and the two renderings below are the demo's own. The heading and the hint are the generic
+    The notes and the two English renderings below are the demo's own; in Russian and Greek the dropdown offers the translators of the
+    first section, and the notes carry a text per language. The heading and the hint are the generic
     `language_notes_*` rows of `ui-{lang}.tsv`; pass `heading=` and `hint=` for a lesson's own wording, and a
     different `block_id=` to each block when a page holds more than one. `eee.language_notes_problems(lines, notes)`
     lists the fragments that would show as nothing (a typo, an overlap); the setup cell asserts there are none.
@@ -470,17 +468,23 @@ def _(mo):
 
 
 @app.cell
-def _(STANZAS, eee, mo):
-    translator = mo.ui.dropdown(options=list(STANZAS[0]["translations"]), value="literal", label="translation")
+def _(eee, mo):
     ui_lang = eee.language_selector(mo, None)
-    return translator, ui_lang
+    return (ui_lang,)
 
 
 @app.cell
-def _(NOTES, STANZAS, eee, mo, translator, ui_lang):
+def _(MIXED_STANZAS_BY_LANG, translator_dropdown, ui_lang):
+    # built again when this section's language changes: English has the demo's own renderings, Russian and Greek the translators of the section above
+    translator = translator_dropdown(MIXED_STANZAS_BY_LANG[ui_lang.value], ui_lang.value, 0, False)
+    return (translator,)
+
+
+@app.cell
+def _(MIXED_STANZAS_BY_LANG, NOTES, eee, mo, translator, ui_lang):
     mo.vstack([
         mo.hstack([translator, ui_lang], justify="start"),
-        eee.mixed_language_notes(mo, stanzas=STANZAS, translator=translator.value, notes=NOTES, lang=ui_lang.value),
+        eee.mixed_language_notes(mo, stanzas=MIXED_STANZAS_BY_LANG[ui_lang.value], translator=translator.value, notes=NOTES, lang=ui_lang.value),
     ])
     return
 
@@ -597,6 +601,18 @@ def _():
            for lang, by_ref in _LESSON_TRANSLATIONS.items()},
     }
 
+    # mixed_language_notes shows stanza I.1-2: the demo's own English renderings, or the same translators as the text section above
+    MIXED_STANZAS_BY_LANG = {"en": STANZAS, **{lang: LESSON_STANZAS_BY_LANG[lang][:1] for lang in _LESSON_TRANSLATIONS}}
+
+    def translator_dropdown(stanzas, lang, selected, allow_none):
+        """A dropdown of the translators of *stanzas* in *lang*: the crib key shows as its label, the label comes from the label files."""
+        keys = list(stanzas[0]["translations"])
+        labels = {k: gu.ui_label('interlinear_label', lang) if k == eee.interlinear_translator_key(lang) else k for k in keys}
+        return mo.ui.dropdown(
+            options={labels[k]: k for k in keys}, value=labels[keys[selected]], allow_select_none=allow_none,
+            label=gu.ui_label('translation_label', lang).rstrip(':'),
+        )
+
     # The exercise "word in the translation" on Odyssey I.1-5: Pope (1725) and Murray (1919), public domain, as in
     # greek-knowledge-eee (texts/odyssey/translations_en.md); the meanings and the answer key are those of the Odyssey lesson
     # 2026_06_01 of created_with_eee (vocab_I_1-21_{en,ru,el}.tsv, translation_presence.tsv), by the same author.
@@ -626,6 +642,27 @@ def _():
             },
         },
     ]
+    # The same exercise in Russian and Greek: the KB's texts of Odyssey I.1-5 and the answer key of the same lesson for them
+    # (generated from greek-knowledge-eee and translation_presence.tsv; a row the lesson has not reviewed is left out).
+    _PRESENCE_TRANSLATIONS = {'ru': {'Жуковский': 'Муза, скажи мне о том многоопытном муже, который,\n'
+                         'Странствуя долго со дня, как святой Илион им разрушен,\n'
+                         'Многих людей города посетил и обычаи видел,\n'
+                         'Много и сердцем скорбел на морях, о спасенье заботясь\n'
+                         'Жизни своей и возврате в отчизну сопутников; тщетны…',
+            'Вересаев': 'Муза, скажи мне о том многоопытном муже, который\n'
+                        'Долго скитался с тех пор, как разрушил священную Трою,\n'
+                        'Многих людей города посетил и обычаи видел,\n'
+                        'Много духом страдал на морях, о спасеньи заботясь\n'
+                        'Жизни своей и возврате в отчизну товарищей верных.'},
+     'el': {'Πολυλάς': "Τον άνδρα, μούσα, λέγε μου, πολύτροπον, 'που εις μέρη\n"
+                       'πολλά επλανήθη, αφού έρριξε την ιερήν Τρωάδα•\n'
+                       'και ανθρώπων είδε αυτός πολλών ταις χώραις και την γνώμην\n'
+                       "έμαθε, και 'ς τα πέλαγα πολλά 'παθε ζητώντας\n"
+                       "με τους συντρόφους άβλαπτος να φθάση 'ς την πατρίδα."}}
+    PRESENCE_STANZAS_BY_LANG = {
+        "en": PRESENCE_STANZAS,
+        **{lang: [{**PRESENCE_STANZAS[0], "translations": texts}] for lang, texts in _PRESENCE_TRANSLATIONS.items()},
+    }
     PRESENCE_VOCAB = {
         "en": [
             {"form": "Ἄνδρα", "lemma": "ἀνήρ", "meaning": "man (accusative singular of ἀνήρ)"},
@@ -789,6 +826,79 @@ def _():
         {"lemma": "Τροία", "form": "Τροίης", "stanza_ref": "I.1–5", "translator": "Murray", "reflected": "yes"},
         {"lemma": "πολύς", "form": "πολλῶν", "stanza_ref": "I.1–5", "translator": "Pope", "reflected": "no"},
         {"lemma": "πολύς", "form": "πολλῶν", "stanza_ref": "I.1–5", "translator": "Murray", "reflected": "yes"},
+    {"lemma": "ἀνήρ", "form": "Ἄνδρα", "stanza_ref": "I.1–5", "translator": "Жуковский", "reflected": "yes"},
+    {"lemma": "γιγνώσκω", "form": "ἔγνω", "stanza_ref": "I.1–5", "translator": "Жуковский", "reflected": "yes"},
+    {"lemma": "ἄνθρωπος", "form": "ἀνθρώπων", "stanza_ref": "I.1–5", "translator": "Жуковский", "reflected": "yes"},
+    {"lemma": "πόντος", "form": "πόντῳ", "stanza_ref": "I.1–5", "translator": "Жуковский", "reflected": "yes"},
+    {"lemma": "ἄστυ", "form": "ἄστεα", "stanza_ref": "I.1–5", "translator": "Жуковский", "reflected": "yes"},
+    {"lemma": "ψυχή", "form": "ψυχήν", "stanza_ref": "I.1–5", "translator": "Жуковский", "reflected": "yes"},
+    {"lemma": "πλάζω", "form": "πλάγχθη", "stanza_ref": "I.1–5", "translator": "Жуковский", "reflected": "yes"},
+    {"lemma": "ὁράω", "form": "ἴδεν", "stanza_ref": "I.1–5", "translator": "Жуковский", "reflected": "yes"},
+    {"lemma": "πάσχω", "form": "πάθεν", "stanza_ref": "I.1–5", "translator": "Жуковский", "reflected": "yes"},
+    {"lemma": "ἐνέπω", "form": "ἔννεπε", "stanza_ref": "I.1–5", "translator": "Жуковский", "reflected": "yes"},
+    {"lemma": "πολύτροπος", "form": "πολύτροπον", "stanza_ref": "I.1–5", "translator": "Жуковский", "reflected": "yes"},
+    {"lemma": "ἱερός", "form": "ἱερόν", "stanza_ref": "I.1–5", "translator": "Жуковский", "reflected": "yes"},
+    {"lemma": "πτολίεθρον", "form": "πτολίεθρον", "stanza_ref": "I.1–5", "translator": "Жуковский", "reflected": "yes"},
+    {"lemma": "νοῦς", "form": "νόον", "stanza_ref": "I.1–5", "translator": "Жуковский", "reflected": "yes"},
+    {"lemma": "ἄλγος", "form": "ἄλγεα", "stanza_ref": "I.1–5", "translator": "Жуковский", "reflected": "yes"},
+    {"lemma": "θυμός", "form": "θυμόν", "stanza_ref": "I.1–5", "translator": "Жуковский", "reflected": "yes"},
+    {"lemma": "νόστος", "form": "νόστον", "stanza_ref": "I.1–5", "translator": "Жуковский", "reflected": "yes"},
+    {"lemma": "ἑταῖρος", "form": "ἑταίρων", "stanza_ref": "I.1–5", "translator": "Жуковский", "reflected": "yes"},
+    {"lemma": "ἄρνυμαι", "form": "ἀρνύμενος", "stanza_ref": "I.1–5", "translator": "Жуковский", "reflected": "yes"},
+    {"lemma": "μοῦσα", "form": "μοῦσα", "stanza_ref": "I.1–5", "translator": "Жуковский", "reflected": "yes"},
+    {"lemma": "μάλα", "form": "μάλα", "stanza_ref": "I.1–5", "translator": "Жуковский", "reflected": "no"},
+    {"lemma": "πολύς", "form": "πολλὰ", "stanza_ref": "I.1–5", "translator": "Жуковский", "reflected": "yes"},
+    {"lemma": "Τροία", "form": "Τροίης", "stanza_ref": "I.1–5", "translator": "Жуковский", "reflected": "yes"},
+    {"lemma": "πολύς", "form": "πολλῶν", "stanza_ref": "I.1–5", "translator": "Жуковский", "reflected": "yes"},
+    {"lemma": "πέρθω", "form": "ἔπερσεν", "stanza_ref": "I.1–5", "translator": "Жуковский", "reflected": "yes"},
+    {"lemma": "ἀνήρ", "form": "Ἄνδρα", "stanza_ref": "I.1–5", "translator": "Вересаев", "reflected": "yes"},
+    {"lemma": "γιγνώσκω", "form": "ἔγνω", "stanza_ref": "I.1–5", "translator": "Вересаев", "reflected": "yes"},
+    {"lemma": "ἄνθρωπος", "form": "ἀνθρώπων", "stanza_ref": "I.1–5", "translator": "Вересаев", "reflected": "yes"},
+    {"lemma": "πόντος", "form": "πόντῳ", "stanza_ref": "I.1–5", "translator": "Вересаев", "reflected": "yes"},
+    {"lemma": "ἄστυ", "form": "ἄστεα", "stanza_ref": "I.1–5", "translator": "Вересаев", "reflected": "yes"},
+    {"lemma": "ψυχή", "form": "ψυχήν", "stanza_ref": "I.1–5", "translator": "Вересаев", "reflected": "yes"},
+    {"lemma": "πλάζω", "form": "πλάγχθη", "stanza_ref": "I.1–5", "translator": "Вересаев", "reflected": "yes"},
+    {"lemma": "ὁράω", "form": "ἴδεν", "stanza_ref": "I.1–5", "translator": "Вересаев", "reflected": "yes"},
+    {"lemma": "πάσχω", "form": "πάθεν", "stanza_ref": "I.1–5", "translator": "Вересаев", "reflected": "yes"},
+    {"lemma": "ἐνέπω", "form": "ἔννεπε", "stanza_ref": "I.1–5", "translator": "Вересаев", "reflected": "yes"},
+    {"lemma": "πολύτροπος", "form": "πολύτροπον", "stanza_ref": "I.1–5", "translator": "Вересаев", "reflected": "yes"},
+    {"lemma": "ἱερός", "form": "ἱερόν", "stanza_ref": "I.1–5", "translator": "Вересаев", "reflected": "yes"},
+    {"lemma": "πτολίεθρον", "form": "πτολίεθρον", "stanza_ref": "I.1–5", "translator": "Вересаев", "reflected": "yes"},
+    {"lemma": "νοῦς", "form": "νόον", "stanza_ref": "I.1–5", "translator": "Вересаев", "reflected": "yes"},
+    {"lemma": "ἄλγος", "form": "ἄλγεα", "stanza_ref": "I.1–5", "translator": "Вересаев", "reflected": "yes"},
+    {"lemma": "θυμός", "form": "θυμόν", "stanza_ref": "I.1–5", "translator": "Вересаев", "reflected": "yes"},
+    {"lemma": "νόστος", "form": "νόστον", "stanza_ref": "I.1–5", "translator": "Вересаев", "reflected": "yes"},
+    {"lemma": "ἑταῖρος", "form": "ἑταίρων", "stanza_ref": "I.1–5", "translator": "Вересаев", "reflected": "yes"},
+    {"lemma": "ἄρνυμαι", "form": "ἀρνύμενος", "stanza_ref": "I.1–5", "translator": "Вересаев", "reflected": "yes"},
+    {"lemma": "μοῦσα", "form": "μοῦσα", "stanza_ref": "I.1–5", "translator": "Вересаев", "reflected": "yes"},
+    {"lemma": "μάλα", "form": "μάλα", "stanza_ref": "I.1–5", "translator": "Вересаев", "reflected": "no"},
+    {"lemma": "πολύς", "form": "πολλὰ", "stanza_ref": "I.1–5", "translator": "Вересаев", "reflected": "yes"},
+    {"lemma": "Τροία", "form": "Τροίης", "stanza_ref": "I.1–5", "translator": "Вересаев", "reflected": "yes"},
+    {"lemma": "πολύς", "form": "πολλῶν", "stanza_ref": "I.1–5", "translator": "Вересаев", "reflected": "yes"},
+    {"lemma": "πέρθω", "form": "ἔπερσεν", "stanza_ref": "I.1–5", "translator": "Вересаев", "reflected": "yes"},
+    {"lemma": "ἀνήρ", "form": "Ἄνδρα", "stanza_ref": "I.1–5", "translator": "Πολυλάς", "reflected": "yes"},
+    {"lemma": "γιγνώσκω", "form": "ἔγνω", "stanza_ref": "I.1–5", "translator": "Πολυλάς", "reflected": "yes"},
+    {"lemma": "ἄνθρωπος", "form": "ἀνθρώπων", "stanza_ref": "I.1–5", "translator": "Πολυλάς", "reflected": "yes"},
+    {"lemma": "πόντος", "form": "πόντῳ", "stanza_ref": "I.1–5", "translator": "Πολυλάς", "reflected": "yes"},
+    {"lemma": "ἄστυ", "form": "ἄστεα", "stanza_ref": "I.1–5", "translator": "Πολυλάς", "reflected": "no"},
+    {"lemma": "ψυχή", "form": "ψυχήν", "stanza_ref": "I.1–5", "translator": "Πολυλάς", "reflected": "no"},
+    {"lemma": "πλάζω", "form": "πλάγχθη", "stanza_ref": "I.1–5", "translator": "Πολυλάς", "reflected": "yes"},
+    {"lemma": "ὁράω", "form": "ἴδεν", "stanza_ref": "I.1–5", "translator": "Πολυλάς", "reflected": "yes"},
+    {"lemma": "πάσχω", "form": "πάθεν", "stanza_ref": "I.1–5", "translator": "Πολυλάς", "reflected": "yes"},
+    {"lemma": "ἐνέπω", "form": "ἔννεπε", "stanza_ref": "I.1–5", "translator": "Πολυλάς", "reflected": "yes"},
+    {"lemma": "πολύτροπος", "form": "πολύτροπον", "stanza_ref": "I.1–5", "translator": "Πολυλάς", "reflected": "yes"},
+    {"lemma": "ἱερός", "form": "ἱερόν", "stanza_ref": "I.1–5", "translator": "Πολυλάς", "reflected": "yes"},
+    {"lemma": "πτολίεθρον", "form": "πτολίεθρον", "stanza_ref": "I.1–5", "translator": "Πολυλάς", "reflected": "no"},
+    {"lemma": "πέρθω", "form": "ἔπερσεν", "stanza_ref": "I.1–5", "translator": "Πολυλάς", "reflected": "yes"},
+    {"lemma": "νοῦς", "form": "νόον", "stanza_ref": "I.1–5", "translator": "Πολυλάς", "reflected": "yes"},
+    {"lemma": "θυμός", "form": "θυμόν", "stanza_ref": "I.1–5", "translator": "Πολυλάς", "reflected": "no"},
+    {"lemma": "νόστος", "form": "νόστον", "stanza_ref": "I.1–5", "translator": "Πολυλάς", "reflected": "yes"},
+    {"lemma": "ἑταῖρος", "form": "ἑταίρων", "stanza_ref": "I.1–5", "translator": "Πολυλάς", "reflected": "yes"},
+    {"lemma": "ἄρνυμαι", "form": "ἀρνύμενος", "stanza_ref": "I.1–5", "translator": "Πολυλάς", "reflected": "yes"},
+    {"lemma": "μοῦσα", "form": "μοῦσα", "stanza_ref": "I.1–5", "translator": "Πολυλάς", "reflected": "yes"},
+    {"lemma": "πολύς", "form": "πολλὰ", "stanza_ref": "I.1–5", "translator": "Πολυλάς", "reflected": "yes"},
+    {"lemma": "Τροία", "form": "Τροίης", "stanza_ref": "I.1–5", "translator": "Πολυλάς", "reflected": "yes"},
+    {"lemma": "πολύς", "form": "πολλῶν", "stanza_ref": "I.1–5", "translator": "Πολυλάς", "reflected": "yes"},
     ]
     GLOSSED_FORMS = {norm(w["form"]) for w in GLOSS_WORDS["en"]}  # what a lesson passes as `clickable`: the words it can gloss
     assert all(GLOSSED_FORMS == {norm(w["form"]) for w in words} for words in GLOSS_WORDS.values()), "every language glosses the same words"
@@ -839,7 +949,7 @@ def _():
         },
     ]
     assert not eee.language_notes_problems(LINES, NOTES), "every fragment must occur in the text and none may overlap another"
-    return CSS, GLOSSED_FORMS, GLOSS_WORDS, LESSON_STANZAS, LESSON_STANZAS_BY_LANG, LINES, NOTES, PRESENCE_ROWS, PRESENCE_STANZAS, PRESENCE_VOCAB, SAMPLE, SETS, STANZAS, STYLES, TOKENS, build_period_tables, eee, gu, mo
+    return CSS, GLOSSED_FORMS, GLOSS_WORDS, LESSON_STANZAS, LESSON_STANZAS_BY_LANG, LINES, MIXED_STANZAS_BY_LANG, NOTES, PRESENCE_ROWS, PRESENCE_STANZAS_BY_LANG, PRESENCE_VOCAB, SAMPLE, SETS, STANZAS, STYLES, TOKENS, build_period_tables, eee, gu, mo, translator_dropdown
 
 
 if __name__ == "__main__":

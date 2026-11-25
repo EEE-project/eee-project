@@ -118,8 +118,8 @@ The interactive notebooks also run as live demos in the browser, with no install
 [Interactive Text demo](https://eee-project.codeberg.page/eee-project/interactive-text/) includes the two translation
 exercises of the Odyssey lessons, with a choice of translators: match a stanza with its translation
 (`stanza_match_form`), and say whether a word is reflected in a translation (`translation_presence_form`, its session
-balanced by translator with `balance_presence_items(..., by_translator=True)`). The text section and the stanza match
-offer the translators of the interface language (English, Russian or Greek); the second exercise uses Pope and Murray.
+balanced by translator with `balance_presence_items(..., by_translator=True)`). The labels and the translators of every
+part of the demo follow the interface language (English, Russian or Greek).
 
 ## API
 

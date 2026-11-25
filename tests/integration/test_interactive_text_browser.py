@@ -377,6 +377,44 @@ def test_the_translation_follows_the_interface_language(browser, base_url):
         assert english in page.locator(f"{STANZA} .eee-tr").inner_text()
 
 
+_DEEP_TEXT = """() => { const out = []; const walk = (n) => {
+    if (n.nodeType === Node.TEXT_NODE) { const t = n.textContent.trim(); if (t) out.push(t); return; }
+    if (n.shadowRoot) walk(n.shadowRoot);
+    for (const c of n.childNodes) walk(c); };
+    walk(document.body); return out.join("\\n"); }"""
+
+
+def _text_when(page, ready):
+    """The text of the whole page (shadow DOM included) once `ready(text)` holds; a change of language rebuilds several cells."""
+    for _ in range(80):
+        text = page.evaluate(_DEEP_TEXT)
+        if ready(text):
+            return text
+        page.wait_for_timeout(250)
+    raise AssertionError("the page never showed what the test waited for")
+
+
+def test_the_labels_the_presence_exercise_and_the_mixed_notes_follow_their_language_selectors(browser, base_url):
+    with _page(browser, base_url, WIDE) as page:
+        # the first selector: the dropdown labels (from the label files) and the translators of the presence exercise
+        for name, lang, quoted in (("Русский", "ru", ("— Жуковский", "— Вересаев")), ("Ελληνικά", "el", ("— Πολυλάς",))):
+            _dropdown_with(page, name).select_option(label=name)
+            text = _text_when(page, lambda t: any(q in t for q in quoted))
+            assert _label("stanza_label", lang) in text and _label("translation_label", lang).rstrip(":") in text
+            assert "— Pope" not in text and "— Murray" not in text
+        _dropdown_with(page, "English").select_option(label="English")
+        text = _text_when(page, lambda t: "— Pope" in t or "— Murray" in t)
+        assert _label("stanza_label", "en") in text and "— Πολυλάς" not in text
+        # the second selector (the mixed_language_notes section further down): its own translator dropdown follows it
+        second = page.locator("select", has=page.locator("option", has_text="Русский")).nth(1)
+        for name, option, shown in (("Русский", "Жуковский", "О муже мне расскажи"), ("Ελληνικά", "Πολυλάς", "Τον άντρα σε μένα πες")):
+            second.select_option(label=name)
+            text = _text_when(page, lambda t: shown in t)
+            assert page.locator("select", has=page.locator("option", has_text=option)).count() >= 1
+        second.select_option(label="English")
+        _text_when(page, lambda t: "О муже мне расскажи" not in t and "Τον άντρα σε μένα πες" not in t)
+
+
 # ── the two translation exercises under the text: the choice of translators ──
 
 
