@@ -264,18 +264,53 @@ class TestModernRung:
 
     def test_modern_period_registered(self):
         from eee_project.notebook_utils import _GRC_LEX_PERIOD, _GRC_LEX_DESCR
-        assert "modern" in _GRC_LEX_PERIOD and "modern" in _GRC_LEX_DESCR
+        assert "modern" in _GRC_LEX_PERIOD["en"] and "modern" in _GRC_LEX_DESCR["en"]
+
+    def test_every_period_name_and_description_has_its_own_row_in_each_language(self):
+        from eee_project.notebook_utils import _GRC_LEX_PERIOD, _GRC_LEX_DESCR
+        for table in (_GRC_LEX_PERIOD, _GRC_LEX_DESCR):
+            assert not [text for text in table["en"].values() if text.startswith("grc_")]  # a missing English row
+            for lang in ("ru", "el"):
+                assert not [key for key, text in table[lang].items() if text == table["en"][key]], lang  # shows English
+
+    @pytest.mark.parametrize("modern", [False, True], ids=["one period", "a picker"])
+    def test_the_tabs_name_the_periods_in_the_language_of_the_builder(self, modern):
+        from modern_greek_backend_eee import ModernGreekBackend
+        ag, um = self._backends()
+        el = ModernGreekBackend() if modern else None
+        html = build_grc_lexicon_tabs(ag, um, lexicons={"homer": ag}, el_backend=el, lang="el")(dict(self._W))
+        for key in ("unimorph", "modern") if modern else ("unimorph",):  # the word of this test is not in the homer lexicon
+            assert _ui_label(f"grc_period_{key}", "el") in html and _ui_label(f"grc_lex_descr_{key}", "el") in html
+        assert "Koine / NT" not in html and "Modern Greek" not in html
+
+    @pytest.mark.parametrize("path", ["the unimorph fallback", "with the Modern tab", "a tagged lexicon", "the required lexicon"])
+    def test_the_tabs_use_the_language_of_the_call(self, path):
+        from ancient_greek_backend_eee import AncientGreekBackend
+        from modern_greek_backend_eee import ModernGreekBackend
+        ag, um = self._backends()
+        word, options, key = dict(self._W), {"lexicons": {"homer": ag}}, "unimorph"
+        if path == "with the Modern tab":
+            options["el_backend"] = ModernGreekBackend()
+        elif path == "a tagged lexicon":
+            word = {"lemma": "ἄνθρωπος", "form": "ἀνθρώπων", "pos": "noun", "lexicon_tag": 'ancient-greek["lsj"]'}
+            options["lexicons"]["lsj"], key = AncientGreekBackend(lexicons=["lsj"]), "lsj"
+        elif path == "the required lexicon":
+            word = {"lemma": "ἀνήρ", "form": "Ἄνδρα", "pos": "noun", "lexicon_tag": 'ancient-greek["homer"]'}
+            options["require_lexicon"], key = "homer", "homer"
+        html = build_grc_lexicon_tabs(ag, um, lang="ru", **options)(word, lang="en")
+        assert _ui_label(f"grc_period_{key}", "en") in html and _ui_label(f"grc_lex_descr_{key}", "en") in html
+        assert "Nom." in html and "Им." not in html and _ui_label(f"grc_period_{key}", "ru") not in html  # the tables, too
 
     def test_modern_rung_present_with_el_backend(self):
         from modern_greek_backend_eee import ModernGreekBackend
         ag, um = self._backends()
-        tabs = build_grc_lexicon_tabs(ag, um, lexicons={"homer": ag}, el_backend=ModernGreekBackend())
+        tabs = build_grc_lexicon_tabs(ag, um, lexicons={"homer": ag}, el_backend=ModernGreekBackend(), lang="en")
         html = tabs(dict(self._W)) or ""
         assert "Modern Greek" in html and "άνθρωπος" in html   # Modern rung + monotonic Modern form
 
     def test_no_modern_rung_without_el_backend(self):
         ag, um = self._backends()
-        tabs = build_grc_lexicon_tabs(ag, um, lexicons={"homer": ag}, el_backend=None)
+        tabs = build_grc_lexicon_tabs(ag, um, lexicons={"homer": ag}, el_backend=None, lang="en")
         assert "Modern Greek" not in (tabs(dict(self._W)) or "")
 
     def test_modern_rung_error_isolated(self):
@@ -283,7 +318,7 @@ class TestModernRung:
             def get_slot_templates(self, *a, **k):
                 raise RuntimeError("boom")
         ag, um = self._backends()
-        tabs = build_grc_lexicon_tabs(ag, um, lexicons={"homer": ag}, el_backend=_Boom())
+        tabs = build_grc_lexicon_tabs(ag, um, lexicons={"homer": ag}, el_backend=_Boom(), lang="en")
         # must not raise; Modern rung omitted, the grc/unimorph side still renders
         assert "Modern Greek" not in (tabs(dict(self._W)) or "")
 
@@ -336,7 +371,7 @@ class TestRequireLexicon:
         w = {"lemma": "ἀνήρ", "form": "Ἄνδρα", "pos": "noun",
              "lexicon_tag": 'ancient-greek["homer"]'}
         tabs = build_grc_lexicon_tabs(ag, um, lexicons={"homer": ag}, el_backend=ModernGreekBackend(),
-                                       require_lexicon="homer")
+                                       require_lexicon="homer", lang="en")
         html = tabs(w)
         assert html is not None
         # attested in the anchor lexicon -> the rest of the diachronic
@@ -356,7 +391,7 @@ class TestRequireLexicon:
         w = {"lemma": "ἄνθρωπος", "form": "ἀνθρώπων", "pos": "noun",
              "lexicon_tag": 'ancient-greek["lsj"]'}
         tabs = build_grc_lexicon_tabs(ag, um, lexicons={"homer": ag, "lsj": ag_lsj},
-                                       el_backend=ModernGreekBackend())
+                                       el_backend=ModernGreekBackend(), lang="en")
         html = tabs(w)
         assert html is not None
         assert "Modern Greek" in html  # confirms the tag-matched lsj path, not the fallback
@@ -538,6 +573,10 @@ class TestGrcPeriodOptions:
     def test_empty_tables(self):
         assert grc_period_options([]) == {}
 
+    def test_the_labels_follow_the_language_and_an_unknown_lexicon_keeps_its_name(self):
+        tables = [("homer", "<table>1</table>"), ("my-lexicon", "<table>2</table>")]
+        assert grc_period_options(tables, "ru") == {_ui_label("grc_period_homer", "ru"): "homer", "my-lexicon": "my-lexicon"}
+
     def test_public_api(self):
         import eee_project as eee
         assert hasattr(eee, "grc_period_options")
@@ -568,6 +607,12 @@ class TestRenderGrcPeriodTable:
 
     def test_empty_tables_returns_empty_string(self):
         assert render_grc_period_table([], None) == ""
+
+    @pytest.mark.parametrize("tables", [_TABLES, _TABLES[:1]], ids=["two periods", "one period"])
+    def test_the_description_follows_the_language(self, tables):
+        html = render_grc_period_table(tables, "homer", lang="el")
+        assert _ui_label("grc_lex_descr_homer", "el") in html and "homer lexicon" not in html
+        assert (_ui_label("grc_period_homer", "el") in html) == (len(tables) == 1)  # the header only without a dropdown
 
     def test_public_api(self):
         import eee_project as eee
@@ -2295,7 +2340,7 @@ class TestBuildGrcLexiconTabsWithData:
 
         fn = build_grc_lexicon_tabs(_EmptyGrcBackend(), _GrcUmNounBackend(),
                                      lexicons={"homer": _EmptyGrcBackend()},
-                                     el_backend=_StubModernBackend())
+                                     el_backend=_StubModernBackend(), lang="en")
         w = {"lemma": "θεος", "pos": "noun", "form": "θεος", "lexicon_tag": ""}
 
         # build_modern_paradigm_table routes inflection through the SAME shared

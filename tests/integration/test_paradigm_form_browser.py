@@ -56,6 +56,15 @@ def _enter_in_first_field(page, text):
     page.keyboard.press("Enter")
 
 
+def test_the_language_menu_scrolls_with_the_page(browser, base_url):
+    with _page(browser, base_url) as page:
+        menu = page.locator("select", has=page.locator("option", has_text="Русский")).first
+        top = menu.bounding_box()["y"]
+        page.locator(FIELD).last.evaluate("e => e.scrollIntoView({block: 'end'})")
+        page.wait_for_timeout(500)
+        assert menu.bounding_box()["y"] < top - 100  # a menu fixed at the top right stayed over the text of the page
+
+
 def test_wrong_enter_draws_the_note_under_the_field_on_the_screen(browser, base_url):
     with _page(browser, base_url) as page:
         _enter_in_first_field(page, "λάθος")
@@ -65,6 +74,14 @@ def test_wrong_enter_draws_the_note_under_the_field_on_the_screen(browser, base_
         assert note_box["y"] >= 0 and note_box["y"] + note_box["height"] <= PHONE_H  # on the screen, no scrolling needed
         assert 0 <= note_box["y"] - (field_box["y"] + field_box["height"]) < 40  # right under the field
         assert "❌" in note.inner_text()
+
+
+@pytest.mark.parametrize("hold_ms", [0, 150])  # 150: a real mouse click keeps the button down for a moment
+def test_check_clicked_at_once_after_typing_grades_the_typed_text(browser, base_url, hold_ms):
+    with _page(browser, base_url) as page:
+        page.locator(FIELD).first.fill("yy1")  # no wait: the click comes before the widget's 300 ms send
+        page.get_by_role("button", name="Check", exact=True).click(delay=hold_ms)
+        sync_api.expect(page.get_by_text('"yy1"').first).to_be_visible(timeout=15000)
 
 
 def test_typing_in_the_field_removes_its_note(browser, base_url):

@@ -91,6 +91,7 @@ card_list_soon	coming soon
 card_list_open	OPEN
 card_list_load_error	Couldn't load file: {url}<br><br>Check that it's accessible at that link.
 word_list_empty_for	The word list for {title} is empty.
+list_empty_label	The list is empty.
 check_entered_must_be	entered **"{value}"**, must be **{expected}**
 verb_check_write_with	Write with **"{prefix}"**
 noun_check_article_missing	article missing, must be **{expected}**
@@ -109,6 +110,20 @@ grc_tense_api	Aor. Pass.
 grc_tense_xai	Perf.
 grc_tense_yai	Pqp.
 grc_default_caption	ancient-greek
+grc_period_homer	Epic Greek · c. 800–700 BCE
+grc_period_lsj	Classical Attic · 5th–4th c. BCE
+grc_period_lxx	Hellenistic Koine · late 4th–1st c. BCE
+grc_period_morphgnt	Roman Koine · 1st–3rd c. CE
+grc_period_modern	Modern Greek · 16th c.–present
+grc_period_unimorph	Koine / NT
+grc_period_byzantine	Byzantine Greek · 4th–15th c. CE
+grc_lex_descr_homer	homer lexicon · 2,335 stems · Epic/Ionic
+grc_lex_descr_lsj	pratt + ltrg + lsj · ~105 stems · Classical Attic
+grc_lex_descr_lxx	lxx lexicon · 1,905 stems · Septuagint
+grc_lex_descr_morphgnt	morphgnt lexicon · 1,848 stems · NT
+grc_lex_descr_modern	modern-greek · rule-based (el) · living language
+grc_lex_descr_unimorph	unimorph · 2,224 noun / 207 adj · Wiktionary-derived
+grc_lex_descr_byzantine	byzantine lexicon · 61 stems · hand-curated (Sophocles)
 el_verb_col_pres	Pres.
 el_verb_col_impf	Impf.
 el_verb_col_aor	Aor.

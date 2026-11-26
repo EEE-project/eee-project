@@ -91,6 +91,7 @@ card_list_soon	скоро
 card_list_open	ОТКРЫТЬ
 card_list_load_error	Не удалось загрузить файл: {url}<br><br>Проверьте, что он доступен по этой ссылке.
 word_list_empty_for	Список слов для «{title}» пуст.
+list_empty_label	Список пуст.
 check_entered_must_be	введено **"{value}"**, должно быть **{expected}**
 verb_check_write_with	Пишите с **"{prefix}"**
 noun_check_article_missing	отсутствует артикль, должен быть **{expected}**
@@ -109,6 +110,20 @@ grc_tense_api	Аор. П.
 grc_tense_xai	Перф.
 grc_tense_yai	Плюскв.
 grc_default_caption	древнегреческий
+grc_period_homer	Эпический греческий · ок. 800–700 гг. до н. э.
+grc_period_lsj	Классический аттический · V–IV вв. до н. э.
+grc_period_lxx	Эллинистическое койне · конец IV – I в. до н. э.
+grc_period_morphgnt	Койне римского времени · I–III вв. н. э.
+grc_period_modern	Новогреческий · с XVI в. по наши дни
+grc_period_unimorph	Койне / Новый Завет
+grc_period_byzantine	Византийский греческий · IV–XV вв. н. э.
+grc_lex_descr_homer	лексикон homer · 2335 основ · эпический и ионийский диалект
+grc_lex_descr_lsj	pratt + ltrg + lsj · около 105 основ · классический аттический
+grc_lex_descr_lxx	лексикон lxx · 1905 основ · Септуагинта
+grc_lex_descr_morphgnt	лексикон morphgnt · 1848 основ · Новый Завет
+grc_lex_descr_modern	modern-greek · по правилам (el) · живой язык
+grc_lex_descr_unimorph	unimorph · 2224 сущ. / 207 прил. · из Викисловаря
+grc_lex_descr_byzantine	лексикон byzantine · 61 основа · составлен вручную (Sophocles)
 el_verb_col_pres	Наст.
 el_verb_col_impf	Имперф.
 el_verb_col_aor	Аор.

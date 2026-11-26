@@ -2,7 +2,7 @@
 # requires-python = ">=3.12"
 # dependencies = [
 #     "marimo>=0.25.1",
-#     "eee-project>=1.1.0",
+#     "eee-project>=1.29.0",
 #     "unimorph-backend-eee>=1.0.3",
 #     "ancient-greek-backend-eee>=2.0.0",
 # ]
@@ -48,7 +48,7 @@ def _():
     ]:
         eee.register_backend("grc", AncientGreekBackend.for_period(_period), backend=_period_name)
 
-    return eee, mo
+    return AncientGreekBackend, UniMorphBackend, eee, mo
 
 
 @app.cell(hide_code=True)
@@ -235,6 +235,66 @@ def _(corpus_table, mo, rows):
     else:
         _output = mo.md("")
     _output
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## One word, period by period
+
+    `eee.build_grc_lexicon_tabs` shows a word's paradigm in each lexicon that has this exact form, one tab per period:
+    Homer, LSJ, the Septuagint, the New Testament. When none of the four has it, a noun can still show its UniMorph
+    paradigm. Pick a word; the 🌐 menu translates the period names and the tables.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(AncientGreekBackend, UniMorphBackend, eee, mo):
+    _tag = 'ancient-greek["homer", "lsj", "lxx", "morphgnt"]'  # the tabs try only the lexicons that a word's tag names
+    TAB_WORDS = {
+        f"{form} ({lemma})": {"lemma": lemma, "form": form, "pos": pos, "lexicon_tag": _tag}
+        for lemma, form, pos in [
+            ("μένω", "μένει", "verb"),  # in all four
+            ("εἰμί", "ἔην", "verb"),  # in Homer only
+            ("ποταμός", "ποταμοῦ", "noun"),  # in none of them: UniMorph
+        ]
+    }
+    lexicon_tabs = eee.build_grc_lexicon_tabs(
+        AncientGreekBackend(), UniMorphBackend(language="grc"), lang="en",
+        lexicons={name: AncientGreekBackend(lexicons=[name]) for name in ("homer", "lsj", "lxx", "morphgnt")},
+    )
+    gu = eee.GreekUtils(mo_module=mo)
+    kept_tab_word = {"word": None}  # a plain dict: a new language keeps the picked word
+    return TAB_WORDS, gu, kept_tab_word, lexicon_tabs
+
+
+@app.cell(hide_code=True)
+def _(eee, mo):
+    tabs_lang = eee.language_selector(mo, None)  # en, ru or el
+    return (tabs_lang,)
+
+
+@app.cell(hide_code=True)
+def _(TAB_WORDS, gu, kept_tab_word, mo, tabs_lang):
+    word_choice = mo.ui.dropdown(
+        options=list(TAB_WORDS),
+        value=kept_tab_word["word"],
+        label=gu.ui_label("word_label", tabs_lang.value),
+        on_change=lambda word: kept_tab_word.update(word=word),
+    )
+    return (word_choice,)
+
+
+@app.cell(hide_code=True)
+def _(TAB_WORDS, lexicon_tabs, mo, tabs_lang, word_choice):
+    _word = TAB_WORDS.get(word_choice.value)  # nothing picked yet: no lexicon is read
+    _tabs = lexicon_tabs(_word, lang=tabs_lang.value) if _word else None
+    mo.vstack([
+        mo.hstack([word_choice, tabs_lang], justify="start", gap=1.5),
+        mo.Html(_tabs or ""),
+    ])
     return
 
 

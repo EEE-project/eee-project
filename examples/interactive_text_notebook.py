@@ -2,7 +2,7 @@
 # requires-python = ">=3.12"
 # dependencies = [
 #     "marimo>=0.25.1",
-#     "eee-project>=1.26.0",
+#     "eee-project>=1.29.0",
 # ]
 # ///
 """interactive_text and mixed_language_notes demo — a poem with clickable words and highlight sets,
@@ -121,10 +121,11 @@ def _(mo):
         mo, lines=stanza["lines"], clickable=CLICKABLE, wrap=True,
         translation=None if tr is None else stanza["translations"][tr].split("\n"),   # ["Tell me, Muse, of the man* of many turns*, ...", ...]
         notes=stanza.get("margin_glosses", {}).get(tr, {}),   # {0: [("man", "ἀνήρ — ..."), ("turns", "τρόποι — ...")]}: the k-th star of line i = the k-th note of line i
+        keep=KEPT_TEXT,   # a dict made in a cell that reads no language: the clicked word stays when the language changes
     )
     mo.vstack([mo.hstack([stanza_choice, trans_choice, lang_choice], justify="start", wrap=True, gap=1.5), stanza_widget])
-    # the word panel, in two cells:
-    #   period_tables, period_selector, gloss_panel = gu.render_gloss_selector(WORDS[lang], stanza_widget.widget.selected_word, build_period_tables, lang=lang)
+    # the word panel, in two cells (keep=KEPT_GLOSS keeps the picked period):
+    #   period_tables, period_selector, gloss_panel = gu.render_gloss_selector(WORDS[lang], stanza_widget.widget.selected_word, build_period_tables, lang=lang, keep=KEPT_GLOSS)
     #   gu.render_gloss_sheet(gloss_panel, period_tables, period_selector, lang=lang, selected_word=..., click_seq=..., note=stanza_widget.widget.selected_note)
     ```
 
@@ -146,16 +147,28 @@ def _(eee, mo):
 
 
 @app.cell
-def _(LESSON_STANZAS_BY_LANG, gu, lang_choice, mo, translator_dropdown):
+def _():
+    kept = {"stanza": None, "direction": "grc_to_tr", "text": {}, "gloss": {}}  # the user's choices that every language has; a plain dict: a write starts no rerun
+    return (kept,)
+
+
+@app.cell
+def _(LESSON_STANZAS_BY_LANG, gu, kept, lang_choice, mo, translator_dropdown):
     # built again when the language changes: the labels and the translators (a crib key shows as its label) are the language's own
     _stanzas = LESSON_STANZAS_BY_LANG[lang_choice.value]
-    stanza_choice = mo.ui.dropdown(options=[s["ref"] for s in _stanzas], value=_stanzas[0]["ref"], label=gu.ui_label("stanza_label", lang_choice.value))
+    _refs = [s["ref"] for s in _stanzas]
+    stanza_choice = mo.ui.dropdown(
+        options=_refs,
+        value=kept["stanza"] if kept["stanza"] in _refs else _refs[0],
+        label=gu.ui_label("stanza_label", lang_choice.value),
+        on_change=lambda ref: kept.update(stanza=ref),
+    )
     trans_choice = translator_dropdown(_stanzas, lang_choice.value, 1, True)  # the 2nd: with margin notes (en), Zhukovsky (ru), Polylas (el); a blank entry: no translation
     return stanza_choice, trans_choice
 
 
 @app.cell
-def _(GLOSSED_FORMS, LESSON_STANZAS_BY_LANG, eee, lang_choice, mo, stanza_choice, trans_choice):
+def _(GLOSSED_FORMS, LESSON_STANZAS_BY_LANG, eee, kept, lang_choice, mo, stanza_choice, trans_choice):
     _stanza = {s["ref"]: s for s in LESSON_STANZAS_BY_LANG[lang_choice.value]}[stanza_choice.value]
     _tr = trans_choice.value
     stanza_widget = eee.interactive_text(
@@ -165,6 +178,7 @@ def _(GLOSSED_FORMS, LESSON_STANZAS_BY_LANG, eee, lang_choice, mo, stanza_choice
         wrap=True,
         translation=None if _tr is None else _stanza["translations"][_tr].split("\n"),
         notes=_stanza.get("margin_glosses", {}).get(_tr, {}),
+        keep=kept["text"],  # a new language or translator keeps the clicked word
     )
     mo.vstack([
         mo.hstack([stanza_choice, trans_choice, lang_choice], justify="start", wrap=True, gap=1.5),
@@ -174,10 +188,12 @@ def _(GLOSSED_FORMS, LESSON_STANZAS_BY_LANG, eee, lang_choice, mo, stanza_choice
 
 
 @app.cell
-def _(GLOSS_WORDS, build_period_tables, gu, lang_choice, stanza_widget):
+def _(GLOSS_WORDS, build_period_tables, gu, kept, lang_choice, stanza_widget):
     # builds the panel and its period dropdown; shows nothing (the next cell shows the sheet)
     period_tables, period_selector, gloss_panel = gu.render_gloss_selector(
-        GLOSS_WORDS[lang_choice.value], stanza_widget.widget.selected_word, build_period_tables, lang=lang_choice.value,
+        GLOSS_WORDS[lang_choice.value], stanza_widget.widget.selected_word,
+        lambda word: build_period_tables(word, lang_choice.value),  # a lesson's factory (build_grc_period_tables) takes lang= once
+        lang=lang_choice.value, keep=kept["gloss"],
     )
     return gloss_panel, period_selector, period_tables
 
@@ -230,14 +246,18 @@ def _(mo):
 
 
 @app.cell
-def _(LESSON_STANZAS_BY_LANG, gu, lang_choice, mo):
+def _(LESSON_STANZAS_BY_LANG, gu, kept, lang_choice, mo):
     ex_translators = gu.translator_multiselect(list(LESSON_STANZAS_BY_LANG[lang_choice.value][0]["translations"]), lang_choice.value)
-    _grc_to_tr = gu.ui_label("stanza_match_toggle_grc_to_tr", lang_choice.value)
+    _directions = {
+        gu.ui_label("stanza_match_toggle_grc_to_tr", lang_choice.value): "grc_to_tr",
+        gu.ui_label("stanza_match_toggle_tr_to_grc", lang_choice.value): "tr_to_grc",
+    }
     ex_direction = mo.ui.radio(
-        options={_grc_to_tr: "grc_to_tr", gu.ui_label("stanza_match_toggle_tr_to_grc", lang_choice.value): "tr_to_grc"},
-        value=_grc_to_tr,
+        options=_directions,
+        value=next(k for k, v in _directions.items() if v == kept["direction"]),
         label=gu.ui_label("stanza_match_direction_label", lang_choice.value),
         inline=True,
+        on_change=lambda value: kept.update(direction=value),
     )
     mo.hstack([ex_translators, ex_direction], justify="start", wrap=True, gap=1.5)
     return ex_direction, ex_translators
@@ -747,7 +767,7 @@ def _():
         ],
     }
 
-    # A lesson's vocabulary per interface language, and build_period_tables(word) -> [(period, html table), ...]: two periods make a dropdown.
+    # A lesson's vocabulary per interface language, and build_period_tables(word, lang) -> [(period, html table), ...]: two periods make a dropdown.
     GLOSS_WORDS = {
         "en": [
             {"form": "ἔπερσεν", "lemma": "πέρθω", "context": "verb", "meaning": "sacked, destroyed", "grammar_label": "aorist, 3rd person singular"},
@@ -902,31 +922,27 @@ def _():
     ]
     GLOSSED_FORMS = {norm(w["form"]) for w in GLOSS_WORDS["en"]}  # what a lesson passes as `clickable`: the words it can gloss
     assert all(GLOSSED_FORMS == {norm(w["form"]) for w in words} for words in GLOSS_WORDS.values()), "every language glosses the same words"
-    _TABLES = {
-        "πέρθω": [
-            ("homer", "<table><tr><th></th><th>aorist</th></tr><tr><td>3 sg.</td><td><b>ἔπερσεν</b></td></tr></table>"),
-            ("lsj", "<table><tr><th></th><th>aorist</th></tr><tr><td>3 sg.</td><td><b>ἔπερσε(ν)</b></td></tr></table>"),
-        ],
-        "πλάζω": [
-            ("homer", "<table><tr><th></th><th>aorist passive</th></tr><tr><td>3 sg.</td><td><b>πλάγχθη</b></td></tr></table>"),
-        ],
-        "ὁράω": [
-            ("homer", "<table><tr><th></th><th>aorist</th></tr><tr><td>3 sg.</td><td><b>ἴδεν</b></td></tr></table>"),
-            ("lsj", "<table><tr><th></th><th>aorist</th></tr><tr><td>3 sg.</td><td><b>εἶδεν</b></td></tr></table>"),
-        ],
-        "γιγνώσκω": [
-            ("homer", "<table><tr><th></th><th>aorist</th></tr><tr><td>3 sg.</td><td><b>ἔγνω</b></td></tr></table>"),
-        ],
-        "πάσχω": [
-            ("homer", "<table><tr><th></th><th>aorist</th></tr><tr><td>3 sg.</td><td><b>πάθεν</b></td></tr></table>"),
-        ],
-        "νόστος": [
-            ("homer", "<table><tr><th></th><th>singular</th></tr><tr><td>acc.</td><td><b>νόστον</b></td></tr></table>"),
-        ],
+    _TABLES = {  # lemma: [(period, header, row label, form)]
+        "πέρθω": [("homer", "aai", "p3", "ἔπερσεν"), ("lsj", "aai", "p3", "ἔπερσε(ν)")],
+        "πλάζω": [("homer", "api", "p3", "πλάγχθη")],
+        "ὁράω": [("homer", "aai", "p3", "ἴδεν"), ("lsj", "aai", "p3", "εἶδεν")],
+        "γιγνώσκω": [("homer", "aai", "p3", "ἔγνω")],
+        "πάσχω": [("homer", "aai", "p3", "πάθεν")],
+        "νόστος": [("homer", "sg", "acc", "νόστον")],
     }
 
-    def build_period_tables(word):
-        return _TABLES.get(word["lemma"])
+    def build_period_tables(word, lang):
+        # the headers come from the library's labels, so the sample tables follow the interface language
+        _names = {
+            "aai": gu.ui_label("grc_tense_aai", lang), "api": gu.ui_label("grc_tense_api", lang),
+            "sg": eee.fmt_ud_feats("Number=Sing", lang), "p3": eee.fmt_ud_feats("Person=3|Number=Sing", lang),
+            "acc": eee.fmt_ud_feats("Case=Acc", lang),
+        }
+        return [
+            (period, f"<table><tr><th></th><th>{_names[head]}</th></tr>"
+                     f"<tr><td style='padding-right:.8em'>{_names[row]}</td><td><b>{form}</b></td></tr></table>")
+            for period, head, row, form in _TABLES.get(word["lemma"], [])
+        ] or None
 
     NOTES = [
         {

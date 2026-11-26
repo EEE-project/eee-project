@@ -40,7 +40,7 @@ def _(mo):
     | `gu.check_item_drill(items, inputs_2d, fields, ...)` | check custom drill answers |
     | `greek_compare(a, b, diacritics=...)` | student-answer comparison |
     | `gu.load_vocab_tsv(file, nb_dir=...)` | load vocabulary from TSV |
-    | `gu.adverb_vocab(adjectives)` | derive adverb vocab from adjectives (καλός → καλῶς) |
+    | `gu.adverb_vocab(adjectives)` | derive adverb vocab from adjectives (δίκαιος → δικαίως) |
     | `gu.word_quiz_widgets(...)` / `word_quiz_form(...)` | multiple-choice quiz — state, navigation, and display in one call |
     | `gu.word_drill_widgets(...)` / `word_drill_form(...)` | write-the-word drill — state, navigation, and display in one call |
     | `gu.word_retry_button(history, lang=...)` | "Errors" button for a quiz or drill: a new round over just the words answered wrong (`retry_btn=`) |
@@ -385,7 +385,7 @@ def _(mo):
 
     **Adverbs don't decline**, so that option switches the same cells to the
     single-answer drill instead (`gu.word_drill_widgets` / `word_drill_form`,
-    as in Exercise 4) over `gu.adverb_vocab`'s derived forms (καλός → καλῶς).
+    as in Exercise 4) over `gu.adverb_vocab`'s derived forms (δίκαιος → δικαίως).
 
     Paradigm-drill features, all inside the form function: Enter submits and
     advances focus past a correct field; the Check button turns orange on

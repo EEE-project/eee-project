@@ -77,6 +77,11 @@ introduced shortly after `30fa087`) is where per-version detail lives now —
   `render_gloss_sheet`: it runs `examples/interactive_text_notebook.py` with `marimo run` and drives Chromium
   through Playwright at a phone width and a wide width (`-m integration`; skipped without Playwright or a Chromium,
   see its docstring). Run it after a change to `_ITEXT_ESM`, `_ITEXT_CSS`, `_ITEXT_CSS_TR` or the sheet.
+  The other browser tests of that folder work the same way: run `test_paradigm_form_browser.py` after a change to
+  `_PARA_ESM`, `test_drill_demo_browser.py` after a change to the cells of the drill demo,
+  `test_lexicon_tabs_demo_browser.py` after a change to `build_grc_lexicon_tabs`, the colours of the paradigm tables
+  (`_GRC_*` in `content.py`) or the tabs section of the Ancient Greek demo (it checks both themes), and
+  `test_deploy_shell_browser.py` after a change to `examples/deploy/shell_template.html`.
 - `tests/test_examples_run.py` runs every `examples/*.py` (the notebooks and the plain
   scripts) from its first line to its last (`python -I`, 4 at a time, about 25 s in all), so a
   library change that breaks an example fails the suite. It does not render a page, so the

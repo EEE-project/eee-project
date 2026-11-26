@@ -356,6 +356,9 @@ def test_the_interface_language_changes_the_labels_and_the_meanings_of_the_sheet
             _settle(page)
             text = _sheet(page)["text"]
             assert meaning in text and _label("gloss_panel_era_caption", lang).strip("*") in text
+            # the period, the line under it and the head of the table speak the language too
+            assert _label("grc_lex_descr_homer", lang) in text and _label("grc_tense_aai", lang) in text
+            assert "homer lexicon" not in text and page.locator(".eee-sheet select").evaluate("s => s.options[0].text") == _label("grc_period_homer", lang)
             # the margin notes are English only, so no note to tap here: the note label per language is a unit test of render_gloss_sheet
 
 
@@ -481,3 +484,92 @@ def test_a_click_on_next_with_no_answer_is_not_read_again_at_the_next_answer(bro
         _answer(page, which)
         _settle(page)
         assert _counters(page)[which] == before
+
+
+# ── a change of the interface language builds the widgets again; the choices that every language has stay ──
+
+
+def _chosen(menu):
+    return menu.evaluate("s => s.options[s.selectedIndex].text")
+
+
+def test_a_new_language_keeps_the_stanza(browser, base_url):
+    with _page(browser, base_url, WIDE) as page:
+        _dropdown_with(page, "1.3-5").select_option("1.3-5")
+        _settle(page)
+        _dropdown_with(page, "Русский").select_option(label="Русский")
+        _text_when(page, lambda t: "— Жуковский" in t)  # the page is in the new language
+        _settle(page)  # a lost stanza shows only after the cells have run again
+        assert _chosen(_dropdown_with(page, "1.3-5")) == "1.3-5"
+        assert page.locator(f"{STANZA} .eee-line").count() == 3
+
+
+def _tap_word(page, word="ἔπερσεν"):
+    page.locator(f"{STANZA} .gk-word", has_text=word).first.click()
+    _settle(page)
+
+
+def _to_russian(page):
+    _dropdown_with(page, "Русский").select_option(label="Русский")
+    _text_when(page, lambda t: "— Жуковский" in t)  # the page is in the new language
+    _settle(page)  # a lost choice shows only after the cells have run again
+
+
+def test_a_new_language_keeps_the_clicked_word_and_the_picked_period(browser, base_url):
+    with _page(browser, base_url, WIDE) as page:
+        _tap_word(page)
+        period = page.locator(".eee-sheet select")
+        period.select_option(index=1)
+        _settle(page)
+        _to_russian(page)
+        assert page.locator(f"{STANZA} .gk-word.active").all_inner_texts() == ["ἔπερσεν·"]
+        sheet = _sheet(page)
+        assert "on" in sheet["cls"].split() and "разрушил" in sheet["text"]
+        assert _label("grc_lex_descr_lsj", "ru") in sheet["text"]  # the table of the 2nd period
+        assert page.locator(".eee-sheet select").evaluate("s => [s.selectedIndex, s.options[1].text]") == [1, _label("grc_period_lsj", "ru")]
+
+
+def test_a_new_translation_keeps_the_clicked_word_and_a_new_stanza_drops_it(browser, base_url):
+    with _page(browser, base_url, WIDE) as page:
+        _tap_word(page)
+        page.locator(TRANSLATION, has=page.locator("option", has_text="with margin notes")).select_option("--")
+        _settle(page)
+        assert page.locator(".eee-itext.wrap .gk-word.active").count() == 1  # without a translation there is no card around the poem
+        _dropdown_with(page, "1.3-5").select_option("1.3-5")
+        _settle(page)
+        assert page.locator(".eee-itext.wrap .gk-word.active").count() == 0
+        assert "Select a word" in _sheet(page)["text"]
+
+
+def test_on_a_phone_a_closed_sheet_stays_closed_after_a_new_language(browser, base_url):
+    with _page(browser, base_url, PHONE) as page:
+        _tap_word(page)
+        page.locator(".eee-sheet-close").click()
+        _to_russian(page)
+        assert _sheet(page)["display"] == "none"
+        assert page.locator(f"{STANZA} .gk-word.active").count() == 1
+
+
+def test_a_chosen_comment_card_stays_after_a_new_translation_and_language(browser, base_url):
+    with _page(browser, base_url, WIDE) as page:
+        page.locator("label[for=mxr1]").click()
+        translator, language = page.locator("select").nth(-2), page.locator("select").nth(-1)  # the dropdowns of the last section
+        translator.select_option(index=1)
+        _settle(page)
+        sync_api.expect(page.locator("input#mxr1")).to_be_checked()
+        language.select_option(label="Русский")
+        _text_when(page, lambda t: "О муже мне расскажи" in t)
+        _settle(page)
+        sync_api.expect(page.locator("input#mxr1")).to_be_checked()
+
+
+def test_a_new_language_keeps_the_exercise_direction(browser, base_url):
+    with _page(browser, base_url, WIDE) as page:
+        _exercise_radios_shown(page, 90000)
+        page.get_by_role("radio", name=_label("stanza_match_toggle_tr_to_grc", "en"), exact=True).click()
+        _settle(page)
+        _dropdown_with(page, "Русский").select_option(label="Русский")
+        reverse = page.get_by_role("radio", name=_label("stanza_match_toggle_tr_to_grc", "ru"), exact=True)
+        sync_api.expect(reverse).to_be_visible(timeout=20000)
+        _settle(page)
+        sync_api.expect(reverse).to_be_checked()

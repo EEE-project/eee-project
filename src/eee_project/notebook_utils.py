@@ -1181,8 +1181,10 @@ function render({ model, el }) {
   // preventDefault prevents form double-submit)
   inp.addEventListener('keydown', e => {
     if (e.key === 'Enter') {
-      e.preventDefault();
       e.stopPropagation();
+      // an Enter of an input method only confirms the composed text (Safari: keyCode 229): not cancelled here
+      if (e.isComposing || e.keyCode === 229) return;
+      e.preventDefault();
       model.set('enter_pressed', (model.get('enter_pressed') || 0) + 1);
       model.save_changes();
     }
@@ -1231,7 +1233,8 @@ class _DiacriticsElement:
 
     @property
     def enter_pressed(self) -> int:
-        """Increments each time Enter is pressed in the input — treat as a second
+        """Increments each time Enter is pressed in the input (not for an Enter that only
+        confirms an input method) — treat as a second
         "check requested" signal alongside a submit button's own click counter
         (same convention as ``make_paradigm_form``'s ``.widget.submit_request["request_id"]``)."""
         return self._ui.widget.enter_pressed
@@ -1334,13 +1337,21 @@ function render({model,el}){
     inputs[idx].readOnly=false;
   }
 
-  let _debTimer;
+  let _debTimer=0;  // not 0 while typed text waits to be sent
   function flushValues(){
+    clearTimeout(_debTimer);
+    _debTimer=0;
     model.set('values',inputs.map(inp=>inp.value));
   }
   function updateValues(){
     clearTimeout(_debTimer);
     _debTimer=setTimeout(()=>{flushValues();model.save_changes();},300);
+  }
+  // A click on a button takes the focus from the field first: send the typed text now, so that Python has it before the click.
+  function flushOnBlur(){
+    if(!_debTimer)return;
+    flushValues();
+    model.save_changes();
   }
 
   const bar=document.createElement('div');
@@ -1400,7 +1411,6 @@ function render({model,el}){
     // field is read-only and hasn't changed, so drop it instead of piling
     // up a second concurrent request for the same field.
     if(idx>=0&&idx<inputs.length&&inputs[idx].readOnly)return;
-    clearTimeout(_debTimer);
     flushValues();
     const reqId=(model.get('submit_request').request_id||0)+1;
     if(idx>=0&&idx<inputs.length){
@@ -1452,8 +1462,11 @@ function render({model,el}){
     inp.className='eee-para-inp';
     inp.value=initVals[i]||'';
     inp.addEventListener('focus',()=>{focusedInp=inp;});
+    inp.addEventListener('blur',flushOnBlur);
     inp.addEventListener('keydown',e=>{
       if(e.key!=='Enter')return;
+      // an Enter of an input method only confirms the composed text (Safari: keyCode 229): not cancelled here
+      if(e.isComposing||e.keyCode===229)return;
       e.preventDefault();
       fireSubmit(i);
     });
@@ -1570,6 +1583,10 @@ def make_paradigm_form(mo, labels, values=None, polytonic=True):
     iota subscript were dropped in the 1982 reform, so offering them for
     Modern Greek content is confusing, not just unnecessary. Pass
     ``config.polytonic`` (from :class:`GreekConfig`) rather than hardcoding.
+
+    Typed text reaches ``.widget.values`` 300 ms after the last key, and at
+    once when a field loses focus: a click on a button right after typing
+    reads the typed text.
 
     On mount, the first field auto-focuses (and its existing value, if
     any, is selected) — but only when nothing else already has focus, so
@@ -1816,9 +1833,9 @@ function render({ model, el }) {
 
   // Python swapping lines/clickable/word_classes/show_ictus/ictus_html must
   // redraw so the new content (and the persisted .active highlight) render.
-  // selected_word and click_seq are JS-write/Python-read only (set
-  // exclusively by activate(), which already redraws explicitly) — no
-  // listener needed for them, and adding one would double-draw every click.
+  // selected_word, selected_note and click_seq: a click writes them here and
+  // redraws itself; Python sets them only before the first draw (`keep=`), so
+  // no listener — it would draw every click twice.
   model.on('change:lines', draw);
   model.on('change:clickable', draw);
   model.on('change:word_classes', draw);
@@ -1887,7 +1904,7 @@ def _translation_card_html(lines, notes) -> str:
 
 
 def interactive_text(mo, *, lines, clickable, homer_words=None, word_classes=None, css=None, ictus_html=None, show_ictus=True, wrap=False,
-                     translation=None, notes=None, two_columns_from_px: int = 600) -> Any:
+                     translation=None, notes=None, two_columns_from_px: int = 600, keep: "dict | None" = None) -> Any:
     """Render poem `lines` with vocabulary words as permanent clickable spans.
 
     Returns the real ``mo.ui.anywidget`` — a panel cell must reference
@@ -1953,6 +1970,16 @@ def interactive_text(mo, *, lines, clickable, homer_words=None, word_classes=Non
     ``selected_word`` (a tap on a Greek word clears ``selected_note``), and
     bumps ``click_seq``. The k-th star of a line belongs to the k-th note of
     that line. All translation text is HTML-escaped.
+
+    ``keep``: a plain dict of the notebook (made in a cell that reads no
+    language) that keeps the reader's click when the widget is built again
+    for the same poem, e.g. after a change of the interface language, of the
+    translator or of a switch. With the same ``lines`` the new widget starts
+    with the clicked word (when it is still clickable) and the same
+    ``click_seq``; the clicked margin note stays only with the same
+    translation and notes. Other lines (a new stanza) start with nothing
+    selected. Each widget with ``keep`` needs a dict of its own, also two
+    widgets made by one function. Opt-in, default unchanged.
     """
     if not _ANYWIDGET_OK:
         raise ImportError("anywidget is required for interactive_text")
@@ -1975,6 +2002,15 @@ def interactive_text(mo, *, lines, clickable, homer_words=None, word_classes=Non
         by_line = {int(i): [(str(word), str(meaning)) for word, meaning in lst] for i, lst in (notes or {}).items()}
         w.translation_html = _translation_card_html(list(translation), by_line)
         w.notes = {str(i): [[word, meaning] for word, meaning in lst] for i, lst in by_line.items()}
+    if keep is not None:
+        old = keep.get("widget")
+        if old is not None and old.lines == w.lines:
+            w.click_seq = old.click_seq  # the word sheet tells a new click by its count: a closed sheet stays closed
+            if norm_grc_surface(old.selected_word) in w.clickable:
+                w.selected_word = old.selected_word
+            if (old.translation_html, old.notes) == (w.translation_html, w.notes):
+                w.selected_note = old.selected_note
+        keep["widget"] = w
     return mo.ui.anywidget(w)
 
 
@@ -2505,7 +2541,7 @@ class GreekUtils:
         return next((s for s in slots if s.tag_type == "ag-paradigm"), None)
 
     def _adv_forms(self, word: str) -> set:
-        """Adverb derived from an adjective (e.g. καλός → καλῶς).
+        """Adverb derived from an adjective (e.g. δίκαιος → δικαίως).
 
         Goes through the same routing layer as every other slot
         (``get_slot_templates`` + ``inflect_slot``), not a direct backend
@@ -2523,7 +2559,7 @@ class GreekUtils:
 
     def adverb_vocab(self, adjectives: list, word_key: str = "form", meaning_key: str = "meaning") -> "list[dict]":
         """Build a word_drill_form/word_quiz_form-ready vocab list of adjectives'
-        derived adverbs (e.g. καλός → καλῶς), via :meth:`_adv_forms`.
+        derived adverbs (e.g. δίκαιος → δικαίως), via :meth:`_adv_forms`.
 
         Each output entry is ``{word_key: <adverb>, meaning_key: <original
         meaning>}``; adjectives with no derivable adverb are skipped. When
@@ -3717,7 +3753,8 @@ class GreekUtils:
         return self._mo.vstack([self._mo.md(gloss), caption, self._mo.Html(tables)])
 
     def render_gloss_selector(self, quiz_words_raw: list, selected_word: str,
-                               build_period_tables: Any, lang: str = "ru") -> "tuple[list | None, Any, Any]":
+                               build_period_tables: Any, lang: str = "ru",
+                               keep: "dict | None" = None) -> "tuple[list | None, Any, Any]":
         """Cell 1 of the real-dropdown gloss panel (see
         :func:`build_grc_period_tables`): resolve *selected_word*, show
         its translation/grammar label, and (if 2+ periods attest the
@@ -3741,7 +3778,16 @@ class GreekUtils:
         (not just *period_tables*) for marimo to rerun it -- and only
         it -- the moment the dropdown's value changes; this cell never
         depends on its own dropdown's value, so it correctly does not
-        rerun on a pick."""
+        rerun on a pick.
+
+        *keep*: a plain dict of the notebook (made in a cell that reads no
+        language) that keeps the picked period when the panel is built again
+        for the same *selected_word*, e.g. after a change of the interface
+        language. Another word starts with the first period, also when the
+        reader comes back to a word. Each widget with ``keep`` needs a dict of
+        its own, also two widgets made by one function."""
+        if keep is not None and keep.get("word") != selected_word:
+            keep.clear()
         resolved = self._resolve_gloss_word(quiz_words_raw, selected_word)
         if resolved is None:
             return None, None, self._mo.md(self.ui_label('gloss_panel_empty', lang))
@@ -3750,10 +3796,12 @@ class GreekUtils:
 
         period_selector = None
         if tables and len(tables) > 1:
-            opts = grc_period_options(tables)
+            opts = grc_period_options(tables, lang)
+            kept = keep.get("period") if keep else None
             period_selector = self._mo.ui.dropdown(
-                options=opts, value=next(iter(opts)),
+                options=opts, value=next((label for label, key in opts.items() if key == kept), next(iter(opts))),
                 label=self.ui_label('period_selector_label', lang),
+                **({} if keep is None else {"on_change": lambda key: keep.update(word=selected_word, period=key)}),
             )
 
         parts = [self._mo.md(gloss)]
@@ -3764,16 +3812,17 @@ class GreekUtils:
         panel = self._mo.vstack(parts)
         return tables, period_selector, panel
 
-    def render_gloss_table(self, period_tables: "list | None", period_selector: Any) -> Any:
+    def render_gloss_table(self, period_tables: "list | None", period_selector: Any, lang: str = "en") -> Any:
         """Cell 2 of the real-dropdown gloss panel -- call as this cell's
         own bare last expression (no assignment needed, same as
         :meth:`render_gloss_panel`); see :meth:`render_gloss_selector`'s
         own docstring for why this must be a separate cell taking
-        *period_selector* as a parameter."""
+        *period_selector* as a parameter. *lang* is the language of the
+        period's name and description."""
         if not period_tables:
             return None
         return self._mo.Html(render_grc_period_table(
-            period_tables, period_selector.value if period_selector is not None else None,
+            period_tables, period_selector.value if period_selector is not None else None, lang,
         ))
 
     def render_gloss_sheet(self, gloss_panel: Any, period_tables: "list | None", period_selector: Any, *,
@@ -3817,7 +3866,7 @@ class GreekUtils:
             inner = (f'<div class="eee-note"><div class="eee-note-word"><b>{word}</b> — {meaning}</div>'
                      f'<div class="eee-note-src">{label}</div></div>')
         else:
-            table = self.render_gloss_table(period_tables, period_selector)
+            table = self.render_gloss_table(period_tables, period_selector, lang)
             body = f'<div class="eee-sheet-table">{table}</div>' if table is not None else ""
             # an f-string would print mo.md(...) as its markdown source, so take .text (a plain str has none)
             inner = f"{getattr(gloss_panel, 'text', gloss_panel)}{body}"
@@ -4126,7 +4175,8 @@ class GreekUtils:
         history_len: int = 0, remaining_len: int = 1,
         next_label: "str | None" = None, prev_label: "str | None" = None,
         restart_label: "str | None" = None, lang: str = "ru",
-        nav_icons: "bool | None" = None,
+        nav_icons: "bool | None" = None, keep: "dict | None" = None,
+        word: "str | None" = None,
     ) -> tuple:
         """Create the form + nav/restart-button widgets for a hand-rolled
         paradigm-drill exercise (a full multi-field paradigm per word via
@@ -4157,6 +4207,16 @@ class GreekUtils:
         hide — rather than grey out — when disabled, and stay first/last in
         the button row. Opt-in, default unchanged.
 
+        ``keep``: a plain dict of the notebook (made in a cell that reads no
+        language) that keeps the text typed in the form across a change of the
+        interface language. Pass it with ``word``, the identity of the current
+        word (``None`` when there is none): a new form takes the text of the
+        form before it when the word and the number of fields are the same and
+        ``lang`` changed, and ``values`` otherwise. So a new word, «Again»,
+        «Errors» or a new list starts as before. Each widget with ``keep`` needs
+        a dict of its own, also two widgets made by one function. Opt-in,
+        default unchanged.
+
         Deliberately does *not* build the check button — call
         :meth:`dirty_check_button` separately, in its own cell. It needs
         ``cap`` (the check snapshot) to color itself, and ``cap`` updates
@@ -4185,7 +4245,14 @@ class GreekUtils:
             next_label = self._icon_decorate(next_label, "▶", before=False)
             prev_label = self._icon_decorate(prev_label, "◀", before=True)
             restart_label = self._icon_decorate(restart_label, "↺", before=True)
+        if keep is not None and word is not None:
+            old = keep.get("form")
+            # only a new language carries the typed text over; Check reads it at once, so it goes into the new form here
+            if old is not None and keep["word"] == word and keep["lang"] != lang and len(old.labels) == len(labels):
+                values = list(old.values)
         form = make_paradigm_form(self._mo, labels, values=values, polytonic=self._cfg.polytonic)
+        if keep is not None:
+            keep.update(form=form.widget, word=word, lang=lang)
         prev_btn = self._mo.ui.button(label=prev_label, on_click=_INC, disabled=history_len == 0)
         # remaining_len < 1 (not <= 1): Next moving the sole remaining word
         # to done works fine unscored (this family has no per-word score to
@@ -4265,6 +4332,7 @@ class GreekUtils:
         retry_btn: Any = None,
         nav_icons: bool = False,
         show_prev_when_done: bool = False,
+        lang: str = "ru",
     ) -> Any:
         """Shared engine behind the public ``*_paradigm_drill_form``
         siblings (noun/verb/adjective/pronoun), which differ only in their
@@ -4297,6 +4365,9 @@ class GreekUtils:
         (``[check_btn, prev_btn, nxt_btn]``, ``justify="end"``)
         byte-for-byte unchanged.
 
+        An empty ``vocab`` gives a "list is empty" text in the language *lang*,
+        in place of the exercise and of its done screen.
+
         ``state`` is the dict built by :meth:`_pack_paradigm_state` — see
         its docstring for why this bundling is only safe internally, never
         across a marimo cell boundary.
@@ -4321,6 +4392,8 @@ class GreekUtils:
         done screen, unchanged.
         """
         mo = self._mo
+        if not vocab:
+            return mo.md(self.ui_label('list_empty_label', lang))
         get_words, set_words = state["words"]
         get_hist, set_hist = state["hist"]
         get_msg, set_msg = state["msg"]
@@ -4564,6 +4637,7 @@ class GreekUtils:
             retry_btn=retry_btn,
             nav_icons=nav_icons,
             show_prev_when_done=show_prev_when_done,
+            lang=lang,
         )
 
     def noun_paradigm_drill_form(
@@ -4659,6 +4733,7 @@ class GreekUtils:
             retry_btn=retry_btn,
             nav_icons=nav_icons,
             show_prev_when_done=show_prev_when_done,
+            lang=lang,
         )
 
     def adjective_paradigm_drill_form(
@@ -4734,6 +4809,7 @@ class GreekUtils:
             retry_btn=retry_btn,
             nav_icons=nav_icons,
             show_prev_when_done=show_prev_when_done,
+            lang=lang,
         )
 
     def pronoun_paradigm_drill_form(
@@ -4805,6 +4881,7 @@ class GreekUtils:
             retry_btn=retry_btn,
             nav_icons=nav_icons,
             show_prev_when_done=show_prev_when_done,
+            lang=lang,
         )
 
     def _handle_prev(self, cv, restore_entry, history, future, score,
@@ -5076,7 +5153,8 @@ class GreekUtils:
         :meth:`word_quiz_form`. On first run, or when a notebook has set
         ``remaining`` to ``None`` to start over (a new selection),
         shuffle-starts ``vocab`` and returns ``None`` -- the caller must
-        return the placeholder (``mo.md("*...*")``) immediately. Otherwise
+        return at once: the placeholder (``mo.md("*...*")``), or the "list is
+        empty" text when ``vocab`` has no words. Otherwise
         returns the unpacked ``(cv, remaining, score, restore_entry,
         history, future)`` 6-tuple.
 
@@ -5166,6 +5244,7 @@ class GreekUtils:
             prev_btn: "Prev" button.
             next_btn: "Next" / "Again" button.
             vocab: Full word list; used for restart shuffle and total count.
+                  An empty list gives a "list is empty" text in place of the exercise.
             title: Markdown heading rendered above the exercise.
             comment: Optional note (use ``<br>`` for tight line breaks).
             meaning_key: Key in each word dict used as the prompt.
@@ -5203,7 +5282,7 @@ class GreekUtils:
                                            get_history, get_future, set_cv, set_remaining, vocab,
                                            set_score, set_history, set_future, set_restore)
         if _state is None:
-            return mo.md("*...*")
+            return mo.md("*...*" if vocab else self.ui_label('list_empty_label', lang))
         cv, remaining, score, restore_entry, history, future = _state
         _wrong = self._wrong_words(history) if retry_btn is not None else []  # the words to retry; only looked up with a retry button
 
@@ -5577,6 +5656,7 @@ class GreekUtils:
             next_btn: "Next" / "Again" button.
             prev_btn: "Prev" button.
             vocab: Full word list; used for restart shuffle and total count.
+                  An empty list gives a "list is empty" text in place of the exercise.
             title: Markdown heading with optional progress line.
             meaning_key: Key in each word dict used as the radio label prompt.
             form_key: Key in each word dict for the correct answer form.
@@ -5615,7 +5695,7 @@ class GreekUtils:
                                            get_history, get_future, set_cv, set_remaining, vocab,
                                            set_score, set_history, set_future, set_restore)
         if _state is None:
-            return mo.md("*...*")
+            return mo.md("*...*" if vocab else self.ui_label('list_empty_label', lang))
         cv, remaining, score, restore_entry, history, future = _state
         _wrong = self._wrong_words(history) if retry_btn is not None else []  # the words to retry; only looked up with a retry button
 
@@ -5979,7 +6059,8 @@ class GreekUtils:
         for a word dict. ``direction`` picks the prompt/answer side:
         ``"grc_to_tr"`` shows the Greek stanza and asks for the matching
         translation; ``"tr_to_grc"`` shows a translation and asks for the
-        matching Greek stanza. Grading uses
+        matching Greek stanza. An empty ``stanzas`` list gives a "list is empty"
+        text in place of the exercise. Grading uses
         :meth:`_stanza_match_prompt_and_correct` — a pure function of the
         current stanza, so it always agrees with the options
         :meth:`stanza_match_widgets` built, without recomputing them.
@@ -6007,7 +6088,7 @@ class GreekUtils:
                 self._shuffle_start(stanzas, set_cv, set_remaining)
             self._clear_round_state(get_score, get_history, get_future, get_restore,
                                     set_score, set_history, set_future, set_restore)
-            return mo.md("*...*")
+            return mo.md("*...*" if stanzas else self.ui_label('list_empty_label', lang))
 
         _done = cv is None and len(remaining) == 0
         _ans = choice_radio.value

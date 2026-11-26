@@ -30,6 +30,7 @@ from eee_project.notebook_utils import (
     make_paradigm_form,
     interactive_text,
     _InteractiveTextWidget,
+    _load_ui_labels,
     _DIA_ESM,
     _PARA_ESM,
     _ITEXT_ESM,
@@ -37,6 +38,7 @@ from eee_project.notebook_utils import (
     _INDEX_HEADER_CSS,
     _CARD_LIST_CSS,
     _UI_LABELS,
+    _ui_label,
 )
 from conftest import (
     StubMo as _StubMo, StubBackend as _StubBackend, StubMoLayout as _StubMoLayout,
@@ -417,15 +419,14 @@ class TestUiLabel:
 
     def test_every_known_key_present_in_all_3_languages(self):
         # regression: guards against a TSV row silently dropped for one
-        # language during a future edit -- every key must resolve in en/ru/el.
+        # language during a future edit. Reads the rows: ui_label() would show
+        # the English text for a missing ru or el row.
         # Iterates _UI_LABELS itself (not a hand-copied key list) so a newly
         # added key is covered automatically, with nothing to keep in sync.
-        gu = GreekUtils(mo_module=_StubMo())
         assert len(_UI_LABELS) >= 80  # sanity: catches a broken loader returning {}
-        for key in _UI_LABELS:
+        for key, entry in _UI_LABELS.items():
             for lang in ('en', 'ru', 'el'):
-                label = gu.ui_label(key, lang)
-                assert label != key, f"{key!r} missing a real {lang} label (echoed the key back)"
+                assert entry.get(lang), f"{key!r} has no {lang} label"
 
 
 # ──────── language_bridge / language_selector / save_language_selection ──
@@ -2008,6 +2009,53 @@ class TestRenderGlossSelector:
         assert selector.label == "Period"
 
 
+class TestRenderGlossSelectorKeep:
+    """keep=: the period a reader picked for a word survives a rebuild of the panel (a new language)."""
+
+    class _Mo(_FormMo):
+        class ui(_FormMo.ui):
+            @staticmethod
+            def dropdown(options=None, value=None, label="", on_change=None):
+                picker = _FakeDropdown(options, value, label)
+                picker.on_change = on_change
+                return picker
+
+    WORDS = [{"form": w, "lemma": w, "context": "word", "meaning": "m"} for w in ("λόγος", "ἄνθρωπος")]
+    TABLES = [("homer", "<t>H</t>"), ("lsj", "<t>A</t>")]
+
+    def _picker(self, keep, word="λόγος", tables=TABLES):
+        gu = GreekUtils(mo_module=self._Mo())
+        return gu.render_gloss_selector(self.WORDS, word, lambda w: tables, keep=keep)[1]
+
+    def test_the_picked_period_survives_a_rebuild(self):
+        keep = {}
+        self._picker(keep).on_change("lsj")  # the reader picks in the dropdown
+        assert self._picker(keep).value == "lsj"
+        assert self._picker(keep).value == "lsj"  # and survives the next one too
+
+    def test_another_word_starts_with_the_first_period(self):
+        keep = {}
+        self._picker(keep).on_change("lsj")
+        assert self._picker(keep, word="ἄνθρωπος").value == "homer"
+
+    def test_a_period_that_the_new_tables_lack_is_ignored(self):
+        keep = {}
+        self._picker(keep).on_change("lsj")
+        assert self._picker(keep, tables=[("homer", "<t>H</t>"), ("lxx", "<t>L</t>")]).value == "homer"
+
+    @pytest.mark.parametrize("other", ["ἄνθρωπος", "", "not-there"], ids=["a word", "nothing", "unknown"])
+    def test_a_word_that_comes_back_after_another_starts_with_the_first_period(self, other):
+        keep = {}
+        self._picker(keep).on_change("lsj")
+        self._picker(keep, word=other)
+        assert self._picker(keep).value == "homer"
+
+    def test_the_options_are_named_in_the_language_of_the_panel(self):
+        gu = GreekUtils(mo_module=self._Mo())
+        selector = gu.render_gloss_selector(self.WORDS, "λόγος", lambda w: self.TABLES, lang="el")[1]
+        assert list(selector.options) == [_ui_label("grc_period_homer", "el"), _ui_label("grc_period_lsj", "el")]
+
+
 class TestRenderGlossTable:
     """render_gloss_table -- Cell 2 of the real-dropdown gloss panel; must
     be called from a cell taking period_selector as its own parameter, see
@@ -2026,6 +2074,16 @@ class TestRenderGlossTable:
         tables = [("homer", "<table>HOMER</table>")]
         html = str(gu_form.render_gloss_table(tables, None))
         assert "HOMER" in html
+
+    def test_the_description_follows_the_language_and_is_english_without_one(self, gu_form):
+        tables = [("homer", "<table>HOMER</table>")]
+        assert _ui_label("grc_lex_descr_homer", "ru") in str(gu_form.render_gloss_table(tables, None, lang="ru"))
+        assert "homer lexicon" in str(gu_form.render_gloss_table(tables, None))
+
+    def test_the_sheet_describes_the_period_in_its_language(self, gu_form):
+        tables = [("homer", "<table>HOMER</table>")]
+        sheet = gu_form.render_gloss_sheet("panel", tables, None, selected_word="x", lang="el")
+        assert _ui_label("grc_lex_descr_homer", "el") in str(sheet)
 
 
 class TestResetQuizState:
@@ -2091,10 +2149,15 @@ class TestWordDrillForm:
             cv_g, cv_s, rem_g, rem_s, sc_g, sc_s, rst_g, rst_s,
             hist_g, hist_s, fut_g, fut_s,
             wi, wi._ui, _FakeBtn(check_v), _FakeBtn(prev_v), _FakeBtn(next_v),
-            vocab=vocab or _WD_VOCAB,
+            vocab=_WD_VOCAB if vocab is None else vocab,
             lang=lang,
             get_checked=get_checked, set_checked=set_checked, nav_icons=nav_icons,
         )
+
+    @pytest.mark.parametrize("lang", ["en", "ru", "el"])
+    def test_an_empty_list_gives_a_message(self, gu_form, lang):
+        result = self._call(gu_form, self._state(rem=None), vocab=[], lang=lang)
+        assert result == _load_ui_labels()["list_empty_label"][lang]
 
     def test_uninit_initializes_and_returns_placeholder(self, gu_form):
         state = self._state(rem=None)
@@ -2594,12 +2657,17 @@ class TestWordQuizForm:
             cv_g, cv_s, rem_g, rem_s, sc_g, sc_s, rst_g, rst_s,
             hist_g, hist_s, fut_g, fut_s,
             radio or _FakeRadio(), _FakeBtn(next_v), _FakeBtn(prev_v),
-            vocab=vocab or _WQ_VOCAB,
+            vocab=_WQ_VOCAB if vocab is None else vocab,
             build_paradigm_table=build_paradigm_table,
             lang=lang,
             renew_btn=renew_btn,
             nav_icons=nav_icons,
         )
+
+    @pytest.mark.parametrize("lang", ["en", "ru", "el"])
+    def test_an_empty_list_gives_a_message(self, gu_form, lang):
+        result = self._call(gu_form, self._state(rem=None), vocab=[], lang=lang)
+        assert result == _load_ui_labels()["list_empty_label"][lang]
 
     def test_uninit_initializes(self, gu_form):
         state = self._state(rem=None)
@@ -3803,6 +3871,56 @@ def _pdform(values, submit_count=0, enter_field_index=0, focus_request=None):
     return types.SimpleNamespace(widget=widget)
 
 
+class TestParadigmDrillWidgetsKeep:
+    """keep=/word=: the text typed for a word survives a change of the interface language, and no other rebuild."""
+
+    class _Mo(_FormMo):
+        class ui(_FormMo.ui):
+            @staticmethod
+            def anywidget(inst):
+                return MagicMock(widget=inst)
+
+    @pytest.fixture
+    def gu(self):
+        return GreekUtils(_StubBackend(), self._Mo(), config=ANCIENT_GREEK)
+
+    def _form(self, gu, keep, *, lang, word="λόγος", labels=("1:", "2:"), values=None):
+        return gu.paradigm_drill_widgets(labels=list(labels), values=values, lang=lang, keep=keep, word=word)[0]
+
+    def _typed(self, gu, keep):
+        self._form(gu, keep, lang="ru").widget.values = ["α", ""]  # as the browser sends the typed text
+
+    def test_a_new_language_keeps_the_typed_text(self, gu):
+        keep = {}
+        self._typed(gu, keep)
+        assert self._form(gu, keep, lang="en").widget.values == ["α", ""]
+
+    def test_two_changes_of_language_keep_it_too(self, gu):
+        keep = {}
+        self._typed(gu, keep)
+        self._form(gu, keep, lang="en")
+        assert self._form(gu, keep, lang="ru").widget.values == ["α", ""]
+
+    def test_typed_text_wins_over_the_saved_values(self, gu):
+        keep = {}
+        self._typed(gu, keep)
+        assert self._form(gu, keep, lang="en", values=["saved", "x"]).widget.values == ["α", ""]
+
+    @pytest.mark.parametrize("change", [
+        {"lang": "ru"},                      # the same language: Restart, «Errors», a new tense
+        {"lang": "en", "word": "ἄνθρωπος"},  # another word
+        {"lang": "en", "word": None},        # no current word
+        {"lang": "en", "labels": ("1:",)},   # another number of fields
+    ])
+    def test_any_other_new_form_starts_from_the_saved_values(self, gu, change):
+        keep = {}
+        self._typed(gu, keep)
+        assert self._form(gu, keep, **change).widget.values == [""] * len(change.get("labels", ("1:", "2:")))
+
+    def test_without_keep_the_saved_values_are_used(self, gu):
+        assert self._form(gu, None, lang="en", values=["x", "y"]).widget.values == ["x", "y"]
+
+
 class _ParadigmDrillFormBase:
     """Shared state/call scaffolding for the three *_paradigm_drill_form
     test classes — subclasses set ``_VOCAB`` and a thin ``_call``."""
@@ -3860,6 +3978,10 @@ class _ParadigmDrillFormBase:
              patch.object(gu, test_name, side_effect=lambda base, cap, *args, **kwargs: (False, f"❌ {cap.value}")):
             call(form)
         return form.widget.focus_request
+
+    def test_an_empty_list_gives_a_message(self, gu):
+        result = self._call(gu, self._state(words=[]), None, _pdform([]), None, vocab=[], lang="en")
+        assert result == "The list is empty."  # not the "every word drilled" screen
 
 
 class TestVerbParadigmDrillForm(_ParadigmDrillFormBase):
@@ -5936,6 +6058,43 @@ class TestInteractiveText:
         assert w._css.rindex("@supports") < w._css.index(".eee-tr .gk-note.active")
 
 
+class TestInteractiveTextKeep:
+    """keep=: a rebuild with the same poem (a new language, translator or switch) keeps what the reader clicked."""
+
+    LINES = ["ἄνδρα μοι ἔννεπε,", "πολλὰ"]
+
+    def _widget(self, keep, **kw):
+        kw = {"lines": self.LINES, "clickable": {"ανδρα", "εννεπε", "πολλα"}, **kw}
+        return interactive_text(_FormMo(), keep=keep, **kw)
+
+    def test_the_clicked_word_and_the_click_count_survive(self):
+        keep = {}
+        first = self._widget(keep)
+        first.selected_word, first.click_seq = "ἔννεπε,", 3  # as the browser sends a click
+        again = self._widget(keep, translation=["x"])
+        assert (again.selected_word, again.click_seq) == ("ἔννεπε,", 3)
+        assert self._widget(keep).selected_word == "ἔννεπε,"  # and survives the next one too
+
+    def test_another_stanza_starts_with_nothing_selected(self):
+        keep = {}
+        first = self._widget(keep)
+        first.selected_word, first.click_seq = "ἔννεπε,", 3
+        other = self._widget(keep, lines=["ἔννεπε, μοῦσα"])
+        assert (other.selected_word, other.click_seq) == ("", 0)
+
+    def test_a_word_that_is_no_longer_clickable_is_dropped(self):
+        keep = {}
+        self._widget(keep).selected_word = "ἔννεπε,"
+        assert self._widget(keep, clickable={"πολλα"}).selected_word == ""
+
+    def test_a_margin_note_survives_only_with_its_translation(self):
+        keep, notes = {}, {0: [("man", "ἀνήρ")]}
+        note = {"line": 0, "k": 0, "word": "man", "meaning": "ἀνήρ"}
+        self._widget(keep, translation=["man*"], notes=notes).selected_note = note
+        assert self._widget(keep, translation=["man*"], notes=notes).selected_note == note
+        assert self._widget(keep, translation=["муж*"], notes=notes).selected_note == {}
+
+
 class TestInteractiveTextEsm:
     """Static _ITEXT_ESM guards — the click/keydown JS can't run headlessly
     (see [[feedback_marimo_reactivity_testing]]); marimo-pair + a human browser
@@ -6163,6 +6322,18 @@ class TestAdverbVocab:
         with patch.object(gu, "_adv_forms", return_value={"καλῶς"}):
             result = gu.adverb_vocab([{"form": "καλός"}])
         assert result == [{"form": "καλῶς", "meaning": ""}]
+
+    def test_every_word_of_the_exercise_demo_list_gives_an_adverb(self):
+        # the demo's adverb drill showed only "..." when no word of its list was in the adjective lexicon
+        import ancient_greek_backend_eee as agb
+        backend = agb.AncientGreekBackend(lexicons=["pratt", "ltrg"])  # as examples/greek_exercise_notebook.py
+        # the package registers its tag type only at the first import, and conftest empties that registry after each test
+        _eee.register_tag_type("ag-paradigm", agb._ag_paradigm_dispatch)
+        _eee.setup_ancient_greek(backend)
+        gu = GreekUtils(backend, _StubMo(), _pd, config=ANCIENT_GREEK, eee_module=_eee)
+        words = gu.load_vocab_tsv("adverb_adjectives.tsv", nb_dir=Path(__file__).parent.parent / "examples")
+        assert len(words) >= 3
+        assert [w["form"] for w in words if not gu.adverb_vocab([w])] == []
 
     def test_multiple_adjectives_mixed_coverage(self, gu):
         def _fake_adv(word):
@@ -6841,6 +7012,9 @@ class TestPronounParadigmDrillForm(_ParadigmDrillFormBase):
     _paradigm_drill_form engine); no need to re-duplicate that here.
     """
     _VOCAB = [{"form": "κανένας", "meaning": "no one"}, {"form": "ίδιος", "meaning": "same"}]
+
+    def _call(self, gu, state, cv, form, pron_meta=None, **kwargs):
+        return self._call_form(gu.pronoun_paradigm_drill_form, state, cv, form, pron_meta=pron_meta, **kwargs)
 
     def test_pron_meta_omitted_falls_back_to_full_slots(self, gu):
         # REGRESSION: pron_meta used to be a required kwarg -- any caller
@@ -8199,12 +8373,17 @@ class TestStanzaMatchForm:
             cv_g, cv_s, rem_g, rem_s, sc_g, sc_s, rst_g, rst_s,
             hist_g, hist_s, fut_g, fut_s,
             radio or _FakeRadio(), _FakeBtn(next_v), _FakeBtn(prev_v),
-            stanzas=stanzas or _SM_STANZAS,
+            stanzas=_SM_STANZAS if stanzas is None else stanzas,
             direction=direction,
             lang=lang,
             renew_btn=renew_btn,
             valid_translators=valid_translators,
         )
+
+    @pytest.mark.parametrize("lang", ["en", "ru", "el"])
+    def test_an_empty_list_gives_a_message(self, gu_form, lang):
+        result = self._call(gu_form, self._state(rem=None), stanzas=[], lang=lang)
+        assert result == _load_ui_labels()["list_empty_label"][lang]
 
     def test_uninit_initializes(self, gu_form):
         state = self._state(rem=None)

@@ -2,7 +2,7 @@
 # requires-python = ">=3.12"
 # dependencies = [
 #     "marimo>=0.25.1",
-#     "eee-project>=1.0.1",
+#     "eee-project>=1.29.0",
 #     "modern-greek-backend-eee>=1.0.0",
 #     "pandas==3.0.5",
 # ]
@@ -56,13 +56,7 @@ def _(bridge, eee, mo):
 
 @app.cell(hide_code=True)
 def _(bridge, eee, language_selector, mo):
-    eee.save_language_selection(bridge, language_selector)
-    mo.Html(f"""
-    <div style="position: fixed; top: 60px; right: 10px; z-index: 1000; background: white; padding: 8px 12px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
-        {language_selector}
-    </div>
-    {bridge}
-    """)
+    eee.language_picker(mo, language_selector, bridge)
     return
 
 
@@ -78,32 +72,40 @@ def _(language_selector, mo, t_ui):
 
 
 @app.cell(hide_code=True)
-def _(language_selector, mo, t_ui):
-    file_upload = mo.ui.file(label=t_ui("load_tsv_label", language_selector.value))
-    file_upload
+def _(mo):
+    # Built once, in a cell that reads no language: a new language leaves the chosen file and its "clear" link.
+    file_upload = mo.ui.file(label="TSV")  # the same in every language; the translated sentence stands above it
     return (file_upload,)
 
 
 @app.cell(hide_code=True)
-def _(language_selector, mo, t_ui):
+def _(file_upload, language_selector, mo, t_ui):
+    mo.vstack([mo.md(t_ui("load_tsv_label", language_selector.value)), file_upload])
+    return
+
+
+@app.cell(hide_code=True)
+def _(kept, language_selector, mo, t_ui):
     _lang = language_selector.value
+    _options = {
+        t_ui("verb_test_topic", _lang): "verb",
+        t_ui("noun_test_topic", _lang): "noun",
+        t_ui("adj_test_topic", _lang): "adjective",
+        t_ui("pron_test_topic", _lang): "pronoun",
+    }
     pos_selector = mo.ui.radio(
-        options={
-            t_ui("verb_test_topic", _lang): "verb",
-            t_ui("noun_test_topic", _lang): "noun",
-            t_ui("adj_test_topic", _lang): "adjective",
-            t_ui("pron_test_topic", _lang): "pronoun",
-        },
-        value=t_ui("noun_test_topic", _lang),
+        options=_options,
+        value=next(k for k, v in _options.items() if v == kept["pos"]),
         label=t_ui("pos_label", _lang),
         inline=True,
+        on_change=lambda value: kept.update(pos=value),
     )
     pos_selector
     return (pos_selector,)
 
 
 @app.cell(hide_code=True)
-def _(file_upload, gu, mo, pd, pos_selector):
+def _(file_upload, gu, pd, pos_selector):
     DEFAULT_VOCAB = {
         "verb": [
             {"form": "γράφω", "meaning": "I write"},
@@ -131,8 +133,6 @@ def _(file_upload, gu, mo, pd, pos_selector):
         ],
     }
 
-    tbl_sel, set_tbl_sel = mo.state(None)
-
     # An uploaded TSV always has Word/Translation columns regardless of the
     # currently-selected part of speech — the same uploaded list is reused
     # across all 3 POS tabs, matching modern-greek-eee's old behavior.
@@ -146,42 +146,60 @@ def _(file_upload, gu, mo, pd, pos_selector):
     else:
         _rows = [{"Word": w["form"], "Translation": w["meaning"]} for w in DEFAULT_VOCAB[pos_selector.value]]
     vocab_df = pd.DataFrame(_rows)
-    return tbl_sel, vocab_df
+    return (vocab_df,)
 
 
 @app.cell(hide_code=True)
 def _(mo):
     confirmed_vocab, set_confirmed_vocab = mo.state([])
-    return confirmed_vocab, set_confirmed_vocab
+    confirmed_tense, set_confirmed_tense = mo.state("present")
+    # The user's choices, for widgets built again on a language change. A plain dict: a write starts no rerun.
+    kept = {"pos": "noun", "article": True, "indefinite": False, "full": False, "tense": "present", "ticked": {}, "typed": {}}
+    return confirmed_tense, confirmed_vocab, kept, set_confirmed_tense, set_confirmed_vocab
 
 
 @app.cell(hide_code=True)
-def _(gu, language_selector, mo, t_ui):
+def _(gu, kept, language_selector, mo, t_ui):
     # Kept in their own cell, undisplayed here: a cell that both builds a
-    # widget and displays/uses it conditionally elsewhere would rerun (and
-    # reset the widget to its default) on every dependent re-render -- these
-    # 4 widgets must depend on *only* language_selector, not on vocab_table
-    # or anything downstream of it, otherwise every checkbox click in the
-    # vocab table (or every POS switch) would silently discard whatever the
-    # user had picked here. Confirmed via a live regression test after an
-    # earlier merge folded these into the same cell as vocab_table-derived
-    # state, which silently broke it (indefinite_toggle reset to False on
-    # any table-selection change).
+    # widget and displays/uses it conditionally elsewhere would rerun on
+    # every dependent re-render -- these widgets must depend on *only*
+    # language_selector (kept never changes as an object), not on vocab_table
+    # or anything downstream of it. An earlier merge folded the switches into
+    # the same cell as vocab_table-derived state, which silently reset
+    # indefinite_toggle on any table-selection change.
     _lang = language_selector.value
-    tense_options = gu.tense_dropdown_options(_lang)
-    default_tense_label = next(
-        (k for k, v in tense_options.items() if v == "present"),
-        next(iter(tense_options)),
+    article_toggle = mo.ui.switch(
+        label=t_ui("require_article_label", _lang), value=kept["article"],
+        on_change=lambda value: kept.update(article=value),
     )
-    tense_selector = mo.ui.dropdown(options=tense_options, value=default_tense_label, label=t_ui("tense_label", _lang))
-    article_toggle = mo.ui.switch(label=t_ui("require_article_label", _lang), value=True)
-    indefinite_toggle = mo.ui.switch(label=t_ui("indefinite_label", _lang), value=False)
-    full_mode_toggle = mo.ui.switch(label=t_ui("full_paradigm_label", _lang), value=False)
+    indefinite_toggle = mo.ui.switch(
+        label=t_ui("indefinite_label", _lang), value=kept["indefinite"],
+        on_change=lambda value: kept.update(indefinite=value),
+    )
+    full_mode_toggle = mo.ui.switch(
+        label=t_ui("full_paradigm_label", _lang), value=kept["full"],
+        on_change=lambda value: kept.update(full=value),
+    )
+    _tense_options = gu.tense_dropdown_options(_lang)
+    tense_selector = mo.ui.dropdown(
+        options=_tense_options,
+        value=next(k for k, v in _tense_options.items() if v == kept["tense"]),
+        label=t_ui("tense_label", _lang),
+        on_change=lambda value: kept.update(tense=value),
+    )
     return article_toggle, full_mode_toggle, indefinite_toggle, tense_selector
 
 
 @app.cell(hide_code=True)
-def _(mo, tbl_sel, vocab_df):
+def _(confirmed_tense, set_confirmed_tense, tense_selector):
+    # Only a new tense is committed, as for the word list below: a change of the language also rebuilds the dropdown.
+    if tense_selector.value != confirmed_tense():
+        set_confirmed_tense(tense_selector.value)
+    return
+
+
+@app.cell(hide_code=True)
+def _(kept, mo, vocab_df):
     # Column headers are always "Word"/"Translation" (not translated) -- this
     # table's own cell must not depend on language_selector. Making it do so
     # once caused a confirmed live regression: since this table's *value*
@@ -189,13 +207,13 @@ def _(mo, tbl_sel, vocab_df):
     # whenever vocab's upstream cell reruns, a plain language switch would
     # silently wipe drill progress (hist/w4t) with no word-content change
     # at all.
-    _selected_words = tbl_sel() or set()
-    _sel_indices = [i for i, w in enumerate(vocab_df["Word"]) if w in _selected_words]
-    if not _sel_indices:
-        # No selection yet, or a stale selection from a different part-of-
-        # speech/upload with no matching words: default to "all selected".
-        _sel_indices = list(range(len(vocab_df)))
-    vocab_table = mo.ui.table(vocab_df, selection="multi", initial_selection=_sel_indices)
+    _words = tuple(vocab_df["Word"])  # each list keeps its own ticked rows
+    vocab_table = mo.ui.table(
+        vocab_df,
+        selection="multi",
+        initial_selection=kept["ticked"].get(_words, list(range(len(_words)))),  # all, until the user changes it
+        on_change=lambda rows, words=_words: kept["ticked"].update({words: list(rows.index)}),
+    )
     vocab_table
     return (vocab_table,)
 
@@ -226,7 +244,8 @@ def _(confirmed_vocab, set_confirmed_vocab, vocab_table):
 
 
 @app.cell(hide_code=True)
-def _(confirmed_vocab, gu):
+def _(confirmed_tense, confirmed_vocab, gu):
+    confirmed_tense()  # read here: a new tense starts a new round
     vocab = confirmed_vocab()
     (w4t, set_w4t, hist, set_hist, msg, set_msg, cap, set_cap,
      entered, set_entered, sub_cnt, set_sub_cnt, prev_cnt, set_prev_cnt,
@@ -275,8 +294,7 @@ def _(
         # -- hidden rather than disabled since mo.ui.switch has no disabled
         # state to toggle post-construction, and reconstructing it here to
         # vary a disabled= arg would tie its build cell to article_toggle,
-        # which the comment on that cell already warns resets it to False on
-        # every unrelated rerun.
+        # which the comment on that cell warns against.
         _controls = mo.hstack(
             [article_toggle] + ([indefinite_toggle] if article_toggle.value else []),
             gap="1.5rem",
@@ -295,6 +313,7 @@ def _(
     gu,
     hist,
     indefinite_toggle,
+    kept,
     language_selector,
     pos_selector,
     set_entercnt,
@@ -331,6 +350,8 @@ def _(
         remaining_len=len(w4t()),
         lang=_lang,
         nav_icons=True,
+        keep=kept["typed"],
+        word=cur["form"] if cur else None,
     )
     set_prev_cnt(0)
     set_nxt_cnt(0)

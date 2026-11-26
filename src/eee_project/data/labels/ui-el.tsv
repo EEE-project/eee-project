@@ -91,6 +91,7 @@ card_list_soon	σύντομα
 card_list_open	ΑΝΟΙΓΜΑ
 card_list_load_error	Δεν ήταν δυνατή η φόρτωση του αρχείου: {url}<br><br>Ελέγξτε αν είναι προσβάσιμο σε αυτόν τον σύνδεσμο.
 word_list_empty_for	Η λίστα λέξεων για {title} είναι κενή.
+list_empty_label	Η λίστα είναι κενή.
 check_entered_must_be	καταχωρήθηκε **"{value}"**, πρέπει να είναι **{expected}**
 verb_check_write_with	Γράψτε με **"{prefix}"**
 noun_check_article_missing	λείπει το άρθρο, πρέπει να είναι **{expected}**
@@ -109,6 +110,20 @@ grc_tense_api	Αόρ. Παθ.
 grc_tense_xai	Παρακ.
 grc_tense_yai	Υπερσ.
 grc_default_caption	αρχαία ελληνικά
+grc_period_homer	Επική ελληνική · περ. 800–700 π.Χ.
+grc_period_lsj	Κλασική αττική · 5ος–4ος αι. π.Χ.
+grc_period_lxx	Ελληνιστική Κοινή · τέλη 4ου – 1ος αι. π.Χ.
+grc_period_morphgnt	Κοινή της ρωμαϊκής εποχής · 1ος–3ος αι. μ.Χ.
+grc_period_modern	Νέα ελληνική · 16ος αι. – σήμερα
+grc_period_unimorph	Κοινή / Καινή Διαθήκη
+grc_period_byzantine	Βυζαντινή ελληνική · 4ος–15ος αι. μ.Χ.
+grc_lex_descr_homer	λεξικό homer · 2.335 θέματα · επική και ιωνική διάλεκτος
+grc_lex_descr_lsj	pratt + ltrg + lsj · περίπου 105 θέματα · κλασική αττική
+grc_lex_descr_lxx	λεξικό lxx · 1.905 θέματα · Μετάφραση των Εβδομήκοντα
+grc_lex_descr_morphgnt	λεξικό morphgnt · 1.848 θέματα · Καινή Διαθήκη
+grc_lex_descr_modern	modern-greek · με κανόνες (el) · ζωντανή γλώσσα
+grc_lex_descr_unimorph	unimorph · 2.224 ουσιαστικά / 207 επίθετα · από το Βικιλεξικό
+grc_lex_descr_byzantine	λεξικό byzantine · 61 θέματα · συνταγμένο με το χέρι (Sophocles)
 el_verb_col_pres	Ενεστ.
 el_verb_col_impf	Παρατ.
 el_verb_col_aor	Αόρ.

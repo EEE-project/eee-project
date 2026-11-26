@@ -843,32 +843,19 @@ _GRC_IMP_LBL = {
            for suf, full in (("S", "Sing"), ("D", "Dual"), ("P", "Plur"))}
     for lang, d in _FMT_NUM.items()
 }
-# Tab button label — the historical PERIOD (what the reader sees on the chooser button).
-_GRC_LEX_PERIOD = {
-    "homer":    "Epic Greek · c. 800–700 BCE",
-    "lsj":      "Classical Attic · 5th–4th c. BCE",
-    "lxx":      "Hellenistic Koine · late 4th–1st c. BCE",
-    "morphgnt": "Roman Koine · 1st–3rd c. CE",
-    "modern":   "Modern Greek · 16th c.–present",
-    "unimorph": "Koine / NT",
-    "byzantine": "Byzantine Greek · 4th–15th c. CE",
-}
+_GRC_LEX_KEYS = ("homer", "lsj", "lxx", "morphgnt", "modern", "unimorph", "byzantine")
+# Tab button label — the historical PERIOD (what the reader sees on the chooser button): {lang: {lexicon: label}}.
+_GRC_LEX_PERIOD = _lang_map(_GRC_LEX_KEYS, lambda key: f"grc_period_{key}")
 # Tab caption — the backend/lexicon detail (the secondary "comment" under the buttons).
-_GRC_LEX_DESCR = {
-    "homer":    "homer lexicon · 2,335 stems · Epic/Ionic",
-    "lsj":      "pratt + ltrg + lsj · ~105 stems · Classical Attic",
-    "lxx":      "lxx lexicon · 1,905 stems · Septuagint",
-    "morphgnt": "morphgnt lexicon · 1,848 stems · NT",
-    "modern":   "modern-greek · rule-based (el) · living language",
-    "unimorph": "unimorph · 2,224 noun / 207 adj · Wiktionary-derived",
-    "byzantine": "byzantine lexicon · 61 stems · hand-curated (Sophocles)",
-}
+_GRC_LEX_DESCR = _lang_map(_GRC_LEX_KEYS, lambda key: f"grc_lex_descr_{key}")
 _GRC_CASE_KEY = {"N": "Nom", "G": "Gen", "D": "Dat", "A": "Acc", "V": "Voc"}
 _GRC_HL  = "background:#fef3c7;font-weight:bold;color:#92400e;padding:3px 10px;text-align:center;font-family:serif;"
 _GRC_TD  = "padding:3px 10px;text-align:center;font-family:serif;"
-_GRC_TH  = "padding:3px 8px;font-weight:600;border-bottom:1px solid #e5e7eb;color:#6b7280;font-size:.82em;text-align:center;"
-_GRC_ROW = "padding:3px 8px;color:#9ca3af;font-size:.82em;text-align:right;"
-_GRC_CAP = "font-size:.75em;color:#9ca3af;text-align:left;padding:2px 4px;"
+# grey text that reads on a light and on a dark page; a browser without light-dark() keeps the first colour
+_GRC_GREY = "color:#6b7280;color:light-dark(#6b7280,#9ca3af)"
+_GRC_TH  = f"padding:3px 8px;font-weight:600;border-bottom:1px solid #e5e7eb;{_GRC_GREY};font-size:.82em;text-align:center;"
+_GRC_ROW = f"padding:3px 8px;{_GRC_GREY};font-size:.82em;text-align:right;"
+_GRC_CAP = f"font-size:.75em;{_GRC_GREY};text-align:left;padding:2px 4px;"
 _GRC_NOTE = "background:#fff7ed;border-left:3px solid #f97316;padding:7px 12px;margin-top:8px;font-size:.9em;color:#7c2d12;"
 
 
@@ -1297,31 +1284,38 @@ def _strip_grc_caption(h: str) -> str:
     return _re.sub(r'<caption[^>]*>.*?</caption>', '', h)
 
 
-_GRC_PERIOD_HDR_STYLE = "font-size:.82em;color:#374151;font-weight:600;margin-top:10px;margin-bottom:1px"
-_GRC_PERIOD_DESC_STYLE = "font-size:.72em;color:#9ca3af;margin-bottom:5px"
+# no colour: the period name takes the text colour of the page, light or dark
+_GRC_PERIOD_HDR_STYLE = "font-size:.82em;font-weight:600;margin-top:10px;margin-bottom:1px"
+_GRC_PERIOD_DESC_STYLE = f"font-size:.72em;{_GRC_GREY};margin-bottom:5px"
 
 
-def _wrap_grc_period_html(label: str, descr_key: str, raw: str) -> str:
-    hdr = f'<div style="{_GRC_PERIOD_HDR_STYLE}">{label}</div>'
-    dsc = f'<div style="{_GRC_PERIOD_DESC_STYLE}">{_GRC_LEX_DESCR.get(descr_key, "")}</div>'
+def _grc_lex_text(table: "dict[str, dict]", lang: str) -> "dict[str, str]":
+    """The {lexicon: text} of *lang* in _GRC_LEX_PERIOD or _GRC_LEX_DESCR; English for another language."""
+    return table.get(lang) or table["en"]
+
+
+def _wrap_grc_period_html(name: str, raw: str, lang: str) -> str:
+    hdr = f'<div style="{_GRC_PERIOD_HDR_STYLE}">{_grc_lex_text(_GRC_LEX_PERIOD, lang).get(name, name)}</div>'
+    dsc = f'<div style="{_GRC_PERIOD_DESC_STYLE}">{_grc_lex_text(_GRC_LEX_DESCR, lang).get(name, "")}</div>'
     return f"<div>{hdr}{dsc}{raw}</div>"
 
 
 def _resolve_grc_period_tables(
     w: dict, *, require_lexicon: "str | None", lexicons: "dict[str, Any]",
-    build_paradigm: Any, build_modern: "Any | None",
+    build_paradigm: Any, build_modern: "Any | None", lang: "str | None" = None,
 ) -> "list[tuple[str, str]] | None":
     """Resolve *w*'s attested lexicon/period tables. Shared by
     :func:`build_grc_lexicon_tabs` (renders a CSS picker on top) and
     :func:`build_grc_period_tables` (returns the raw list) -- see either
-    for the require_lexicon/Modern-rung/error-isolation semantics."""
+    for the require_lexicon/Modern-rung/error-isolation semantics.
+    *lang* labels the tables; ``None`` keeps the builders' own language."""
     _req_table = None
     if require_lexicon is not None:
         _req_backend = lexicons.get(require_lexicon)
         if _req_backend is None:
             return None
         try:
-            _req_table = build_paradigm(w, _backend=_req_backend, hide_if_absent=True)
+            _req_table = build_paradigm(w, lang=lang, _backend=_req_backend, hide_if_absent=True)
         except Exception:
             # isolate a require_lexicon backend hiccup the same way the Modern
             # rung below is isolated -- one bad word/backend must not abort
@@ -1345,7 +1339,7 @@ def _resolve_grc_period_tables(
     # Keep only lexicons whose paradigm actually contains the tested form — no
     # "form absent" tables (build_paradigm_table returns None when hide_if_absent).
     for name, backend in available:
-        tbl = build_paradigm(w, _backend=backend, hide_if_absent=True)
+        tbl = build_paradigm(w, lang=lang, _backend=backend, hide_if_absent=True)
         if tbl:
             tables.append((name, _strip_grc_caption(tbl)))
 
@@ -1359,7 +1353,7 @@ def _resolve_grc_period_tables(
         # named in `tag` would also be missed here, not just a genuine absence;
         # this is a pre-existing imprecision (relocated, not introduced, by
         # this change), not a claim that every other possibility was ruled out.
-        raw = build_paradigm(w, hide_if_absent=True) or ""
+        raw = build_paradigm(w, lang=lang, hide_if_absent=True) or ""
         if "unimorph" not in raw:
             return None
         tables.append(("unimorph", _strip_grc_caption(raw)))
@@ -1370,7 +1364,7 @@ def _resolve_grc_period_tables(
     # (curated lexicon or unimorph) has already confirmed this exact form.
     if build_modern is not None:
         try:
-            m = build_modern(w, hide_if_absent=True)
+            m = build_modern(w, lang=lang, hide_if_absent=True)
         except Exception:
             m = None
         if m:
@@ -1413,22 +1407,29 @@ def build_grc_lexicon_tabs(
     incomplete. When attested, the anchor lexicon's own rung still renders
     alongside the rest of the diachronic progression as usual. Default ``None``
     preserves prior behaviour for callers with no single anchor lexicon.
+
+    A lexicon of *lexicons* is tried only when ``w["lexicon_tag"]`` names it in
+    double quotes, e.g. ``'ancient-greek["homer", "lsj"]'`` (*require_lexicon*
+    is always tried). *lang* is the language of the names, descriptions and table
+    labels; ``build_lexicon_tabs(w, lang=...)`` picks another one for that call.
     """
     _build_paradigm = build_grc_paradigm_table(ag_backend, um_backend, lang=lang)
     _build_modern = (build_modern_paradigm_table(el_backend, lang=lang)
                      if el_backend is not None else None)
+    _builder_lang = lang  # build_lexicon_tabs's own `lang` parameter shadows this name
 
     def build_lexicon_tabs(w: dict, *, lang: "str | None" = None) -> "str | None":
+        _lang = lang or _builder_lang
         tables = _resolve_grc_period_tables(
             w, require_lexicon=require_lexicon, lexicons=lexicons,
-            build_paradigm=_build_paradigm, build_modern=_build_modern,
+            build_paradigm=_build_paradigm, build_modern=_build_modern, lang=_lang,
         )
         if tables is None:
             return None
 
         if len(tables) == 1:
-            name = tables[0][0]
-            return _wrap_grc_period_html(_GRC_LEX_PERIOD.get(name, name), name, tables[0][1])
+            return _wrap_grc_period_html(tables[0][0], tables[0][1], _lang)
+        _period, _descr = _grc_lex_text(_GRC_LEX_PERIOD, _lang), _grc_lex_text(_GRC_LEX_DESCR, _lang)
 
         names = [n for n, _ in tables]
         uid = abs(hash(w.get("lemma", "") + w.get("form", ""))) % 99999
@@ -1483,7 +1484,7 @@ def build_grc_lexicon_tabs(
         )
 
         # <summary> is the collapsed pill; shows the selected period (only :checked span visible)
-        cur = "".join(f'<span class="dc-{uid}-{n}">{_GRC_LEX_PERIOD.get(n, n)}</span>' for n in names)
+        cur = "".join(f'<span class="dc-{uid}-{n}">{_period.get(n, n)}</span>' for n in names)
         _SUM = ("display:inline-flex;align-items:center;gap:6px;font-size:.82em;color:#1f2937;"
                 "cursor:pointer;padding:3px 11px;border:1px solid #9ca3af;border-radius:5px;"
                 "background:#f3f4f6;user-select:none;list-style:none")
@@ -1493,7 +1494,7 @@ def build_grc_lexicon_tabs(
         _OPT = ("display:block;font-size:.82em;color:#374151;cursor:pointer;"
                 "padding:4px 14px;white-space:nowrap")
         opts = "".join(
-            f'<label for="lr-{uid}-{n}" style="{_OPT}">{_GRC_LEX_PERIOD.get(n, n)}</label>'
+            f'<label for="lr-{uid}-{n}" style="{_OPT}">{_period.get(n, n)}</label>'
             for n in names
         )
         _MENU = ("margin-top:3px;background:#fff;border:1px solid #d1d5db;border-radius:6px;"
@@ -1504,9 +1505,8 @@ def build_grc_lexicon_tabs(
 
         panels = "".join(f'<div id="lp-{uid}-{n}">{tbl}</div>' for n, tbl in tables)
 
-        _DSTYLE2 = "font-size:.72em;color:#9ca3af;margin-top:1px;margin-bottom:5px"
         descrs = "".join(
-            f'<div id="ld-{uid}-{n}" style="{_DSTYLE2}">{_GRC_LEX_DESCR.get(n, "")}</div>'
+            f'<div id="ld-{uid}-{n}" style="{_GRC_PERIOD_DESC_STYLE};margin-top:1px">{_descr.get(n, "")}</div>'
             for n in names
         )
 
@@ -1552,22 +1552,25 @@ def build_grc_period_tables(
     return build_period_tables
 
 
-def grc_period_options(tables: "list[tuple[str, str]]") -> "dict[str, str]":
+def grc_period_options(tables: "list[tuple[str, str]]", lang: str = "en") -> "dict[str, str]":
     """Display-label -> period-key options for a real
-    ``mo.ui.dropdown(options=grc_period_options(tables), ...)``, from
+    ``mo.ui.dropdown(options=grc_period_options(tables, lang), ...)``, from
     :func:`build_grc_period_tables`'s ``tables`` result. Uses the same
-    full ``_GRC_LEX_PERIOD`` name/dates as :func:`build_grc_lexicon_tabs`'s
-    own CSS picker did for its summary pill and menu options."""
-    return {_GRC_LEX_PERIOD.get(n, n): n for n, _ in tables}
+    full period name/dates (the ``grc_period_*`` rows of ``ui-{lang}.tsv``) as
+    :func:`build_grc_lexicon_tabs`'s own CSS picker does for its summary pill
+    and menu options; a lexicon without a row keeps its name."""
+    _period = _grc_lex_text(_GRC_LEX_PERIOD, lang)
+    return {_period.get(n, n): n for n, _ in tables}
 
 
-def render_grc_period_table(tables: "list[tuple[str, str]]", period: "str | None" = None) -> str:
+def render_grc_period_table(tables: "list[tuple[str, str]]", period: "str | None" = None, lang: str = "en") -> str:
     """Render one period's description + table from *tables* (a
     :func:`build_grc_period_tables` result); includes the name/dates header
     too when there's no dropdown to show it (a single attested period).
     *period* is a period key (a real ``mo.ui.dropdown``'s ``.value``, built
     from :func:`grc_period_options`); falls back to *tables*' first entry
-    when *period* is ``None`` or not present in *tables*."""
+    when *period* is ``None`` or not present in *tables*. *lang* is the
+    language of the name and of the description."""
     if not tables:
         return ""
     _by_key = dict(tables)
@@ -1575,9 +1578,9 @@ def render_grc_period_table(tables: "list[tuple[str, str]]", period: "str | None
         period = tables[0][0]
     if len(tables) > 1:
         # negative margin cancels marimo's own gap to the dropdown's cell above
-        dsc = f'<div style="{_GRC_PERIOD_DESC_STYLE};margin-top:-20px">{_GRC_LEX_DESCR.get(period, "")}</div>'
+        dsc = f'<div style="{_GRC_PERIOD_DESC_STYLE};margin-top:-20px">{_grc_lex_text(_GRC_LEX_DESCR, lang).get(period, "")}</div>'
         return f"<div>{dsc}{_by_key[period]}</div>"
-    return _wrap_grc_period_html(_GRC_LEX_PERIOD.get(period, period), period, _by_key[period])
+    return _wrap_grc_period_html(period, _by_key[period], lang)
 
 
 def norm_grc_surface(s: str) -> str:

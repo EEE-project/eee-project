@@ -12,8 +12,8 @@ resolution-markers = [
 
 [[package]]
 name = "ancient-greek-backend-eee"
-version = "2.0.1"
-source = { git = "https://codeberg.org/EEE-project/ancient-greek-backend-eee.git#c97fac08f687814300a84a4b49cffe33dd7ef066" }
+version = "2.1.0"
+source = { git = "https://codeberg.org/EEE-project/ancient-greek-backend-eee.git#e4878d4d4e4f557c6d2a9122ad75e20b5b553bd2" }
 dependencies = [
     { name = "greek-inflexion-eee" },
 ]
@@ -245,7 +245,7 @@ wheels = [
 
 [[package]]
 name = "eee-project"
-version = "1.28.0"
+version = "1.29.0"
 source = { editable = "." }
 dependencies = [
     { name = "anywidget" },
@@ -306,16 +306,16 @@ wheels = [
 
 [[package]]
 name = "greek-inflexion-eee"
-version = "3.1.0"
+version = "3.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "greek-accentuation" },
     { name = "inflexion" },
     { name = "pyyaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/19/4e/3ad994f5f9f98eac2e2924844910a91a5943faaf3345a457a36bcdbecbb1/greek_inflexion_eee-3.1.0.tar.gz", hash = "sha256:8adcc090f72b93ddb2cce1041c45fc435e262ac0e230d9ce7547f9591e7e0e81", size = 726195, upload-time = "2026-09-24T18:51:29.948Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7b/f6/6eea8a1c4c7e1f8683ce41df5df9ccb3e3bf750a314e7e33fd8d7d40c531/greek_inflexion_eee-3.2.0.tar.gz", hash = "sha256:3b82685a86ef19d9a62488fb561ef7344c1e5f1dc96ca17952932100f849be93", size = 769632, upload-time = "2026-10-19T22:00:32.328Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6a/49/a3a2e409185a02d1ae0f1af086d8e16107d684061f589c2adbfe6aebf73c/greek_inflexion_eee-3.1.0-py3-none-any.whl", hash = "sha256:041cf8d5af62ec7f636702037f0cd46585fcd176a2a6a4f1f06d8cb9cd97d23c", size = 179775, upload-time = "2026-09-24T18:51:28.502Z" },
+    { url = "https://files.pythonhosted.org/packages/b5/85/304ca8ec3ca5bcb62d08328c7449f6d441a805fabd77c15aeaad6a6b87fa/greek_inflexion_eee-3.2.0-py3-none-any.whl", hash = "sha256:2ba89776961e9a514f056b9c473984a6ab5cf84d552913e034e861e5941d0a3e", size = 181931, upload-time = "2026-10-19T22:00:30.707Z" },
 ]
 
 [[package]]
@@ -495,22 +495,22 @@ wheels = [
 
 [[package]]
 name = "modern-greek-backend-eee"
-version = "1.0.0"
-source = { git = "https://codeberg.org/EEE-project/modern-greek-backend-eee.git#90be6bab767e6bd45415b7a1e07f59973e3270a9" }
+version = "1.1.0"
+source = { git = "https://codeberg.org/EEE-project/modern-greek-backend-eee.git#041ea34f6648192e0933672ab29fa97eb3bf73c8" }
 dependencies = [
     { name = "modern-greek-inflexion-eee" },
 ]
 
 [[package]]
 name = "modern-greek-inflexion-eee"
-version = "2.1.6"
+version = "2.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "modern-greek-accentuation-eee" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/01/20/3cd96c2ea39c4d081ab9b5e7a41eb5322ad23dbd531fdfd8f45132f26699/modern_greek_inflexion_eee-2.1.6.tar.gz", hash = "sha256:4324213641ebc489b2a4e6e9f733bb943a3ff65163e7cedd957a4efaf2d8c2c7", size = 9424434, upload-time = "2026-08-15T09:22:24.251Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5e/6d/9e1db506508cda9db0796ea1e820b9efa4ffe71058f65d1f5a04c03fc02f/modern_greek_inflexion_eee-2.2.0.tar.gz", hash = "sha256:415f6291d6a7baeb5b95cee80176df9bb9023a81e311c7752c6d95806598c5df", size = 9426631, upload-time = "2026-09-24T19:02:29.627Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/32/be/ffecc680343fb86209a11b73a46d296e5e5c5ab13e9364a1912b0c893331/modern_greek_inflexion_eee-2.1.6-py3-none-any.whl", hash = "sha256:8f9f96aad0b3ef652b33a170782046170dd88c23b39adfd2134d4835deef3f0a", size = 9739542, upload-time = "2026-08-15T09:22:22.069Z" },
+    { url = "https://files.pythonhosted.org/packages/aa/f3/140944b5140b1c651cb5589ac950abf0d6a69477067483f4d482298bd034/modern_greek_inflexion_eee-2.2.0-py3-none-any.whl", hash = "sha256:8db45dc691cd44f921f3e2356fad8bc4ef3825b9c13ba271699a660b9aff577a", size = 9741780, upload-time = "2026-09-24T19:02:27.293Z" },
 ]
 
 [[package]]
@@ -1095,9 +1095,10 @@ wheels = [
 
 [[package]]
 name = "unimorph-backend-eee"
-version = "0.4.2"
-source = { git = "https://codeberg.org/EEE-project/unimorph-backend-eee.git#6f12a097e5684198a4d8f83a5b3a220da0fb5920" }
+version = "1.0.5"
+source = { git = "https://codeberg.org/EEE-project/unimorph-backend-eee.git#87c26d8536bdd07aa451c93b8e65e9375e688f77" }
 dependencies = [
+    { name = "eee-project" },
     { name = "tomlkit" },
 ]
 

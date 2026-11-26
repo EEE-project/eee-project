@@ -813,7 +813,7 @@ above for why `lemma`/`context` are optional rather than a design flaw):
 | `pos`           | optional | `"noun"` / `"verb"` / `"adj"` / `"adv"` / etc.          |
 | `grammar`       | optional | UD FEATS string (e.g. `"Case=Nom|Number=Sing"`)         |
 | `grammar_label` | derived  | human-readable grammar, set by `resolve_word_grammar`   |
-| `lexicon_tag`   | optional | source/backend label shown in paradigm table captions   |
+| `lexicon_tag`   | optional | source label under paradigm tables; the lexicons it names get a period tab |
 
 **`ensure_file` behaviour:**
 
@@ -1170,6 +1170,13 @@ the Prev history of the earlier round (`stanza_match_form` and
 question read "5 / 4 — correct: 1", Prev was on, and the Errors button could retry
 words of the old selection. A notebook does not need to clear these states itself.
 
+**Empty list (1.29.0+).** With an empty word list, `word_drill_form`,
+`word_quiz_form`, `stanza_match_form` and the `*_paradigm_drill_form` helpers
+show "The list is empty." in the interface language (label `list_empty_label`) in
+place of the exercise. Before, the first three showed «...» for ever and the
+paradigm drills showed their done screen. A notebook that has its own text for
+"nothing selected" (`noun_empty`, `verb_empty`, ...) can keep it and not call the form.
+
 ### Paradigm drill (3-cell API)
 
 For exercises where the student fills in an entire paradigm at once (every
@@ -1227,6 +1234,24 @@ clicks, the third three). A notebook that must also run on 1.23.x or older
 therefore keeps `set_prev_cnt(0)`, `set_nxt_cnt(0)` and `set_entercnt(0)` at the
 end of Cell 2 and `set_sub_cnt(0)` in the cell that builds `check_btn`; on
 1.24.0 and later these lines do no harm.
+
+**Typed text across a change of language (1.29.0+).** A change of the interface
+language builds the form of Cell 2 again, and the text typed but not yet checked
+is lost. To keep it, pass `keep=` (a plain dict made in a cell that reads no
+language) and `word=` (the identity of the current word) together with `lang=`:
+
+```python
+form, prev_btn, nxt_btn, restart_btn = gu.paradigm_drill_widgets(
+    labels=labels, values=entered().get(cv["form"]) if cv else None,
+    history_len=len(hist()), remaining_len=len(words()), lang=lang_sel.value,
+    keep=typed_keep, word=cv["form"] if cv else None,
+)
+```
+
+The new form takes the text of the form before it when the word and the number of
+fields are the same and `lang` changed; in every other case it takes `values`, so
+a new word, «Again», «Errors» and a new list start as before. Each widget with
+`keep=` needs a dict of its own, also two widgets made by one function.
 
 **Opt-in: ◀/▶/↺ nav icons (1.9.1+).** Pass `nav_icons=True` to both
 `paradigm_drill_widgets` and the `*_paradigm_drill_form` call — same flag
@@ -1462,20 +1487,30 @@ build_paradigm_table(w, *, _backend=None, _cap=None) -> str | None
 `build_grc_lexicon_tabs(ag_backend, um_backend, *, lexicons, el_backend=None, lang="ru")` returns a closure:
 
 ```python
-build_lexicon_tabs(w) -> str | None
+build_lexicon_tabs(w, *, lang=None) -> str | None
 ```
 
 - `lexicons` — `dict[str, backend]` mapping lexicon name to its per-lexicon
   backend instance (e.g. `{"homer": ag_homer, "lxx": ag_lxx, "morphgnt": ag_morphgnt}`)
-- When a word's `"lexicon_tag"` matches a key in `lexicons`, only that lexicon's
-  backend is used; otherwise all available lexicons are shown as CSS radio tabs
-- Falls back to UniMorph when no AG lexicon produces any forms
-- Highlights the cell that matches `w["form"]` across all tabs
+- A lexicon is tried only when the word's `"lexicon_tag"` names it in double
+  quotes (e.g. `'ancient-greek["homer", "lxx"]'`), and it gets a table only when
+  it has the exact form: several tables show as CSS radio tabs, one as a header
+  and a table
+- With no such table, a noun that `ag_backend` has no forms for shows its UniMorph
+  paradigm, if that has the form; else the result is `None`
+- Highlights the cell that matches `w["form"]` in every table
+- `lang` of a call (`ru`/`en`/`el`) labels that result; without it the builder's
+  `lang` does. The quiz functions pass their own `lang`; `render_gloss_panel`
+  passes the word only, so build the tabs in a cell that reads the language
 - Drop-in compatible: pass as `build_paradigm_table=build_lexicon_tabs` to
   `word_quiz_feedback` or `word_quiz_form`
 
 Both closures cache slot templates internally — call the factory once at
 notebook startup, not once per word.
+
+Runnable demo (one word form period by period, with a language menu and a
+word that only UniMorph has): `examples/ancient_greek_notebook.py`, or
+`make -C examples notebook-grc`.
 
 #### Modern Greek table (`build_modern_paradigm_table`)
 
@@ -1611,20 +1646,27 @@ return period_tables, period_selector
 # Cell 2 — takes period_selector as its own parameter (not just
 # period_tables) so marimo reruns THIS cell -- and only this one -- the
 # moment the dropdown's value changes. Call as the cell's own bare last
-# expression, same as render_gloss_panel:
-gu.render_gloss_table(period_tables, period_selector)
+# expression, same as render_gloss_panel, with the lang= of cell 1:
+gu.render_gloss_table(period_tables, period_selector, lang=lang_sel.value)
 ```
 
-`gu.render_gloss_selector(quiz_words_raw, selected_word, build_period_tables, lang="ru")`
+`gu.render_gloss_selector(quiz_words_raw, selected_word, build_period_tables, lang="ru", keep=None)`
 → `(period_tables, period_selector, panel)`. `period_tables` the
 `build_grc_period_tables` result (below), or `None` when the word doesn't
 resolve or has no tables; `period_selector` a real `mo.ui.dropdown` when
 2+ periods attest the form, else `None`; `panel` the gloss text + era
-caption + dropdown, ready to display.
+caption + dropdown, ready to display. `keep` (new in 1.29.0), a plain dict made
+in a cell that reads no language (each widget with `keep=` needs a dict of its
+own, also two widgets made by one function), keeps the picked period when the
+panel is built again for the same word, e.g. after a change of the interface
+language; another word starts with the first period, also when the reader comes
+back to a word. The dropdown names the periods in `lang` (since 1.29.0; before,
+always in English).
 
-`gu.render_gloss_table(period_tables, period_selector)` — the chosen
+`gu.render_gloss_table(period_tables, period_selector, lang="en")` — the chosen
 period's header + description + table (or nothing, if the word has no
-tables at all).
+tables at all); `lang` (new in 1.29.0) is the language of the header and the
+description. `render_gloss_sheet` passes its own `lang`.
 
 `gu.render_gloss_sheet(gloss_panel, period_tables, period_selector, *, selected_word, click_seq=0, lang="ru", sheet_below_px=750, note=None)`
 (new in 1.26.0) — shows the panel and the table as ONE sheet, in place of the bare
@@ -1678,16 +1720,18 @@ as `build_grc_lexicon_tabs` — returns `[(period_key, table_html), ...]`
 (e.g. `[("homer", "<table>...</table>"), ("modern", "<table>...</table>")]`)
 instead of one HTML blob, or `None` when no lexicon attests the exact form.
 
-`grc_period_options(tables) -> dict[str, str]` — display-label → period-key,
-for the dropdown's `options=` (e.g. `{"Epic Greek · c. 800–700 BCE": "homer",
-"Modern Greek · 16th c.–present": "modern"}`). Same full `_GRC_LEX_PERIOD`
-name/dates `build_grc_lexicon_tabs`'s own CSS picker already used for its
-summary pill and menu options.
+`grc_period_options(tables, lang="en") -> dict[str, str]` — display-label →
+period-key, for the dropdown's `options=` (e.g. `{"Epic Greek · c. 800–700 BCE":
+"homer", "Modern Greek · 16th c.–present": "modern"}`). The names and dates are
+the rows `grc_period_*` of `ui-{lang}.tsv`, the same ones that
+`build_grc_lexicon_tabs`'s own CSS picker shows (in the `lang` of its call, else
+of its builder); a lexicon without a row keeps its name.
 
-`render_grc_period_table(tables, period=None) -> str` — the chosen period's
-description + table (plus a name/dates header when there's only one period,
-since then there's no dropdown to show it elsewhere). Falls back to `tables`'
-first entry when `period` is `None` or isn't present in `tables`.
+`render_grc_period_table(tables, period=None, lang="en") -> str` — the chosen
+period's description (rows `grc_lex_descr_*`) + table (plus a name/dates header
+when there's only one period, since then there's no dropdown to show it
+elsewhere). Falls back to `tables`' first entry when `period` is `None` or isn't
+present in `tables`.
 
 ### Filtering `QUIZ_WORDS_RAW` and coverage highlighting
 
@@ -1746,7 +1790,7 @@ text_widget = eee.interactive_text(
 translation = eee.find_stanza_translation(stanza["ref"], translations[trans_selector.value])
 ```
 
-- `interactive_text(mo, *, lines, clickable, homer_words=None, word_classes=None, css=None, ictus_html=None, show_ictus=True, wrap=False, translation=None, notes=None, two_columns_from_px=600)`
+- `interactive_text(mo, *, lines, clickable, homer_words=None, word_classes=None, css=None, ictus_html=None, show_ictus=True, wrap=False, translation=None, notes=None, two_columns_from_px=600, keep=None)`
   — returns a real `mo.ui.anywidget` rendering `lines` with vocabulary words
   as permanent clickable spans. A panel cell that reacts to word clicks must
   take the *widget*, not this call's return value, as a parameter and read
@@ -1835,14 +1879,24 @@ translation = eee.find_stanza_translation(stanza["ref"], translations[trans_sele
   ])
   ```
 
+  `keep=` (new in 1.29.0) is a plain dict of the notebook, made in a cell that
+  reads no language, e.g. `kept_text = {}`. Without it the widget starts with
+  nothing selected every time it is built again: after a change of the interface
+  language, of the translator or of a switch. With it, a new widget with the same
+  `lines` starts with the clicked word (when it is still clickable) and the same
+  `click_seq`, so a sheet that the reader closed stays closed; a clicked margin
+  note stays only with the same translation. Other lines (a new stanza) start
+  with nothing selected. Each widget with `keep=` needs a dict of its own, also
+  two widgets made by one function.
+
   Runnable demo (clickable words, overlapping sets, `css=` on/off, a
   click-reactive panel, and `wrap=True` with `translation=`/`notes=` and
   `render_gloss_sheet` set up as a lesson sets them up: a stanza dropdown and
   a translation dropdown with a blank entry in one wrapping row, an interface
-  language that changes the labels and the meanings of the sheet, and two
-  stanzas, the second with a translation of 2 lines for 3 Greek lines and its
-  own notes): `examples/interactive_text_notebook.py`, or
-  `make -C examples notebook-itext`.
+  language that changes the labels and the meanings of the sheet while the
+  clicked word and the picked period stay (`keep=`), and two stanzas, the
+  second with a translation of 2 lines for 3 Greek lines and its own notes):
+  `examples/interactive_text_notebook.py`, or `make -C examples notebook-itext`.
 - `resolve_clicked_word(words_raw, selected_form) -> dict | None` — map the
   token that `interactive_text` reports in `.widget.selected_word` (tags and
   edge punctuation stripped; case, accents and breathings kept) back to its
@@ -1990,6 +2044,10 @@ exactly what `paradigm_drill_widgets` does automatically) to limit the
 diacritics bar to acute accent + diaeresis for Modern Greek content, instead
 of the full polytonic mark set (default `True`, unchanged behavior).
 
+The typed text reaches `.widget.values` 300 ms after the last key and, since
+1.29.0, also at once when a field loses focus. So a button clicked right after
+typing reads the typed text. Before, such a click could read the older text.
+
 The buttons below use `on_click=lambda v: (v or 0) + 1`. `eee.increment_counter`
 is that same function, exported so a notebook can write
 `on_click=eee.increment_counter` instead of repeating the lambda.
@@ -2133,6 +2191,9 @@ return noun_fb, noun_ok
   advance focus, don't hand-roll it on top of this recipe — use the
   "Paradigm drill (3-cell API)" recipe above, which already implements the
   reply side of this protocol correctly.
+- An Enter that only confirms the text of an input method (its keydown has
+  `isComposing`, or `keyCode` 229) is left to the browser and submits
+  nothing (1.29.0+), here and in `diacritics_text`.
 - A reply may carry `"note": [line, ...]` (new in 1.27.0): plain-text lines that the
   form draws right under the field the Enter came from. The "Paradigm drill (3-cell
   API)" recipe does this for a wrong answer, so on a phone the message is under the
