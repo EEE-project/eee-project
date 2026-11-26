@@ -5366,9 +5366,12 @@ class GreekUtils:
 
         Args:
             word:      Current word dict from state (cv()); None when quiz not started.
-            all_words: Full word list used to sample up to 3 distractor forms.
+            all_words: Word list the wrong answers come from: up to 3 forms, drawn
+                       per word and the same on every call. A form that the typed
+                       check accepts for the word, or that has the same meaning and
+                       context, is left out.
             lang:      UI language (``"ru"``, ``"en"``, or ``"el"``).
-            rng:       The ``random`` module from the calling cell.
+            rng:       The ``random`` module from the calling cell; orders the options.
 
         Returns ``(answer_radio, word)``.  Calls ``mo.stop`` when *word* is None
         so the cell halts cleanly.
@@ -5382,9 +5385,14 @@ class GreekUtils:
             mo.stop(True, mo.md(""))
 
         _meaning = self._get_meaning(word, lang)
-        other_forms = list({q["form"] for q in all_words if q["form"] != word["form"]})
-        choices = sorted([word["form"]] + other_forms[:3], key=lambda x: rng.random())
         _ctx = word.get("context", "")
+        # Never a second right answer: no form the typed check accepts, and none shown with the same meaning and context.
+        _right = {q["form"] for q in all_words
+                  if self._ci(q["form"], {word["form"]}) or (self._get_meaning(q, lang), q.get("context", "")) == (_meaning, _ctx)}
+        _pool = sorted({q["form"] for q in all_words} - _right - {word["form"]})
+        # Seeded by the word, not drawn with rng: Prev builds the radio again, and the old answer must still be an option.
+        _wrong = _random.Random(word["form"]).sample(_pool, min(3, len(_pool)))
+        choices = sorted([word["form"], *_wrong], key=lambda x: rng.random())
         _ctx_part = f" — _{_ctx}_" if _ctx else ""
         _kw = {"value": initial_value} if initial_value is not None and initial_value in choices else {}
         radio = mo.ui.radio(

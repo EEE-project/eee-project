@@ -918,6 +918,10 @@ mo.vstack([answer_radio,
                                  build_paradigm_table=build_paradigm_table)])
 ```
 
+The wrong answers are up to 3 other forms of that list. A word gets the same ones on every
+call; the `random` argument only orders the options. A form that the typed check accepts for
+the word, or that is shown with the same meaning and context, is never offered.
+
 `QUIZ_WORDS` is a list of dicts with a required `"form"` key and usually
 `"meaning"` / `"meaning_en"` / `"meaning_el"` (for multilingual labels). Inflected-text
 vocab (Odyssey-style) may also include `"lemma"` and `"context"` — when `"lemma"`

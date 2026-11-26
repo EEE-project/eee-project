@@ -7220,6 +7220,46 @@ class TestWordQuizQuestion:
         radio, _ = gu_form.word_quiz_question(w, [w], "ru", random)
         assert radio is not None  # exercises the context branch (label not stored by stub)
 
+    @staticmethod
+    def _options(gu, word, vocab, lang="ru", rng_seed=0):
+        import random
+        radio, _ = gu.word_quiz_question(word, vocab, lang, random.Random(rng_seed))
+        return set(radio.options)
+
+    def test_wrong_answers_differ_between_words(self, gu_form):
+        vocab = [{"meaning": f"m{i}", "form": f"form{i}"} for i in range(30)]
+        wrong = [self._options(gu_form, w, vocab) - {w["form"]} for w in vocab]
+        assert all(len(options) == 3 for options in wrong)
+        assert len(set().union(*wrong)) >= 10  # one slice of one set for every word gives 4 in all
+
+    @pytest.mark.parametrize("lang", ["ru", "en"])
+    def test_form_that_shows_the_same_prompt_is_never_offered(self, gu_form, lang):
+        vocab = [
+            {"meaning": "Алло?", "meaning_en": "Hello?", "context": "phone", "form": "Παρακαλώ."},
+            {"meaning": "Алло?", "meaning_en": "Hello?", "context": "phone", "form": "Εμπρός;"},
+            {"meaning": "Вперёд?", "meaning_en": "Ahead?", "context": "road", "form": "Εμπρός;"},
+            {"meaning": "Слушаю?", "meaning_en": "Yes?", "context": "phone", "form": "Λέγετε;"},
+            {"meaning": "Да?", "meaning_en": "Go on?", "context": "phone", "form": "Ορίστε;"},
+        ]
+        assert self._options(gu_form, vocab[0], vocab, lang=lang) == {"Παρακαλώ.", "Λέγετε;", "Ορίστε;"}
+
+    def test_form_with_the_same_meaning_in_another_context_stays_an_option(self, gu_form):
+        vocab = [{"meaning": "see", "context": "v. 1", "form": "ὁράω"}, {"meaning": "see", "context": "v. 2", "form": "εἶδον"}]
+        assert self._options(gu_form, vocab[0], vocab) == {"ὁράω", "εἶδον"}
+
+    def test_form_the_typed_check_accepts_is_never_offered(self, gu_form):
+        vocab = [{"meaning": "please", "form": "Παρακαλώ."}, {"meaning": "hello?", "form": "Παρακαλώ;"},
+                 {"meaning": "yes?", "form": "Λέγετε;"}, {"meaning": "go on?", "form": "Ορίστε;"}]
+        assert self._options(gu_form, vocab[0], vocab) == {"Παρακαλώ.", "Λέγετε;", "Ορίστε;"}
+
+    def test_redraw_keeps_the_wrong_answers_so_history_can_restore_one(self, gu_form):
+        """Prev builds the radio again, with the old answer as ``initial_value``: a draw with the caller's rng would lose it."""
+        import random
+        vocab = [{"meaning": f"m{i}", "form": f"form{i}"} for i in range(30)]
+        for wrong in self._options(gu_form, vocab[0], vocab, rng_seed=1) - {vocab[0]["form"]}:
+            radio, _ = gu_form.word_quiz_question(vocab[0], vocab, "ru", random.Random(2), initial_value=wrong)
+            assert radio.value == wrong
+
 
 # ──────────────────────────────── word_quiz_feedback ──
 
