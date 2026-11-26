@@ -1,6 +1,7 @@
 # Changelog
 
-## 1.27.9 - 2026-11-26
+## 1.28.0 - 2026-11-26
+- Added: `language_picker(mo, lang_sel, bridge=None)` saves the chosen interface language and returns the language menu row (`div.eee-lang-picker`) with the dropdown and the bridge. With `bridge` `None` the row holds the dropdown alone. See «Language persistence» in `docs/api-patterns.md`.
 - Fixed: the multiple-choice word quiz (`word_quiz_widgets`, `word_quiz_question`) offered nearly the same 3 wrong answers in every question, because every question took the first 3 forms of one unordered set. Each word now gets its own 3 wrong answers, drawn from the list given as `vocab`. A word gets the same ones on every call, so Prev shows the same options and the old answer stays selected.
 - Changed: a form that is also right for the question is no longer offered as a wrong answer: a form that the typed check accepts for the word (`Παρακαλώ;` for `Παρακαλώ.`), or a form shown with the same meaning and context. A list with few other forms can therefore give fewer than 4 options.
 - Changed: the demo pages are built with marimo 0.26.0 (was 0.25.1). Two browser console errors with no visible effect are gone: `RPC request timed out.` after a start longer than 20 s, and failed web font requests (404) in WebKit browsers. A harmless console warning from marimo is new: `tool.marimo.export in script metadata is ignored for security reasons`.

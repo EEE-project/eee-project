@@ -18,7 +18,7 @@ from eee_project._grammar_fmt import fmt_ud_feats
 from eee_project.notebook_utils import (
     GreekUtils, GreekConfig, MODERN_GREEK, ANCIENT_GREEK,
     eee_topbar, eee_ga_tracker, eee_footer, magnify_image, strip_diacritics, greek_compare,
-    language_bridge, language_selector, save_language_selection,
+    language_bridge, language_selector, language_picker, save_language_selection,
     load_ga_config, ConfigStore,
     build_grc_paradigm_table, build_modern_paradigm_table, build_grc_lexicon_tabs,
     build_grc_period_tables, grc_period_options, render_grc_period_table,
@@ -30,7 +30,7 @@ from eee_project.notebook_utils import (
     _INC as increment_counter,
 )
 
-__version__ = "1.27.9"
+__version__ = "1.28.0"
 
 _UNSET = object()  # sentinel distinguishing "not provided" from explicit None
 
@@ -87,6 +87,7 @@ __all__ = [
     "greek_compare",
     "language_bridge",
     "language_selector",
+    "language_picker",
     "save_language_selection",
     "fmt_ud_feats",
     "load_ga_config",

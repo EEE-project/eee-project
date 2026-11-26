@@ -909,10 +909,11 @@ if _ANYWIDGET_OK:
 def language_bridge(mo):
     """Anywidget bridge for cross-page UI-language persistence
     (browser ``localStorage``, key ``"eee_lang"``) — pass the result to
-    :func:`language_selector` and :func:`save_language_selection`.
+    :func:`language_selector` and :func:`language_picker` (or
+    :func:`save_language_selection`).
 
-    Returns ``None`` if ``anywidget`` isn't installed; the other two
-    functions degrade to a plain, non-persisted dropdown in that case.
+    Returns ``None`` if ``anywidget`` isn't installed; the functions that
+    take it degrade to a plain, non-persisted dropdown in that case.
 
     Must be created in its own cell (not inlined into
     :func:`language_selector`'s cell) — marimo's reactivity is
@@ -952,6 +953,24 @@ def language_selector(mo, bridge, options: dict | None = None, default: str = "e
     if bridge is not None:
         bridge.shown = options[initial_label]
     return mo.ui.dropdown(options=options, value=initial_label, label="🌐")
+
+
+def language_picker(mo, lang_sel, bridge=None):
+    """The language menu row: saves the choice of *lang_sel* through *bridge*
+    (see :func:`save_language_selection`) and returns the row
+    (``div.eee-lang-picker``) that holds the dropdown and the bridge.
+
+    Call it as the last expression of its own cell, which takes *lang_sel*
+    and *bridge* as parameters: the row must be shown, because that also
+    starts the browser side of *bridge*. With *bridge* ``None`` the row holds
+    the dropdown alone.
+    """
+    save_language_selection(bridge, lang_sel)
+    return mo.Html(
+        '<div class="eee-lang-picker" style="width:max-content;margin:6px 12px 0 auto;'
+        'background:white;padding:6px 10px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.12);">'
+        f'{lang_sel}{"" if bridge is None else bridge}</div>'
+    )
 
 
 _DIA_CSS = _bar_css(".eee-dia-bar") + """\

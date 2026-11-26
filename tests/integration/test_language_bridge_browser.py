@@ -5,7 +5,8 @@ that comes from the browser makes marimo run again every cell that reads the lan
 the one it already shows ran all its cells a second time, and a choice made in the first seconds (a translator, say) was
 reset. The page of this test counts the runs of a cell that reads the language. It comes in the two shapes of the lessons
 of `created_with_eee`: the Odyssey lessons show the bridge in the cell that saves the language (so a new language draws the
-bridge again), the other courses show it in its own cell.
+bridge again), the other courses show it in its own cell. A third shape lets `language_picker` save the language and show
+the dropdown and the bridge.
 
 Run:
     uv run pytest tests/integration/test_language_bridge_browser.py -m integration -v
@@ -51,8 +52,8 @@ def _(bridge, mo):
 
 @app.cell
 def _(bridge, lang_sel, mo):
-    from eee_project import save_language_selection
-    save_language_selection(bridge, lang_sel)
+    from eee_project import language_picker, save_language_selection
+    SAVE_CALL
     SAVE_SHOWS
     return
 
@@ -76,9 +77,14 @@ if __name__ == "__main__":
 SHAPES = {
     # the Odyssey lessons: the cell that saves the language also shows the dropdown and the bridge
     "bridge_in_the_save_cell": {"BRIDGE_SHOWN": "None", "SELECTOR_SHOWN": "None",
+                                "SAVE_CALL": "save_language_selection(bridge, lang_sel)",
                                 "SAVE_SHOWS": 'mo.Html(f"<div class=\'eee-lang-picker\'>{lang_sel}{bridge}</div>")'},
     # the other courses: the bridge and the dropdown are shown by the cells that make them
-    "bridge_in_its_own_cell": {"BRIDGE_SHOWN": "bridge", "SELECTOR_SHOWN": "lang_sel", "SAVE_SHOWS": "None"},
+    "bridge_in_its_own_cell": {"BRIDGE_SHOWN": "bridge", "SELECTOR_SHOWN": "lang_sel",
+                               "SAVE_CALL": "save_language_selection(bridge, lang_sel)", "SAVE_SHOWS": "None"},
+    # language_picker: one call saves the language and returns the row with the dropdown and the bridge
+    "the_picker_helper": {"BRIDGE_SHOWN": "None", "SELECTOR_SHOWN": "None", "SAVE_CALL": "None",
+                          "SAVE_SHOWS": "language_picker(mo, lang_sel, bridge)"},
 }
 COUNT = re.compile(r"RUNS=(\d+) LANG=(\w+)")
 
@@ -146,3 +152,14 @@ def test_after_a_first_visit_a_new_choice_is_stored_and_runs_the_cells_once(brow
         page.locator("select").first.select_option(label="Русский")
         assert _settled(page) == (2, "ru")
         assert page.evaluate("localStorage.getItem('eee_lang')") == "ru"
+
+
+def test_a_chosen_language_is_kept_on_the_next_visit(browser, base_url):
+    # a new tab is a new session with the same browser storage
+    with _visit(browser, base_url) as page:
+        assert _settled(page) == (1, "en")
+        page.locator("select").first.select_option(label="Русский")
+        assert _settled(page) == (2, "ru")
+        again = page.context.new_page()
+        again.goto(base_url, wait_until="load")
+        assert _settled(again) == (2, "ru")

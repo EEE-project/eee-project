@@ -436,7 +436,7 @@ Cross-page UI-language persistence via the browser's `localStorage` (key
 when the visitor navigates to another:
 
 ```python
-from eee_project import language_bridge, language_selector, save_language_selection
+from eee_project import language_bridge, language_selector, language_picker
 
 # cell 1 — bridge, in its own cell, undisplayed: a cell that both builds
 # this and displays/uses it elsewhere would rerun (and reset the bridge)
@@ -449,9 +449,9 @@ bridge = language_bridge(mo)
 # moment the browser's (async) localStorage read completes
 lang_sel = language_selector(mo, bridge)
 
-# cell 3 — persist the current selection, then display both
-save_language_selection(bridge, lang_sel)
-mo.Html(f"{lang_sel}{bridge}")
+# cell 3 — save the current selection and show the menu row; it must be the
+# last expression, because showing the row also starts the bridge
+language_picker(mo, lang_sel, bridge)
 ```
 
 `language_bridge(mo)` returns `None` if `anywidget` isn't installed — pass
@@ -464,6 +464,12 @@ lands — until then, or if `bridge` is `None`, it starts at `default`. Falls
 back to `default` if the stored value isn't one of `options`' codes (e.g. a
 stale/removed language). `options` defaults to `{"English": "en", "Русский":
 "ru", "Ελληνικά": "el"}`.
+
+`language_picker(mo, lang_sel, bridge=None)` (1.28.0+) calls
+`save_language_selection` and returns the menu row, a `div.eee-lang-picker`
+that holds the dropdown and the bridge; with `bridge` `None` it holds the
+dropdown alone. A notebook that shows the dropdown somewhere else calls
+`save_language_selection(bridge, lang_sel)` itself and must show `bridge` too.
 
 `save_language_selection` skips writing until `bridge` has reported back a
 real (possibly empty) stored value — otherwise, on every fresh page load, it

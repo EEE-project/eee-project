@@ -25,6 +25,7 @@ from eee_project.notebook_utils import (
     magnify_image,
     language_bridge,
     language_selector,
+    language_picker,
     ConfigStore,
     make_paradigm_form,
     interactive_text,
@@ -539,6 +540,41 @@ class TestLanguageSelector:
         bridge = language_bridge(mo_stub)
         language_selector(mo_stub, bridge, options={"Foo": "fo"}, default="en")
         assert bridge.shown == "fo"
+
+
+class _SavedBridge:
+    """Stands for the language bridge: *stored* is what the browser reported (None: nothing yet)."""
+    def __init__(self, stored):
+        self.stored, self.save = stored, ""
+
+    def __format__(self, spec):
+        return "<bridge/>"
+
+
+class TestLanguagePicker:
+    ROW = ('<div class="eee-lang-picker" style="width:max-content;margin:6px 12px 0 auto;'
+           'background:white;padding:6px 10px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.12);">')
+
+    def test_the_row_holds_the_dropdown_and_the_bridge(self):
+        selector = language_selector(mo, None, default="ru")
+        assert language_picker(mo, selector, _SavedBridge("ru")).text == f"{self.ROW}{selector}<bridge/></div>"
+
+    def test_the_choice_is_saved(self):
+        bridge = _SavedBridge("en")
+        language_picker(mo, language_selector(mo, None, default="ru"), bridge)
+        assert bridge.save == "ru"
+
+    def test_nothing_is_saved_before_the_browser_reported(self):
+        bridge = _SavedBridge(None)
+        language_picker(mo, language_selector(mo, None, default="ru"), bridge)
+        assert bridge.save == ""
+
+    def test_without_a_bridge_only_the_dropdown_is_drawn(self):  # any dropdown goes in unchanged
+        selector = mo.ui.dropdown(options={"Foo": "fo"}, value="Foo", label="Lang")
+        assert language_picker(mo, selector).text == f"{self.ROW}{selector}</div>"
+
+    def test_it_is_public(self):
+        assert "language_picker" in _eee.__all__
 
 
 # ──────────────────────────────────────── eee_topbar / eee_footer ──

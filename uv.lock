@@ -245,7 +245,7 @@ wheels = [
 
 [[package]]
 name = "eee-project"
-version = "1.27.9"
+version = "1.28.0"
 source = { editable = "." }
 dependencies = [
     { name = "anywidget" },
