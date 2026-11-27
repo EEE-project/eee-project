@@ -308,6 +308,7 @@
       clearInterval(readyPoll);
       loader.classList.add('hidden');
       frame.classList.add('visible');
+      errorState.classList.remove('show');
     }
 
     frame.addEventListener('load', () => {
@@ -323,7 +324,6 @@
     });
 
     function showError() {
-      clearInterval(readyPoll);
       loader.classList.add('hidden');
       errorState.classList.add('show');
     }
